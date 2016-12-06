@@ -7,7 +7,7 @@ SET (TEST_SRCS
   sphere_operators.cpp
 )
 
-INCLUDE_DIRECTORIES (${CMAKE_CURRENT_BINARY_DIR})
+CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/config.h.in config.h)
 
 ADD_EXECUTABLE (f90_vs_cxx_test_cxx ${TEST_SRCS})
 
