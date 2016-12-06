@@ -53,7 +53,15 @@ integer :: i,j,k,ie
    do j =1 , np
     do i = 1, np
       elem(ie)%derived%phi(i,j,k) = 1.0
+      elem(ie)%derived%vn0(i,j,1:2,k) = 1.0
+
       elem(ie)%state%dp3d(i,j,k,1:timelevels) = 1.0
+      elem(ie)%state%v(i,j,1:2,k,1:timelevels) = 1.0
+
+      elem(ie)%Dinv(i,j,1,1) = 1.0
+      elem(ie)%Dinv(i,j,1,2) = 0.0
+      elem(ie)%Dinv(i,j,2,1) = 0.0
+      elem(ie)%Dinv(i,j,2,2) = 1.0
     enddo
    enddo 
   enddo

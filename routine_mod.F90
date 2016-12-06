@@ -67,7 +67,6 @@ implicit none
 
 
   do ie=nets,nete
-     !ps => elem(ie)%state%ps_v(:,:,n0)
      phi => elem(ie)%derived%phi(:,:,:)
      dp  => elem(ie)%state%dp3d(:,:,:,n0)
 

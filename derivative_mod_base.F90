@@ -2,7 +2,6 @@ module derivative_mod_base
 
   use kinds,          only : real_kind, longdouble_kind
   use element_mod, only : np, nelemd, nlev, element_t
-!  use quadrature_mod, only : quadrature_t, gauss, gausslobatto,legendre, jacobi
   use physical_constants, only : rrearth
 
 implicit none
@@ -10,83 +9,13 @@ private
 
   type, public :: derivative_t
      real (kind=real_kind) :: Dvv(np,np)
-!     real (kind=real_kind) :: Dvv_diag(np,np)
-!     real (kind=real_kind) :: Dvv_twt(np,np)
-!     real (kind=real_kind) :: Mvv_twt(np,np)  ! diagonal matrix of GLL weights
-!     real (kind=real_kind) :: legdg(np,np)
   end type derivative_t
 
-!  real (kind=real_kind), allocatable :: integration_matrix(:,:)
-!  real (kind=real_kind), allocatable :: boundary_interp_matrix(:,:,:)
-
-! ======================================
-! Public Interfaces
-! ======================================
-
-!  public :: derivinit
-
-!  public :: gradient
-!  public :: gradient_wk
-!  public :: vorticity
-!  public :: divergence
-
-!  public :: interpolate_gll2fvm_corners
-!  public :: interpolate_gll2fvm_points
-!  public :: remap_phys2gll
-
-
- ! interface divergence
- !     module procedure divergence_nonstag
- ! end interface
-
- ! interface gradient
- !     module procedure gradient_str_nonstag
- ! end interface
-
-!  interface gradient_wk
-!      module procedure gradient_wk_nonstag
-!  end interface
-
-!  public :: v2pinit
-
-!  private :: dvvinit
-
-! these routines compute spherical differential operators as opposed to
-! the gnomonic coordinate operators above.  Vectors (input or output)
-! are always expressed in lat-lon coordinates
-!
-! note that weak derivatives (integrated by parts form) can be defined using
-! contra or co-variant test functions, so 
-!
   public  :: gradient_sphere
-!  public  :: gradient_sphere_wk_testcov
-!  public  :: gradient_sphere_wk_testcontra   ! only used for debugging
-!  public  :: ugradv_sphere
   public  :: vorticity_sphere
-!  public  :: vorticity_sphere_diag
   public  :: divergence_sphere
-!  public  :: curl_sphere
-!  public  :: curl_sphere_wk_testcov
-! public  :: curl_sphere_wk_testcontra  ! not coded
-!  public  :: divergence_sphere_wk
-!  public  :: laplace_sphere_wk
-!  public  :: vlaplace_sphere_wk
-!  public  :: element_boundary_integral
-!  public  :: edge_flux_u_cg
-!  public  :: limiter_optim_iter_full
 
 contains
-
-! ==========================================
-! derivinit:
-!
-! Initialize the matrices for taking 
-! derivatives and interpolating
-! ==========================================
-
-
-
-
     
 !----------------------------------------------------------------
 

@@ -88,87 +88,36 @@ module element_mod
   end type derived_state_t
   
   !___________________________________________________________________
-  type, public :: elem_accum_t
-
-#ifdef ENERGY_DIAGNOSTICS
-
-    real (kind=real_kind) :: KEvert1(np,np)                           ! term from continuity equ
-    real (kind=real_kind) :: KEvert2(np,np)                           ! term from momentum equ
-    real (kind=real_kind) :: IEvert1(np,np)                           ! term from continuity equ
-    real (kind=real_kind) :: IEvert2(np,np)                           ! term from T equ
-    real (kind=real_kind) :: IEvert1_wet(np,np)                       ! wet term from continuity equ
-    real (kind=real_kind) :: IEvert2_wet(np,np)                       ! wet term from T equ
-
-    real (kind=real_kind) :: KEhorz1(np,np)                           ! at time t
-    real (kind=real_kind) :: KEhorz2(np,np)                           ! after calling time_advance, these will be at time t-1
-    real (kind=real_kind) :: IEhorz1(np,np)
-    real (kind=real_kind) :: IEhorz2(np,np)
-    real (kind=real_kind) :: IEhorz1_wet(np,np)
-    real (kind=real_kind) :: IEhorz2_wet(np,np)
-
-    real (kind=real_kind) :: T1(np,np)
-    real (kind=real_kind) :: T2(np,np)
-    real (kind=real_kind) :: T2_s(np,np)
-    real (kind=real_kind) :: S1(np,np)
-    real (kind=real_kind) :: S1_wet(np,np)
-    real (kind=real_kind) :: S2(np,np)
-
-    ! the KE conversion term and diffusion term
-    real (kind=real_kind) :: DIFF(np,np,2,nlev)                       ! net hypervis term
-    real (kind=real_kind) :: DIFFT(np,np,nlev)                        ! net hypervis term
-    real (kind=real_kind) :: CONV(np,np,2,nlev)                       ! dpdn u dot CONV = T1 + T2
-#endif
-
-    real (kind=real_kind) :: KEner(np,np,4)
-    real (kind=real_kind) :: PEner(np,np,4)
-    real (kind=real_kind) :: IEner(np,np,4)
-    real (kind=real_kind) :: IEner_wet(np,np,4)
-    real (kind=real_kind) :: Qvar(np,np,qsize_d,4)                    ! Q variance at half time levels
-    real (kind=real_kind) :: Qmass(np,np,qsize_d,4)                   ! Q mass at half time levels
-    real (kind=real_kind) :: Q1mass(np,np,qsize_d)                    ! Q mass at full time levels
-
-  end type elem_accum_t
-
-
-! ============= DATA-STRUCTURES COMMON TO ALL SOLVERS ================
-
-  type, public :: index_t
-     integer(kind=int_kind) :: is,ie
-     integer(kind=int_kind) :: NumUniquePts
-     integer(kind=int_kind) :: UniquePtOffset
-  end type index_t
-
-  !___________________________________________________________________
   type, public :: element_t
-     integer(kind=int_kind) :: LocalId
-     integer(kind=int_kind) :: GlobalId
+!     integer(kind=int_kind) :: LocalId
+!     integer(kind=int_kind) :: GlobalId
 
      ! Coordinate values of element points
-     type (spherical_polar_t) :: spherep(np,np)                       ! Spherical coords of GLL points
+!     type (spherical_polar_t) :: spherep(np,np)                       ! Spherical coords of GLL points
 
      ! Equ-angular gnomonic projection coordinates
-     type (cartesian2D_t)     :: cartp(np,np)                         ! gnomonic coords of GLL points
-     type (cartesian2D_t)     :: corners(4)                           ! gnomonic coords of element corners
+!     type (cartesian2D_t)     :: cartp(np,np)                         ! gnomonic coords of GLL points
+!     type (cartesian2D_t)     :: corners(4)                           ! gnomonic coords of element corners
 
      ! 3D cartesian coordinates
      type (cartesian3D_t)     :: corners3D(4)
 
      ! Element diagnostics
-     real (kind=real_kind)    :: area                                 ! Area of element
-     real (kind=real_kind)    :: normDinv                             ! some type of norm of Dinv used for CFL
-     real (kind=real_kind)    :: dx_short                             ! short length scale in km
-     real (kind=real_kind)    :: dx_long                              ! long length scale in km
+!     real (kind=real_kind)    :: area                                 ! Area of element
+!     real (kind=real_kind)    :: normDinv                             ! some type of norm of Dinv used for CFL
+!     real (kind=real_kind)    :: dx_short                             ! short length scale in km
+!     real (kind=real_kind)    :: dx_long                              ! long length scale in km
 
-     real (kind=real_kind)    :: variable_hyperviscosity(np,np)       ! hyperviscosity based on above
-     real (kind=real_kind)    :: hv_courant                           ! hyperviscosity courant number
-     real (kind=real_kind)    :: tensorVisc(np,np,2,2)                !og, matrix V for tensor viscosity
+!     real (kind=real_kind)    :: variable_hyperviscosity(np,np)       ! hyperviscosity based on above
+!     real (kind=real_kind)    :: hv_courant                           ! hyperviscosity courant number
+!     real (kind=real_kind)    :: tensorVisc(np,np,2,2)                !og, matrix V for tensor viscosity
 
      type (elem_state_t)      :: state
 
      type (derived_state_t)   :: derived
-#if defined _PRIM 
-     type (elem_accum_t)       :: accum
-#endif
+!#if defined _PRIM 
+!     type (elem_accum_t)       :: accum
+!#endif
      ! Metric terms
      real (kind=real_kind)    :: met(np,np,2,2)                       ! metric tensor on velocity and pressure grid
      real (kind=real_kind)    :: metinv(np,np,2,2)                    ! metric tensor on velocity and pressure grid
@@ -181,11 +130,11 @@ module element_mod
 
      ! Convert vector fields from spherical to rectangular components
      ! The transpose of this operation is its pseudoinverse.
-     real (kind=real_kind)    :: vec_sphere2cart(np,np,3,2)
+!     real (kind=real_kind)    :: vec_sphere2cart(np,np,3,2)
 
      ! Mass matrix terms for an element on a cube face
-     real (kind=real_kind)    :: mp(np,np)                            ! mass matrix on v and p grid
-     real (kind=real_kind)    :: rmp(np,np)                           ! inverse mass matrix on v and p grid
+!     real (kind=real_kind)    :: mp(np,np)                            ! mass matrix on v and p grid
+!     real (kind=real_kind)    :: rmp(np,np)                           ! inverse mass matrix on v and p grid
 
      ! Mass matrix terms for an element on the sphere
      ! This mass matrix is used when solving the equations in weak form
@@ -193,13 +142,13 @@ module element_mod
      real (kind=real_kind)    :: spheremp(np,np)                      ! mass matrix on v and p grid
      real (kind=real_kind)    :: rspheremp(np,np)                     ! inverse mass matrix on v and p grid
 
-     integer(kind=long_kind)  :: gdofP(np,np)                         ! global degree of freedom (P-grid)
+!     integer(kind=long_kind)  :: gdofP(np,np)                         ! global degree of freedom (P-grid)
 
      real (kind=real_kind)    :: fcor(np,np)                          ! Coreolis term
 
-     type (index_t) :: idxP
-     type (index_t),pointer :: idxV
-     integer :: FaceNum
+!     type (index_t) :: idxP
+!     type (index_t),pointer :: idxV
+!     integer :: FaceNum
 
   end type element_t
 
