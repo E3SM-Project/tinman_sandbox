@@ -6,7 +6,14 @@
 namespace Homme
 {
 
-int compute_and_apply_rhs (TestData& data);
+void compute_and_apply_rhs (TestData& data);
+
+void preq_hydrostatic (const real* const phis, const real* const T_v,
+                       const real* const p, const real* dp,
+                       real Rgas, real* const phi);
+
+void preq_omega_ps (const real* const p, const real* const vgrad_p,
+                   const real* const divdp, real* const omega_p);
 
 } // Namespace Homme
 

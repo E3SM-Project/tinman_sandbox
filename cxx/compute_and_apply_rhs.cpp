@@ -1,5 +1,5 @@
+#include "compute_and_apply_rhs.hpp"
 #include "test_macros.hpp"
-
 #include "dimensions.hpp"
 #include "data_structures.hpp"
 #include "sphere_operators.hpp"
@@ -7,190 +7,329 @@
 namespace Homme
 {
 
-int compute_and_apply_rhs (TestData& data)
+void compute_and_apply_rhs (TestData& data)
 {
   // Create local arrays
-  real grad_p[nlev][2][np][np];
-  real p[nlev][np][np];
-  real vdp[nlev][np][np][2];
-  real vgrad_p[nlev][np][np];
-  real divdp[nlev][np][np];
-  real vort[nlev][np][np];
+  real Ephi[np][np]                   = {};
+  real T_v[nlev][np][np]              = {};
+  real divdp[nlev][np][np]            = {};
+  real grad_p[nlev][2][np][np]        = {};
+  real eta_dot_dpdn_tmp[nlev][np][np] = {};
+  real kappa_star[nlev][np][np]       = {};
+  real omega_p_tmp[nlev][np][np]      = {};
+  real p[nlev][np][np]                = {};
+  real ttens[nlev][np][np]            = {};
+  real T_vadv[nlev][np][np]           = {};
+  real v_vadv[nlev][np][np][2]        = {};
+  real vdp[nlev][np][np][2]           = {};
+  real vgrad_T[np][np]                = {};
+  real vgrad_p[nlev][np][np]          = {};
+  real vort[nlev][np][np]             = {};
+  real vtemp[nlev][np][np]            = {};
+  real vtens1[nlev][np][np]           = {};
+  real vtens2[nlev][np][np]           = {};
 
-  // Get a pointer version so we can use single subroutines interface
-  real* p_ptr = PTR_FROM_3D(p);
-  real* grad_p_ptr = PTR_FROM_4D(grad_p);
-  real* vdp_ptr = PTR_FROM_4D(vdp);
-  real* vgrad_p_ptr = PTR_FROM_3D(vgrad_p);
-  real* divdp_ptr = PTR_FROM_3D(divdp);
-  real* vort_ptr = PTR_FROM_3D(vort);
+  // Get a pointer version so we can use single
+  // subroutines interface for both ptrs and arrays
+  real* Ephi_ptr             = PTR_FROM_2D(Ephi);
+  real* divdp_ptr            = PTR_FROM_3D(divdp);
+  real* eta_dot_dpdn_tmp_ptr = PTR_FROM_3D(eta_dot_dpdn_tmp);
+  real* grad_p_ptr           = PTR_FROM_4D(grad_p);
+  real* p_ptr                = PTR_FROM_3D(p);
+  real* vdp_ptr              = PTR_FROM_4D(vdp);
+  real* vgrad_p_ptr          = PTR_FROM_3D(vgrad_p);
+  real* vort_ptr             = PTR_FROM_3D(vort);
+  real* vtemp_ptr            = PTR_FROM_3D(vtemp);
+  real* omega_p_tmp_ptr      = PTR_FROM_3D(omega_p_tmp);
+  real* T_v_ptr              = PTR_FROM_3D(T_v);
 
   // Other accessory variables
-  real v1,v2;
+  real Qt     = 0;
+  real glnps1 = 0;
+  real glnps2 = 0;
+  real gpterm = 0;
+  real v1     = 0;
+  real v2     = 0;
 
-  // Extract stuff from data (for notation shortness)
-  HVCoord& hvcoord = data.hvcoord;
+  real* Qdp_qn0           = nullptr;
+  real* T_n0              = nullptr;
+  real* T_nm1             = nullptr;
+  real* T_np1             = nullptr;
+  real* derived_vn0       = nullptr;
+  real* dp3d_n0           = nullptr;
+  real* dp3d_nm1          = nullptr;
+  real* dp3d_np1          = nullptr;
+  real* fcor              = nullptr;
+  real* omega_p           = nullptr;
+  real* pecnd             = nullptr;
+  real* phi               = nullptr;
+  real* phis              = nullptr;
+  real* spheremp          = nullptr;
+  real* v_n0              = nullptr;
+  real* v_nm1             = nullptr;
+  real* v_np1             = nullptr;
+  real* eta_dot_dpdn      = nullptr;
 
-  // Extract arrays from data (for notation shortness)
-  real* elem_Dinv         = data.arrays.elem_Dinv;
-  real* elem_state_v      = data.arrays.elem_state_v;
-  real* elem_state_ps_v   = data.arrays.elem_state_ps_v;
-  real* elem_state_dp3d   = data.arrays.elem_state_dp3d;
-  real* elem_derived_vn0  = data.arrays.elem_derived_vn0;
+  // Input parameters
+  const int nets = data.control.nets;
+  const int nete = data.control.nete;
+  const int n0   = data.control.n0;
+  const int np1  = data.control.np1;
+  const int nm1  = data.control.nm1;
+  const int qn0  = data.control.qn0;
+  const real dt2 = data.control.dt2;
 
-  const int nets = 0;
-  const int nete = nelems;
-  const int n0 = 0;
-
+  // Loop over elements
   for (int ie=nets; ie<nete; ++ie)
   {
-    real* dp = SLICE_5D(elem_state_dp3d,ie,timelevels,nlev,np,np);
-    dp = SLICE_4D(dp,n0,nlev,np,np);
+    dp3d_n0 = SLICE_5D_IJ(data.arrays.elem_state_dp3d,ie,n0,timelevels,nlev,np,np);
 
-    for (int ipt=0; ipt<np; ++ipt)
+    for (int igp=0; igp<np; ++igp)
     {
-      for (int jpt=0; jpt<np; ++jpt)
+      for (int jgp=0; jgp<np; ++jgp)
       {
-        p[0][ipt][jpt] = hvcoord.hyai[0]*hvcoord.ps0 + 0.5*AT_3D(dp,0,ipt,jpt,np,np);
+        p[0][igp][jgp] = data.hvcoord.hyai[0]*data.hvcoord.ps0 + 0.5*AT_3D(dp3d_n0,0,igp,jgp,np,np);
       }
     }
 
     for (int ilev=1; ilev<nlev; ++ilev)
     {
-      for (int ipt=0; ipt<np; ++ipt)
+      for (int igp=0; igp<np; ++igp)
       {
-        for (int jpt=0; jpt<np; ++jpt)
+        for (int jgp=0; jgp<np; ++jgp)
         {
-          p[ilev][ipt][jpt] = p[ilev-1][ipt][jpt] + 0.5*( AT_3D(dp,ilev-1,ipt,jpt,np,np) + AT_3D(dp,ilev,ipt,jpt,np,np) );
+          p[ilev][igp][jgp] = p[ilev-1][igp][jgp]
+                            + 0.5*AT_3D(dp3d_n0,(ilev-1),igp,jgp,np,np)
+                            + 0.5*AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
         }
       }
     }
+
+    derived_vn0 = SLICE_5D(data.arrays.elem_derived_vn0,ie,nlev,np,np,2);
+    v_n0 = SLICE_6D_IJ(data.arrays.elem_state_v,ie,n0,timelevels,nlev,np,np,2);
+    for (int ilev=0; ilev<nlev; ++ilev)
+    {
+      gradient_sphere (SLICE_3D(p_ptr,ilev,np,np), data, ie, SLICE_4D(grad_p_ptr,ilev,np,np,2));
+
+      for (int igp=0; igp<np; ++igp)
+      {
+        for (int jgp=0; jgp<np; ++jgp)
+        {
+          v1 = AT_4D(v_n0,ilev,igp,jgp,0,np,np,2);
+          v2 = AT_4D(v_n0,ilev,igp,jgp,1,np,np,2);
+          vgrad_p[ilev][igp][jgp] = v1 * grad_p[ilev][igp][jgp][0] + v2 * grad_p[ilev][igp][jgp][1];
+
+          vdp[ilev][igp][jgp][0] = v1 * AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
+          vdp[ilev][igp][jgp][1] = v2 * AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
+
+          AT_4D(derived_vn0,ilev,igp,jgp,0,np,np,2) += data.constants.eta_ave_w * vdp[ilev][igp][jgp][0];
+          AT_4D(derived_vn0,ilev,igp,jgp,1,np,np,2) += data.constants.eta_ave_w * vdp[ilev][igp][jgp][1];
+        }
+      }
+
+      divergence_sphere(SLICE_4D(vdp_ptr,ilev,np,np,2), data, ie, SLICE_3D (divdp_ptr,ilev,np,np));
+      vorticity_sphere(SLICE_4D(v_n0,ilev,np,np,2), data, ie, SLICE_3D (vort_ptr,ilev,np,np));
+    }
+
+    T_n0 = SLICE_5D_IJ(data.arrays.elem_state_T,ie,n0,timelevels,nlev,np,np);
+    if (qn0==-1)
+    {
+      for (int ilev=0; ilev<nlev; ++ilev)
+      {
+        for (int igp=0; igp<np; ++igp)
+        {
+          for (int jgp=0; jgp<np; ++jgp)
+          {
+            T_v[ilev][igp][jgp] = AT_3D(T_n0,ilev,igp,jgp,np,np);
+            kappa_star[ilev][igp][jgp] = data.constants.kappa;
+          }
+        }
+      }
+    }
+    else
+    {
+      Qdp_qn0 = SLICE_6D_IJK (data.arrays.elem_state_Qdp,ie,qn0,1,2,qsize_d,nlev,np,np);
+      for (int ilev=0; ilev<nlev; ++ilev)
+      {
+        for (int igp=0; igp<np; ++igp)
+        {
+          for (int jgp=0; jgp<np; ++jgp)
+          {
+            Qt = AT_3D(Qdp_qn0,ilev,igp,jgp,np,np) / AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
+            T_v[ilev][igp][jgp] = AT_3D(T_n0,ilev,igp,jgp,np,np)*(1.0+ (data.constants.Rwater_vapor/data.constants.Rgas - 1.0)*Qt);
+            kappa_star[ilev][igp][jgp] = data.constants.kappa;
+          }
+        }
+      }
+    }
+
+    phis = SLICE_3D(data.arrays.elem_state_phis,ie,np,np);
+    phi  = SLICE_4D(data.arrays.elem_derived_phi,ie,nlev,np,np);
+
+    preq_hydrostatic (phis,T_v_ptr,p_ptr,dp3d_n0,data.constants.Rgas,phi);
+    preq_omega_ps (p_ptr,vgrad_p_ptr,divdp_ptr,omega_p_tmp_ptr);
+
+    omega_p      = SLICE_4D(data.arrays.elem_derived_omega_p,ie,nlev,np,np);
+    eta_dot_dpdn = SLICE_4D(data.arrays.elem_derived_eta_dot_dpdn,ie,nlev,np,np);
+    for (int ilev=0; ilev<nlev; ++ilev)
+    {
+      for (int igp=0; igp<np; ++igp)
+      {
+        for (int jgp=0; jgp<np; ++jgp)
+        {
+          AT_3D(eta_dot_dpdn,ilev,igp,jgp,np,np) += data.constants.eta_ave_w * eta_dot_dpdn_tmp[ilev][igp][jgp];
+          AT_3D(omega_p,ilev,igp,jgp,np,np) += data.constants.eta_ave_w * omega_p_tmp[ilev][igp][jgp];
+        }
+      }
+    }
+
+    pecnd = SLICE_4D(data.arrays.elem_derived_pecnd,ie,nlev,np,np);
+    fcor  = SLICE_3D(data.arrays.elem_fcor,ie,np,np);
+    for (int ilev=0; ilev<nlev; ++ilev)
+    {
+      for (int igp=0; igp<np; ++igp)
+      {
+        for (int jgp=0; jgp<np; ++jgp)
+        {
+          v1 = AT_4D(v_n0,ilev,igp,jgp,0,np,np,2);
+          v2 = AT_4D(v_n0,ilev,igp,jgp,1,np,np,2);
+
+          Ephi[igp][jgp] = 0.5 * (v1*v1 + v2*v2) + AT_3D(phi,ilev,igp,jgp,np,np) + AT_3D (pecnd,ilev,igp,jgp,np,np);
+        }
+      }
+
+      gradient_sphere (SLICE_3D(T_n0,ilev,np,np),data,ie,vtemp_ptr);
+
+      for (int igp=0; igp<np; ++igp)
+      {
+        for (int jgp=0; jgp<np; ++jgp)
+        {
+          v1 = AT_4D(v_n0,ilev,igp,jgp,0,np,np,2);
+          v2 = AT_4D(v_n0,ilev,igp,jgp,1,np,np,2);
+
+          vgrad_T[igp][jgp] = v1*vtemp[igp][jgp][0] + v2*vtemp[igp][jgp][1];
+        }
+      }
+
+      gradient_sphere (Ephi_ptr, data, ie, vtemp_ptr);
+
+      for (int igp=0; igp<np; ++igp)
+      {
+        for (int jgp=0; jgp<np; ++jgp)
+        {
+          gpterm = T_v[ilev][igp][jgp] / p[ilev][igp][jgp];
+
+          glnps1 = data.constants.Rgas*gpterm*grad_p[ilev][igp][jgp][0];
+          glnps2 = data.constants.Rgas*gpterm*grad_p[ilev][igp][jgp][1];
+
+          v1 = AT_4D(v_n0,ilev,igp,jgp,0,np,np,2);
+          v2 = AT_4D(v_n0,ilev,igp,jgp,1,np,np,2);
+
+          vtens1[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][0] + v2 * (AT_2D(fcor,igp,jgp,np) + vort[ilev][igp][jgp]) - vtemp[igp][jgp][0] - glnps1;
+          vtens2[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][1] - v1 * (AT_2D(fcor,igp,jgp,np) + vort[ilev][igp][jgp]) - vtemp[igp][jgp][1] - glnps2;
+
+          ttens[ilev][igp][jgp]  = T_vadv[ilev][igp][jgp] - vgrad_T[igp][jgp] + kappa_star[ilev][igp][jgp]*T_v[ilev][igp][jgp]*omega_p_tmp[ilev][igp][jgp];
+        }
+      }
+    }
+
+    spheremp = SLICE_3D(data.arrays.elem_spheremp,ie,np,np);
+    v_np1    = SLICE_6D_IJ(data.arrays.elem_state_v,ie,np1,timelevels,nlev,np,np,2);
+    T_np1    = SLICE_5D_IJ(data.arrays.elem_state_T,ie,np1,timelevels,nlev,np,np);
+    dp3d_np1 = SLICE_5D_IJ(data.arrays.elem_state_T,ie,np1,timelevels,nlev,np,np);
+    v_nm1    = SLICE_6D_IJ(data.arrays.elem_state_v,ie,nm1,timelevels,nlev,np,np,2);
+    T_nm1    = SLICE_5D_IJ(data.arrays.elem_state_T,ie,nm1,timelevels,nlev,np,np);
+    dp3d_nm1 = SLICE_5D_IJ(data.arrays.elem_state_dp3d,ie,nm1,timelevels,nlev,np,np);
 
     for (int ilev=0; ilev<nlev; ++ilev)
     {
-      real* gradp_ilev = SLICE_4D(grad_p_ptr,ilev,np,np,2);
-
-      gradient_sphere (SLICE_3D(p_ptr,ilev,np,np), data, ie, gradp_ilev);
-
-      real* state_v_n0_ilev = SLICE_6D(elem_state_v,ie,timelevels,nlev,np,np,2);
-      state_v_n0_ilev = SLICE_5D(state_v_n0_ilev,n0,nlev,np,np,2);
-      state_v_n0_ilev = SLICE_4D(state_v_n0_ilev,ilev,np,np,2);
-
-      real* vdp_ilev = SLICE_4D (vdp_ptr,ilev,np,np,2);
-      real* vgrad_p_ilev = SLICE_3D (vgrad_p_ptr,ilev,np,np);
-
-      real* derived_vn0_ilev = SLICE_5D(elem_derived_vn0,ie,nlev,np,np,2);
-      derived_vn0_ilev = SLICE_4D(derived_vn0_ilev,ilev,np,np,2);
-      for (int ipt=0; ipt<np; ++ipt)
+      for (int igp=0; igp<np; ++igp)
       {
-        for (int jpt=0; jpt<np; ++jpt)
+        for (int jgp=0; jgp<np; ++jgp)
         {
-          v1 = AT_3D(state_v_n0_ilev,ipt,jpt,0,np,2);
-          v2 = AT_3D(state_v_n0_ilev,ipt,jpt,1,np,2);
-          AT_2D(vgrad_p_ilev,ipt,jpt,np) = v1 * AT_3D(gradp_ilev,ipt,jpt,0,np,2)
-                                         + v2 * AT_3D(gradp_ilev,ipt,jpt,1,np,2);
+          AT_4D(v_np1,ilev,igp,jgp,0,np,np,2) = AT_2D(spheremp,igp,jgp,np) * (AT_4D(v_nm1,ilev,igp,jgp,0,np,np,2) + dt2*vtens1[ilev][igp][jgp]);
+          AT_4D(v_np1,ilev,igp,jgp,1,np,np,2) = AT_2D(spheremp,igp,jgp,np) * (AT_4D(v_nm1,ilev,igp,jgp,1,np,np,2) + dt2*vtens1[ilev][igp][jgp]);
+          AT_3D(T_np1,ilev,igp,jgp,np,np)     = AT_2D(spheremp,igp,jgp,np) * (AT_3D(T_nm1,ilev,igp,jgp,np,np) + dt2*ttens[ilev][igp][jgp]);
 
-          AT_3D(vdp_ilev,ipt,jpt,0,np,2) = v1 * AT_3D(dp,ilev,ipt,jpt,np,np);
-          AT_3D(vdp_ilev,ipt,jpt,1,np,2) = v2 * AT_3D(dp,ilev,ipt,jpt,np,np);
-
-          AT_3D(derived_vn0_ilev,ipt,jpt,0,np,2) += data.constants.eta_ave_w * AT_3D(vdp_ilev,ipt,jpt,0,np,2);
-          AT_3D(derived_vn0_ilev,ipt,jpt,1,np,2) += data.constants.eta_ave_w * AT_3D(vdp_ilev,ipt,jpt,1,np,2);
+          AT_3D(dp3d_np1,ilev,igp,jgp,np,np)  = AT_2D(spheremp,igp,jgp,np) * (AT_3D(dp3d_nm1,ilev,igp,jgp,np,np) + dt2*divdp[ilev][igp][jgp]);
         }
       }
-
-      divergence_sphere(vdp_ilev, data, ie, SLICE_3D (divdp_ptr,ilev,np,np));
-      vorticity_sphere(state_v_n0_ilev, data, ie, SLICE_3D (vort_ptr,ilev,np,np));
     }
   }
+}
 
-/*
-     do k=1,nlev
-...
-     if (qn0 == -1 ) then
-        do k=1,nlev
-           do j=1,np
-              do i=1,np
-                 T_v(i,j,k) = elem(ie)%state%T(i,j,k,n0)
-                 kappa_star(i,j,k) = kappa
-              end do
-           end do
-        end do
-     else
-        do k=1,nlev
-           do j=1,np
-              do i=1,np
-                 Qt = elem(ie)%state%Qdp(i,j,k,1,qn0)/dp(i,j,k)
-                 T_v(i,j,k) = Virtual_Temperature1d(elem(ie)%state%T(i,j,k,n0),Qt)
-                 kappa_star(i,j,k) = kappa
-              end do
-           end do
-        end do
-     end if
-     call preq_hydrostatic(phi,elem(ie)%state%phis,T_v,p,dp)
-     call preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
-     sdot_sum=0
-     ! VERTICALLY LAGRANGIAN:   no vertical motion
-     eta_dot_dpdn=0
-     T_vadv=0
-     v_vadv=0
-     do k=1,nlev  !  Loop index added (AAM)
-        elem(ie)%derived%eta_dot_dpdn(:,:,k) = &
-             elem(ie)%derived%eta_dot_dpdn(:,:,k) + eta_ave_w*eta_dot_dpdn(:,:,k)
-        elem(ie)%derived%omega_p(:,:,k) = &
-             elem(ie)%derived%omega_p(:,:,k) + eta_ave_w*omega_p(:,:,k)
-     enddo
-     elem(ie)%derived%eta_dot_dpdn(:,:,nlev+1) = &
-          elem(ie)%derived%eta_dot_dpdn(:,:,nlev+1) + eta_ave_w*eta_dot_dpdn(:,:,nlev+1)
-     vertloop: do k=1,nlev
-        do j=1,np
-           do i=1,np
-              v1     = elem(ie)%state%v(i,j,1,k,n0)
-              v2     = elem(ie)%state%v(i,j,2,k,n0)
-              E = 0.5D0*( v1*v1 + v2*v2 )
-              Ephi(i,j)=E+phi(i,j,k)+elem(ie)%derived%pecnd(i,j,k)
-           end do
-        end do
-        vtemp(:,:,:)   = gradient_sphere(elem(ie)%state%T(:,:,k,n0),deriv,elem(ie)%Dinv)
-        do j=1,np
-           do i=1,np
-              v1     = elem(ie)%state%v(i,j,1,k,n0)
-              v2     = elem(ie)%state%v(i,j,2,k,n0)
-              vgrad_T(i,j) =  v1*vtemp(i,j,1) + v2*vtemp(i,j,2)
-           end do
-        end do
+void preq_hydrostatic (const real* const phis, const real* const T_v,
+                       const real* const p, const real* dp,
+                       real Rgas, real* const phi)
+{
+  real hkk, hkl;
+  real phii[nlev][np][np];
 
-        vtemp = gradient_sphere(Ephi(:,:),deriv,elem(ie)%Dinv)
-        do j=1,np
-           do i=1,np
-              gpterm = T_v(i,j,k)/p(i,j,k)
-              glnps1 = Rgas*gpterm*grad_p(i,j,1,k)
-              glnps2 = Rgas*gpterm*grad_p(i,j,2,k)
+  for (int jgp=0; jgp<np; ++jgp)
+  {
+    for (int igp=0; igp<np; ++igp)
+    {
+      hkk = 0.5*AT_3D(dp,(nlev-1),igp,jgp,np,np) / AT_3D(p,(nlev-1),igp,jgp,np,np);
+      hkl = 2.0*hkk;
+      phii[nlev-1][igp][jgp] = Rgas*AT_3D(T_v, (nlev-1),igp,jgp,np,np)*hkl;
+      AT_3D(phi,(nlev-1),igp,jgp,np,np) = AT_2D(phis,igp,jgp,np) + Rgas*AT_3D(T_v, (nlev-1),igp,jgp,np,np)*hkk;
+    }
+    for (int ilev=nlev-2; ilev>0; --ilev)
+    {
+      for (int igp=0; igp<np; ++igp)
+      {
+        hkk = 0.5*AT_3D(dp,ilev,igp,jgp,np,np) / AT_3D(p,ilev,igp,jgp,np,np);
+        hkl = 2.0*hkk;
+        phii[ilev][igp][jgp] = phii[ilev+1][igp][jgp] + Rgas*AT_3D(T_v, ilev,igp,jgp,np,np)*hkl;
+        AT_3D(phi,ilev,igp,jgp,np,np) = AT_2D(phis,igp,jgp,np) + phii[ilev+1][igp][jgp] + Rgas*AT_3D(T_v, ilev,igp,jgp,np,np)*hkk;
+      }
+    }
+    for (int igp=0; igp<np; ++igp)
+    {
+      hkk = 0.5*AT_3D(dp,0,igp,jgp,np,np) / AT_3D(p,0,igp,jgp,np,np);
+      AT_3D(phi,0,igp,jgp,np,np) = AT_2D(phis,igp,jgp,np) + phii[2][igp][jgp] + Rgas*AT_3D(T_v,1,igp,jgp,np,np)*hkk;
+    }
+  }
+}
 
-              v1     = elem(ie)%state%v(i,j,1,k,n0)
-              v2     = elem(ie)%state%v(i,j,2,k,n0)
+void preq_omega_ps (const real* const p, const real* const vgrad_p,
+                    const real* const divdp, real* const omega_p)
+{
+  real ckk, ckl, term;
+  real suml[np][np];
+  for (int jgp=0; jgp<np; ++jgp)
+  {
+    for (int igp=0; igp<np; ++igp)
+    {
+      ckk = 0.5 / AT_3D(p,0,igp,jgp,np,np);
+      term  = AT_3D(divdp,0,igp,jgp,np,np);
+      AT_3D (omega_p,0,igp,jgp,np,np) = AT_3D (vgrad_p,0,igp,jgp,np,np)/AT_3D(p,0,igp,jgp,np,np) - ckk*term;
+      suml[igp][jgp] = term;
+    }
 
-              vtens1(i,j,k) =   - v_vadv(i,j,1,k)                           &
-                   + v2*(elem(ie)%fcor(i,j) + vort(i,j,k))        &
-                   - vtemp(i,j,1) - glnps1
-              vtens2(i,j,k) =   - v_vadv(i,j,2,k)                            &
-                   - v1*(elem(ie)%fcor(i,j) + vort(i,j,k))        &
-                   - vtemp(i,j,2) - glnps2
-              ttens(i,j,k)  = - T_vadv(i,j,k) - vgrad_T(i,j) + kappa_star(i,j,k)*T_v(i,j,k)*omega_p(i,j,k)
-           end do
-        end do
-     end do vertloop
+    for (int ilev=1; ilev<nlev-1; ++ilev)
+    {
+      for (int igp=0; igp<np; ++igp)
+      {
+        ckk = 0.5 / AT_3D(p,ilev,igp,jgp,np,np);
+        ckl = 2.0 * ckk;
+        term  = AT_3D(divdp,ilev,igp,jgp,np,np);
+        AT_3D (omega_p,ilev,igp,jgp,np,np) = AT_3D (vgrad_p,ilev,igp,jgp,np,np)/AT_3D(p,ilev,igp,jgp,np,np)
+                                           - ckl*suml[igp][jgp] - ckk*term;
 
-     do k=1,nlev
-        elem(ie)%state%v(:,:,1,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,1,k,nm1) + dt2*vtens1(:,:,k) )
-        elem(ie)%state%v(:,:,2,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,2,k,nm1) + dt2*vtens2(:,:,k) )
-        elem(ie)%state%T(:,:,k,np1) = elem(ie)%spheremp(:,:)*(elem(ie)%state%T(:,:,k,nm1) + dt2*ttens(:,:,k))
-        elem(ie)%state%dp3d(:,:,k,np1) = &
-             elem(ie)%spheremp(:,:) * (elem(ie)%state%dp3d(:,:,k,nm1) - &
-             dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
-     enddo ! k loop
-  end subroutine compute_and_apply_rhs
-*/
+        suml[igp][jgp] += term;
+      }
+    }
 
+    for (int igp=0; igp<np; ++igp)
+    {
+      ckk = 0.5 / AT_3D(p,(nlev-1),igp,jgp,np,np);
+      ckl = 2.0 * ckk;
+      term  = AT_3D(divdp,(nlev-1),igp,jgp,np,np);
+      AT_3D (omega_p,(nlev-1),igp,jgp,np,np) = AT_3D (vgrad_p,(nlev-1),igp,jgp,np,np)/AT_3D(p,(nlev-1),igp,jgp,np,np)
+                                             - ckl*suml[igp][jgp] - ckk*term;
+    }
+  }
 }
 
 } // Namespace Homme
