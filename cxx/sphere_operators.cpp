@@ -59,30 +59,30 @@ void divergence_sphere (const real* const v, const TestData& data,
   real* rmetdet = SLICE_3D (data.arrays.elem_rmetdet,ielem,np,np);
 
   real gv[np][np][2];
-  for (int ipt=0; ipt<np; ++ipt)
+  for (int igp=0; igp<np; ++igp)
   {
-    for (int jpt=0; jpt<np; ++jpt)
+    for (int jgp=0; jgp<np; ++jgp)
     {
-      gv[ipt][jpt][0] = AT_2D(metdet,ipt,jpt,np)* ( AT_4D(Dinv,ipt,jpt,0,0,np,2,2)*AT_3D(v,ipt,jpt,0,np,2)
-                                                   +AT_4D(Dinv,ipt,jpt,0,1,np,2,2)*AT_3D(v,ipt,jpt,1,np,2) );
-      gv[ipt][jpt][1] = AT_2D(metdet,ipt,jpt,np)* ( AT_4D(Dinv,ipt,jpt,1,0,np,2,2)*AT_3D(v,ipt,jpt,0,np,2)
-                                                   +AT_4D(Dinv,ipt,jpt,1,1,np,2,2)*AT_3D(v,ipt,jpt,1,np,2) );
+      gv[igp][jgp][0] = AT_2D(metdet,igp,jgp,np)* ( AT_4D(Dinv,igp,jgp,0,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
+                                                   +AT_4D(Dinv,igp,jgp,0,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2) );
+      gv[igp][jgp][1] = AT_2D(metdet,igp,jgp,np)* ( AT_4D(Dinv,igp,jgp,1,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
+                                                   +AT_4D(Dinv,igp,jgp,1,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2) );
     }
   }
 
   real dudx, dvdy;
-  for (int ipt=0; ipt<np; ++ipt)
+  for (int igp=0; igp<np; ++igp)
   {
-    for (int jpt=0; jpt<np; ++jpt)
+    for (int jgp=0; jgp<np; ++jgp)
     {
       dudx = dvdy = 0.;
-      for (int kpt=0; kpt<np; ++kpt)
+      for (int kgp=0; kgp<np; ++kgp)
       {
-        dudx += Dvv[kpt][ipt] * gv[kpt][jpt][0];
-        dvdy += Dvv[kpt][jpt] * gv[ipt][kpt][1];
+        dudx += Dvv[kgp][igp] * gv[kgp][jgp][0];
+        dvdy += Dvv[kgp][jgp] * gv[igp][kgp][1];
       }
 
-      AT_2D(div,ipt,jpt,np) = (dudx + dvdy) * AT_2D(rmetdet,ipt,jpt,np) * rrearth;
+      AT_2D(div,igp,jgp,np) = (dudx + dvdy) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
     }
   }
 }
@@ -99,30 +99,30 @@ void vorticity_sphere (const real* const v, const TestData& data,
   real* rmetdet = SLICE_3D (data.arrays.elem_rmetdet,ielem,np,np);
 
   real vcov[np][np][2];
-  for (int ipt=0; ipt<np; ++ipt)
+  for (int igp=0; igp<np; ++igp)
   {
-    for (int jpt=0; jpt<np; ++jpt)
+    for (int jgp=0; jgp<np; ++jgp)
     {
-      vcov[ipt][jpt][0] = AT_4D(D,ipt,jpt,0,0,np,2,2)*AT_3D(v,ipt,jpt,0,np,2)
-                        + AT_4D(D,ipt,jpt,1,0,np,2,2)*AT_3D(v,ipt,jpt,1,np,2);
-      vcov[ipt][jpt][1] = AT_4D(D,ipt,jpt,0,1,np,2,2)*AT_3D(v,ipt,jpt,0,np,2)
-                        + AT_4D(D,ipt,jpt,1,1,np,2,2)*AT_3D(v,ipt,jpt,1,np,2);
+      vcov[igp][jgp][0] = AT_4D(D,igp,jgp,0,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
+                        + AT_4D(D,igp,jgp,1,0,np,2,2)*AT_3D(v,igp,jgp,1,np,2);
+      vcov[igp][jgp][1] = AT_4D(D,igp,jgp,0,1,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
+                        + AT_4D(D,igp,jgp,1,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2);
     }
   }
 
   real dudy, dvdx;
-  for (int ipt=0; ipt<np; ++ipt)
+  for (int igp=0; igp<np; ++igp)
   {
-    for (int jpt=0; jpt<np; ++jpt)
+    for (int jgp=0; jgp<np; ++jgp)
     {
       dudy = dvdx = 0.;
-      for (int kpt=0; kpt<np; ++kpt)
+      for (int kgp=0; kgp<np; ++kgp)
       {
-        dudy += Dvv[kpt][jpt] * vcov[ipt][kpt][1];
-        dvdx += Dvv[kpt][ipt] * vcov[kpt][jpt][0];
+        dudy += Dvv[kgp][jgp] * vcov[igp][kgp][1];
+        dvdx += Dvv[kgp][igp] * vcov[kgp][jgp][0];
       }
 
-      AT_2D(vort,ipt,jpt,np) = (dvdx - dudy) * AT_2D(rmetdet,ipt,jpt,np) * rrearth;
+      AT_2D(vort,igp,jgp,np) = (dvdx - dudy) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
     }
   }
 }
