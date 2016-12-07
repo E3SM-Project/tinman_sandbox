@@ -1,6 +1,7 @@
 ### Template configure script
 
-rm -rf CMake*
+rm -f CMakeCache.txt
+rm -rf CMakeFiles
 
 cmake \
   -D CMAKE_BUILD_TYPE:STRING=RELEASE \
