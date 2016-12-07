@@ -11,16 +11,8 @@ struct HVCoord
 {
   real ps0;         // base state surface-pressure for level definitions
   real hyai[nlevp]; // ps0 component of hybrid coordinate - interfaces
-  real hyam[nlev];  // ps0 component of hybrid coordinate - midpoints
-  real hybi[nlevp]; // ps  component of hybrid coordinate - interfaces
-  real hybm[nlev];  // ps  component of hybrid coordinate - midpoints
-  real hybd[nlev];  // difference in b (hybi) across layers
-  real prsfac;      // log pressure extrapolation factor (time, space independent)
-  real etam[nlev];  // eta-levels at midpoints
-  real etai[nlevp]; // eta-levels at interfaces
 
-  int nprlev;       // number of pure pressure levels at top
-  int pad;
+  void init_data ();
 };
 
 struct Arrays
@@ -32,10 +24,8 @@ struct Arrays
   real* elem_spheremp;
   real* elem_metdet;
   real* elem_rmetdet;
-  real* elem_sub_elem_mass_flux;
 
   // Members of elem%state
-  real* elem_state_ps_v;
   real* elem_state_dp3d;
   real* elem_state_v;
   real* elem_state_T;
@@ -47,39 +37,54 @@ struct Arrays
   real* elem_derived_omega_p;
   real* elem_derived_phi;
   real* elem_derived_pecnd;
-  real* elem_derived_ps_met;
-  real* elem_derived_dpsdt_met;
   real* elem_derived_vn0;
+
+  void init_data ();
+  void cleanup_data ();
 };
 
 struct Constants
 {
   real  rrearth;
   real  eta_ave_w;
+  real  Rwater_vapor;
+  real  Rgas;
+  real  kappa;
+
+  void init_data ();
 };
 
 struct Control
 {
-  int     rsplit;
+  int  nets;
+  int  nete;
+  int  n0;
+  int  np1;
+  int  nm1;
+  int  qn0;
+  real dt2;
+
+  void init_data ();
 };
 
 struct Derivative
 {
   real Dvv[np][np];
+
+  void init_data ();
 };
 
 struct TestData
 {
-  Arrays      arrays;
-  Constants   constants;
-  Control     control;
-  Derivative  deriv;
-  HVCoord     hvcoord;
+  Arrays      arrays    = {};
+  Constants   constants = {};
+  Control     control   = {};
+  Derivative  deriv     = {};
+  HVCoord     hvcoord   = {};
+
+  void init_data ();
+  void cleanup_data ();
 };
-
-int init_test_data (TestData& data);
-
-int cleanup_data (TestData& data);
 
 } // Namespace Homme
 
