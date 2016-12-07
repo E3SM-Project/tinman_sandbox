@@ -1,4 +1,4 @@
-#include <cstdlib>
+#include <iostream>
 
 //#include <mpi.h>
 
@@ -9,19 +9,20 @@ int main (int argc, char** argv)
 {
   using namespace Homme;
 
-  int status = EXIT_SUCCESS;
-
   //MPI_Init (argc, argv);
 
   TestData data;
 
-  status += init_test_data(data);
+  std::cout << " --- Initializing data...\n";
+  data.init_data();
 
-  status += compute_and_apply_rhs(data);
+  std::cout << " --- Performing computations...\n";
+  compute_and_apply_rhs(data);
 
-  status += cleanup_data (data);
+  std::cout << " --- Cleaning up data...\n";
+  data.cleanup_data ();
 
   //MPI_Finalize ();
 
-  return status;
+  return 0;
 }
