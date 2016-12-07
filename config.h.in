@@ -1,6 +1,9 @@
 /* Energy Diagnostics */
 #cmakedefine ENERGY_DIAGNOSTICS
 
+/* Number of POINTS in the element (Default value is 4) */
+#define NUM_ELEMS @NUM_ELEMENTS@
+
 /* Number of cells NC*NC in each element (Default value NC=4) */
 #define NC @NUM_CELLS@
 
@@ -9,3 +12,7 @@
 
 /* Number of POINTS in the element (Default value is 1) */
 #define PLEV @NUM_PLEV@
+
+#define QSIZE_D @Q_SIZE_D@
+
+#define NUM_TIME_LEVELS 3
