@@ -41,8 +41,6 @@ module element_mod
 
   end type elem_state_t
 
-  integer(kind=int_kind),public,parameter::StateComponents=8! num prognistics variables (for prim_restart_mod.F90)
-
   !___________________________________________________________________
   type, public :: derived_state_t
 
@@ -51,9 +49,6 @@ module element_mod
     ! storage for subcycling tracers/dynamics
 
     real (kind=real_kind) :: vn0  (np,np,2,nlev)                      ! velocity for SE tracer advection
-    real (kind=real_kind) :: vstar(np,np,2,nlev)                      ! velocity on Lagrangian surfaces
-    real (kind=real_kind) :: dpdiss_biharmonic(np,np,nlev)            ! mean dp dissipation tendency, if nu_p>0
-    real (kind=real_kind) :: dpdiss_ave(np,np,nlev)                   ! mean dp used to compute psdiss_tens
 
     ! diagnostics for explicit timestep
     real (kind=real_kind) :: phi(np,np,nlev)                          ! geopotential
@@ -62,8 +57,6 @@ module element_mod
 
     ! tracer advection fields used for consistency and limiters
     real (kind=real_kind) :: dp(np,np,nlev)                           ! for dp_tracers at physics timestep
-    real (kind=real_kind) :: divdp(np,np,nlev)                        ! divergence of dp
-    real (kind=real_kind) :: divdp_proj(np,np,nlev)                   ! DSSed divdp
 
     real (kind=real_kind) :: pecnd(np,np,nlev)                        ! pressure perturbation from condensate
 
@@ -71,66 +64,19 @@ module element_mod
   
   !___________________________________________________________________
   type, public :: element_t
-!     integer(kind=int_kind) :: LocalId
-!     integer(kind=int_kind) :: GlobalId
-
-     ! Coordinate values of element points
-!     type (spherical_polar_t) :: spherep(np,np)                       ! Spherical coords of GLL points
-
-     ! Equ-angular gnomonic projection coordinates
-!     type (cartesian2D_t)     :: cartp(np,np)                         ! gnomonic coords of GLL points
-!     type (cartesian2D_t)     :: corners(4)                           ! gnomonic coords of element corners
-
-     ! 3D cartesian coordinates
-     type (cartesian3D_t)     :: corners3D(4)
-
-     ! Element diagnostics
-!     real (kind=real_kind)    :: area                                 ! Area of element
-!     real (kind=real_kind)    :: normDinv                             ! some type of norm of Dinv used for CFL
-!     real (kind=real_kind)    :: dx_short                             ! short length scale in km
-!     real (kind=real_kind)    :: dx_long                              ! long length scale in km
-
-!     real (kind=real_kind)    :: variable_hyperviscosity(np,np)       ! hyperviscosity based on above
-!     real (kind=real_kind)    :: hv_courant                           ! hyperviscosity courant number
-!     real (kind=real_kind)    :: tensorVisc(np,np,2,2)                !og, matrix V for tensor viscosity
 
      type (elem_state_t)      :: state
 
      type (derived_state_t)   :: derived
-!#if defined _PRIM 
-!     type (elem_accum_t)       :: accum
-!#endif
+
      ! Metric terms
-     real (kind=real_kind)    :: met(np,np,2,2)                       ! metric tensor on velocity and pressure grid
-     real (kind=real_kind)    :: metinv(np,np,2,2)                    ! metric tensor on velocity and pressure grid
      real (kind=real_kind)    :: metdet(np,np)                        ! g = SQRT(det(g_ij)) on velocity and pressure grid
      real (kind=real_kind)    :: rmetdet(np,np)                       ! 1/metdet on velocity pressure grid
      real (kind=real_kind)    :: D(np,np,2,2)                         ! Map covariant field on cube to vector field on the sphere
      real (kind=real_kind)    :: Dinv(np,np,2,2)                      ! Map vector field on the sphere to covariant v on cube
 
-
-
-     ! Convert vector fields from spherical to rectangular components
-     ! The transpose of this operation is its pseudoinverse.
-!     real (kind=real_kind)    :: vec_sphere2cart(np,np,3,2)
-
-     ! Mass matrix terms for an element on a cube face
-!     real (kind=real_kind)    :: mp(np,np)                            ! mass matrix on v and p grid
-!     real (kind=real_kind)    :: rmp(np,np)                           ! inverse mass matrix on v and p grid
-
-     ! Mass matrix terms for an element on the sphere
-     ! This mass matrix is used when solving the equations in weak form
-     ! with the natural (surface area of the sphere) inner product
      real (kind=real_kind)    :: spheremp(np,np)                      ! mass matrix on v and p grid
-     real (kind=real_kind)    :: rspheremp(np,np)                     ! inverse mass matrix on v and p grid
-
-!     integer(kind=long_kind)  :: gdofP(np,np)                         ! global degree of freedom (P-grid)
-
      real (kind=real_kind)    :: fcor(np,np)                          ! Coreolis term
-
-!     type (index_t) :: idxP
-!     type (index_t),pointer :: idxV
-!     integer :: FaceNum
 
   end type element_t
 

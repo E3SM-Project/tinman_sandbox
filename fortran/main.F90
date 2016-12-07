@@ -52,11 +52,17 @@ integer :: i,j,k,ie
   do k = 1,nlev
    do j =1 , np
     do i = 1, np
+!not nlev arrays
       elem(ie)%fcor(i,j) = 1.0
+      elem(ie)%metdet(i,j) = 1.0
+      elem(ie)%rmetdet(i,j) = 1.0
+      elem(ie)%spheremp(i,j) = 1.0
+!      elem(ie)%rspheremp(i,j) = 1.0 
       
       elem(ie)%derived%phi(i,j,k) = 1.0
       elem(ie)%derived%vn0(i,j,1:2,k) = 1.0
       elem(ie)%derived%pecnd(i,j,k) = 1.0
+      elem(ie)%derived%omega_p(i,j,k) = 1.0
 
       elem(ie)%state%dp3d(i,j,k,1:timelevels) = 1.0
       elem(ie)%state%v(i,j,1:2,k,1:timelevels) = 1.0
@@ -79,7 +85,7 @@ integer :: i,j,k,ie
   enddo
   enddo
 
-
+! init hybrid!!!!!!!!!!!!!!!!!!!!!!
 
 
 !----------------- END OF INIT
@@ -93,6 +99,10 @@ integer :: i,j,k,ie
 print *, 'hey', np
 
 call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete,eta_ave_w)
+
+do ie = 1,nelem
+print *, 'From element', ie, 'variable T =', elem(ie)%state%T(:,:,:,:)
+enddo
 
 end program main
 
