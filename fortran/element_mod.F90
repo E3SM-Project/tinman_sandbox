@@ -36,10 +36,7 @@ module element_mod
     real (kind=real_kind) :: v   (np,np,2,nlev,timelevels)            ! velocity                           1
     real (kind=real_kind) :: T   (np,np,nlev,timelevels)              ! temperature                        2
     real (kind=real_kind) :: dp3d(np,np,nlev,timelevels)              ! delta p on levels                  8
-    real (kind=real_kind) :: lnps(np,np,timelevels)                   ! log surface pressure               3
-    real (kind=real_kind) :: ps_v(np,np,timelevels)                   ! surface pressure                   4
     real (kind=real_kind) :: phis(np,np)                              ! surface geopotential (prescribed)  5
-    real (kind=real_kind) :: Q   (np,np,nlev,qsize_d)                 ! Tracer concentration               6
     real (kind=real_kind) :: Qdp (np,np,nlev,qsize_d,2)               ! Tracer mass                        7
 
   end type elem_state_t
@@ -62,28 +59,13 @@ module element_mod
     real (kind=real_kind) :: phi(np,np,nlev)                          ! geopotential
     real (kind=real_kind) :: omega_p(np,np,nlev)                      ! vertical tendency (derived)
     real (kind=real_kind) :: eta_dot_dpdn(np,np,nlevp)                ! mean vertical flux from dynamics
-    real (kind=real_kind) :: eta_dot_dpdn_prescribed(np,np,nlevp)     ! prescribed wind test cases
-
-    ! semi-implicit diagnostics: computed in explict-component, reused in Helmholtz-component.
-    real (kind=real_kind) :: grad_lnps(np,np,2)                       ! gradient of log surface pressure
-    real (kind=real_kind) :: zeta(np,np,nlev)                         ! relative vorticity
-    real (kind=real_kind) :: div(np,np,nlev,timelevels)               ! divergence
 
     ! tracer advection fields used for consistency and limiters
     real (kind=real_kind) :: dp(np,np,nlev)                           ! for dp_tracers at physics timestep
     real (kind=real_kind) :: divdp(np,np,nlev)                        ! divergence of dp
     real (kind=real_kind) :: divdp_proj(np,np,nlev)                   ! DSSed divdp
 
-    ! forcing terms for HOMME
-    real (kind=real_kind) :: FQ(np,np,nlev,qsize_d, timelevels)       ! tracer forcing
-    real (kind=real_kind) :: FM(np,np,2,nlev, timelevels)             ! momentum forcing
-    real (kind=real_kind) :: FT(np,np,nlev, timelevels)               ! temperature forcing
-
-    ! forcing terms for both CAM and HOMME
-    ! FQps for conserving dry mass in the presence of precipitation
-
     real (kind=real_kind) :: pecnd(np,np,nlev)                        ! pressure perturbation from condensate
-    real (kind=real_kind) :: FQps(np,np,timelevels)                   ! forcing of FQ on ps_v
 
   end type derived_state_t
   

@@ -42,7 +42,7 @@ integer :: i,j,k,ie
 
   do j =1 , np
    do i = 1, np
-     deriv%Dvv(i,j) = Dvv_init((i-1)*np+j)
+     deriv%Dvv(i,j) = Dvv_init((j-1)*np+i)
    enddo
   enddo 
 
@@ -52,16 +52,28 @@ integer :: i,j,k,ie
   do k = 1,nlev
    do j =1 , np
     do i = 1, np
+      elem(ie)%fcor(i,j) = 1.0
+      
       elem(ie)%derived%phi(i,j,k) = 1.0
       elem(ie)%derived%vn0(i,j,1:2,k) = 1.0
+      elem(ie)%derived%pecnd(i,j,k) = 1.0
 
       elem(ie)%state%dp3d(i,j,k,1:timelevels) = 1.0
       elem(ie)%state%v(i,j,1:2,k,1:timelevels) = 1.0
+      elem(ie)%state%T(i,j,k,1:timelevels) = 1.0
+
+!only vapor
+      elem(ie)%state%Qdp(i,j,k,1,qn0) = 1.0
 
       elem(ie)%Dinv(i,j,1,1) = 1.0
       elem(ie)%Dinv(i,j,1,2) = 0.0
       elem(ie)%Dinv(i,j,2,1) = 0.0
       elem(ie)%Dinv(i,j,2,2) = 1.0
+
+      elem(ie)%D(i,j,1,1) = 1.0
+      elem(ie)%D(i,j,1,2) = 0.0
+      elem(ie)%D(i,j,2,1) = 0.0
+      elem(ie)%D(i,j,2,2) = 1.0
     enddo
    enddo 
   enddo
