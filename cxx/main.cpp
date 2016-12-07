@@ -3,11 +3,12 @@
 //#include <mpi.h>
 
 #include "data_structures.hpp"
-
-int compute_and_apply_rhs (TestData& data);
+#include "compute_and_apply_rhs.hpp"
 
 int main (int argc, char** argv)
 {
+  using namespace Homme;
+
   int status = EXIT_SUCCESS;
 
   //MPI_Init (argc, argv);
