@@ -1,16 +1,18 @@
+#include "config.h"
+
 module dimensions_mod
   implicit none
   private
 
   integer, parameter         :: qsize_d=1
 
-  integer, parameter, public :: np = 4
+  integer, parameter, public :: np = NP
 
   integer         :: ntrac = 0
   integer         :: qsize = 0
 
 
-  integer, parameter, public :: nlev=3
+  integer, parameter, public :: nlev=PLEV
   integer, parameter, public :: nlevp=nlev+1
   public :: qsize,qsize_d,ntrac_d,ntrac
 
