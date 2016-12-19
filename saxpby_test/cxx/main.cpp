@@ -5,7 +5,9 @@
 #include <cstdlib>
 #include <string>
 
-int I1 = 10000;
+#include <config.h>
+
+int I1 = I1_MACRO;
 
 int main( int argc, char * argv[] )
 {

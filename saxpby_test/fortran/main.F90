@@ -1,8 +1,10 @@
+#include <config.h>
+
 PROGRAM main
 
   USE loop_bounds
   USE loop_test
-  
+
   IMPLICIT NONE
 
   Real(kind=8), Dimension(:, :, :), ALLOCATABLE :: x, y
@@ -20,7 +22,7 @@ PROGRAM main
     CALL GETARG(1, arg)
     READ(arg,*) I1
   else
-    I1 = 10000
+    I1 = I1_MACRO
   endif
 
   ALLOCATE( X(I3,I2,I1) )

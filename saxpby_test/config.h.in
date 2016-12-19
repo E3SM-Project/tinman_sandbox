@@ -1,0 +1,5 @@
+#define I1_MACRO 1000
+
+#define I2_MACRO 128
+
+#define I3_MACRO 256

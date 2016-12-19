@@ -1,0 +1,13 @@
+MESSAGE (STATUS "Building saxby_test (cxx version)")
+
+SET (TEST_SRCS
+  main.cpp
+  common.cpp
+)
+
+GET_FILENAME_COMPONENT(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
+CONFIGURE_FILE(${PARENT_DIR}/config.h.in config.h)
+
+INCLUDE_DIRECTORIES (${CMAKE_CURRENT_BINARY_DIR})
+
+ADD_EXECUTABLE (saxbpy_test_cxx ${TEST_SRCS})
