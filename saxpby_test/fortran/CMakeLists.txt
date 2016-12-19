@@ -1,0 +1,18 @@
+MESSAGE (STATUS "Building saxbpy_test (f90 version)")
+
+SET (SOURCES
+  loop_bounds.F90
+  loop_test.F90
+  main.F90
+  config.h
+)
+
+GET_FILENAME_COMPONENT(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
+CONFIGURE_FILE(${PARENT_DIR}/config.h.in config.h)
+
+EXECUTE_PROCESS(COMMAND sed -i -e "s;^/;!/;g" config.h
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
+INCLUDE_DIRECTORIES (${CMAKE_CURRENT_BINARY_DIR})
+
+ADD_EXECUTABLE (saxbpy_test_f90 ${SOURCES})
