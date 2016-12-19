@@ -39,7 +39,7 @@
 
 // Take slice of 5d array with given first two indices and last four dimensions
 #define SLICE_5D_IJ(pointer, i, j, dim2, dim3, dim4, dim5) \
-   SLICE_4D((SLICE_5D(pointer,i,dim2,dim3,dim4,dim5)),j,dim3,dim4,dim5)
+   &pointer[ i*dim2*dim3*dim4*dim5 + j*dim3*dim4*dim5 ]
 
 // Take slice of 6d array with given first index and last five dimensions
 #define SLICE_6D(pointer, i, dim2, dim3, dim4, dim5, dim6) \
@@ -47,24 +47,24 @@
 
 // Take slice of 6d array with given first two indices and last five dimensions
 #define SLICE_6D_IJ(pointer, i, j, dim2, dim3, dim4, dim5, dim6) \
-   SLICE_5D((SLICE_6D(pointer,i,dim2,dim3,dim4,dim5,dim6)),j,dim3,dim4,dim5,dim6)
+   &pointer[ i*dim2*dim3*dim4*dim5*dim6 + j*dim3*dim4*dim5*dim6 ]
 
 // Take slice of 6d array with given first three indices and last five dimensions
 #define SLICE_6D_IJK(pointer, i, j, k, dim2, dim3, dim4, dim5, dim6) \
-   SLICE_4D((SLICE_5D((SLICE_6D(pointer,i,dim2,dim3,dim4,dim5,dim6)),j,dim3,dim4,dim5,dim6)),j,dim4,dim5,dim6)
+   &pointer[ i*dim2*dim3*dim4*dim5*dim6 + j*dim3*dim4*dim5*dim6 + k*dim4*dim5*dim6 ]
 
 // ================= ARRAY TO POINTER ================ //
 
 // Convert a 2D array into a 1D pointer
-#define PTR_FROM_2D(array) &array[0][0]
+#define PTR_FROM_2D(array) (&array[0][0])
 
 // Convert a 3D array into a 1D pointer
-#define PTR_FROM_3D(array) &array[0][0][0]
+#define PTR_FROM_3D(array) (&array[0][0][0])
 
 // Convert a 4D array into a 1D pointer
-#define PTR_FROM_4D(array) &array[0][0][0][0]
+#define PTR_FROM_4D(array) (&array[0][0][0][0])
 
 // Convert a 5D array into a 1D pointer
-#define PTR_FROM_5D(array) &array[0][0][0][0][0]
+#define PTR_FROM_5D(array) (&array[0][0][0][0][0])
 
 #endif // TEST_MACROS_HPP
