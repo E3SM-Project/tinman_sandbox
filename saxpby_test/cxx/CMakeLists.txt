@@ -1,4 +1,4 @@
-MESSAGE (STATUS "Building saxby_test (cxx version)")
+MESSAGE (STATUS "Building saxbpy_test (cxx version)")
 
 SET (TEST_SRCS
   main.cpp
