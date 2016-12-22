@@ -4,6 +4,10 @@
 #include "data_structures.hpp"
 #include "sphere_operators.hpp"
 
+#include <cmath>
+#include <iostream>
+#include <fstream>
+
 namespace Homme
 {
 
@@ -13,7 +17,7 @@ void compute_and_apply_rhs (TestData& data)
   real Ephi[np][np]                   = {};
   real T_v[nlev][np][np]              = {};
   real divdp[nlev][np][np]            = {};
-  real grad_p[nlev][2][np][np]        = {};
+  real grad_p[nlev][np][np][2]        = {};
   real eta_dot_dpdn_tmp[nlev][np][np] = {};
   real kappa_star[nlev][np][np]       = {};
   real omega_p_tmp[nlev][np][np]      = {};
@@ -25,7 +29,7 @@ void compute_and_apply_rhs (TestData& data)
   real vgrad_T[np][np]                = {};
   real vgrad_p[nlev][np][np]          = {};
   real vort[nlev][np][np]             = {};
-  real vtemp[nlev][np][np]            = {};
+  real vtemp[np][np][2]               = {};
   real vtens1[nlev][np][np]           = {};
   real vtens2[nlev][np][np]           = {};
 
@@ -51,7 +55,7 @@ void compute_and_apply_rhs (TestData& data)
   real v1     = 0;
   real v2     = 0;
 
-  real* Qdp_qn0           = nullptr;
+  real* Qdp_ie            = nullptr;
   real* T_n0              = nullptr;
   real* T_nm1             = nullptr;
   real* T_np1             = nullptr;
@@ -148,14 +152,14 @@ void compute_and_apply_rhs (TestData& data)
     }
     else
     {
-      Qdp_qn0 = SLICE_6D_IJK (data.arrays.elem_state_Qdp,ie,qn0,1,2,qsize_d,nlev,np,np);
+      Qdp_ie = SLICE_6D (data.arrays.elem_state_Qdp,ie,nlev,qsize_d,2,np,np);
       for (int ilev=0; ilev<nlev; ++ilev)
       {
         for (int igp=0; igp<np; ++igp)
         {
           for (int jgp=0; jgp<np; ++jgp)
           {
-            Qt = AT_3D(Qdp_qn0,ilev,igp,jgp,np,np) / AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
+            Qt = AT_5D(Qdp_ie,ilev,1,qn0,igp,jgp,qsize_d,2,np,np) / AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
             T_v[ilev][igp][jgp] = AT_3D(T_n0,ilev,igp,jgp,np,np)*(1.0+ (data.constants.Rwater_vapor/data.constants.Rgas - 1.0)*Qt);
             kappa_star[ilev][igp][jgp] = data.constants.kappa;
           }
@@ -236,7 +240,8 @@ void compute_and_apply_rhs (TestData& data)
     spheremp = SLICE_3D(data.arrays.elem_spheremp,ie,np,np);
     v_np1    = SLICE_6D_IJ(data.arrays.elem_state_v,ie,np1,timelevels,nlev,np,np,2);
     T_np1    = SLICE_5D_IJ(data.arrays.elem_state_T,ie,np1,timelevels,nlev,np,np);
-    dp3d_np1 = SLICE_5D_IJ(data.arrays.elem_state_T,ie,np1,timelevels,nlev,np,np);
+    dp3d_np1 = SLICE_5D_IJ(data.arrays.elem_state_dp3d,ie,np1,timelevels,nlev,np,np);
+
     v_nm1    = SLICE_6D_IJ(data.arrays.elem_state_v,ie,nm1,timelevels,nlev,np,np,2);
     T_nm1    = SLICE_5D_IJ(data.arrays.elem_state_T,ie,nm1,timelevels,nlev,np,np);
     dp3d_nm1 = SLICE_5D_IJ(data.arrays.elem_state_dp3d,ie,nm1,timelevels,nlev,np,np);
@@ -250,7 +255,6 @@ void compute_and_apply_rhs (TestData& data)
           AT_4D(v_np1,ilev,igp,jgp,0,np,np,2) = AT_2D(spheremp,igp,jgp,np) * (AT_4D(v_nm1,ilev,igp,jgp,0,np,np,2) + dt2*vtens1[ilev][igp][jgp]);
           AT_4D(v_np1,ilev,igp,jgp,1,np,np,2) = AT_2D(spheremp,igp,jgp,np) * (AT_4D(v_nm1,ilev,igp,jgp,1,np,np,2) + dt2*vtens1[ilev][igp][jgp]);
           AT_3D(T_np1,ilev,igp,jgp,np,np)     = AT_2D(spheremp,igp,jgp,np) * (AT_3D(T_nm1,ilev,igp,jgp,np,np) + dt2*ttens[ilev][igp][jgp]);
-
           AT_3D(dp3d_np1,ilev,igp,jgp,np,np)  = AT_2D(spheremp,igp,jgp,np) * (AT_3D(dp3d_nm1,ilev,igp,jgp,np,np) + dt2*divdp[ilev][igp][jgp]);
         }
       }
@@ -287,7 +291,7 @@ void preq_hydrostatic (const real* const phis, const real* const T_v,
     for (int igp=0; igp<np; ++igp)
     {
       hkk = 0.5*AT_3D(dp,0,igp,jgp,np,np) / AT_3D(p,0,igp,jgp,np,np);
-      AT_3D(phi,0,igp,jgp,np,np) = AT_2D(phis,igp,jgp,np) + phii[2][igp][jgp] + Rgas*AT_3D(T_v,1,igp,jgp,np,np)*hkk;
+      AT_3D(phi,0,igp,jgp,np,np) = AT_2D(phis,igp,jgp,np) + phii[1][igp][jgp] + Rgas*AT_3D(T_v,0,igp,jgp,np,np)*hkk;
     }
   }
 }
@@ -331,5 +335,132 @@ void preq_omega_ps (const real* const p, const real* const vgrad_p,
     }
   }
 }
+
+void print_results_2norm (const TestData& data)
+{
+  // Input parameters
+  const int nets = data.control.nets;
+  const int nete = data.control.nete;
+  const int np1  = data.control.np1;
+
+  real* v_np1;
+  real* T_np1;
+  real* dp3d_np1;
+
+  real vnorm(0.), tnorm(0.), dpnorm(0.);
+  for (int ie=nets; ie<nete; ++ie)
+  {
+    v_np1    = SLICE_6D_IJ(data.arrays.elem_state_v,ie,np1,timelevels,nlev,np,np,2);
+    T_np1    = SLICE_5D_IJ(data.arrays.elem_state_T,ie,np1,timelevels,nlev,np,np);
+    dp3d_np1 = SLICE_5D_IJ(data.arrays.elem_state_dp3d,ie,np1,timelevels,nlev,np,np);
+
+    for (int ilev=0; ilev<nlev; ++ilev)
+    {
+      for (int igp=0; igp<np; ++igp)
+      {
+        for (int jgp=0; jgp<np; ++jgp)
+        {
+          vnorm  += std::pow( AT_4D(v_np1,ilev,igp,jgp,0,np,np,2), 2 );
+          vnorm  += std::pow( AT_4D(v_np1,ilev,igp,jgp,1,np,np,2), 2 );
+          tnorm  += std::pow( AT_3D(T_np1,ilev,igp,jgp,np,np), 2 );
+          dpnorm += std::pow( AT_3D(dp3d_np1,ilev,igp,jgp,np,np), 2 );
+        }
+      }
+    }
+  }
+
+  std::cout << "   ---> Norms:\n"
+            << "          ||v||_2  = " << std::sqrt (vnorm) << "\n"
+            << "          ||T||_2  = " << std::sqrt (tnorm) << "\n"
+            << "          ||dp||_2 = " << std::sqrt (dpnorm) << "\n";
+}
+
+void dump_results_to_file (const TestData& data)
+{
+  // Input parameters
+  const int nets = data.control.nets;
+  const int nete = data.control.nete;
+  const int np1  = data.control.np1;
+
+  real* v_np1;
+  real* T_np1;
+  real* dp3d_np1;
+
+  std::ofstream vxfile, vyfile, tfile, dpfile;
+  vxfile.open("elem_state_vx.txt");
+  if (!vxfile.is_open())
+  {
+    std::cout << "Error! Cannot open 'elem_state_vx.txt'.\n";
+    std::abort();
+  }
+
+  vyfile.open("elem_state_vy.txt");
+  if (!vyfile.is_open())
+  {
+    vxfile.close();
+    std::cout << "Error! Cannot open 'elem_state_vy.txt'.\n";
+    std::abort();
+  }
+
+  tfile.open("elem_state_t.txt");
+  if (!tfile.is_open())
+  {
+    std::cout << "Error! Cannot open 'elem_state_t.txt'.\n";
+    vxfile.close();
+    vyfile.close();
+    std::abort();
+  }
+
+  dpfile.open("elem_state_dp3d.txt");
+  if (!dpfile.is_open())
+  {
+    std::cout << "Error! Cannot open 'elem_state_dp3d.txt'.\n";
+    vxfile.close();
+    vyfile.close();
+    tfile.close();
+    std::abort();
+  }
+
+  vxfile.precision(6);
+  vyfile.precision(6);
+  tfile.precision(6);
+  dpfile.precision(6);
+
+  for (int ie=nets; ie<nete; ++ie)
+  {
+    v_np1    = SLICE_6D_IJ(data.arrays.elem_state_v,ie,np1,timelevels,nlev,np,np,2);
+    T_np1    = SLICE_5D_IJ(data.arrays.elem_state_T,ie,np1,timelevels,nlev,np,np);
+    dp3d_np1 = SLICE_5D_IJ(data.arrays.elem_state_dp3d,ie,np1,timelevels,nlev,np,np);
+
+    for (int ilev=0; ilev<nlev; ++ilev)
+    {
+      vxfile << "[" << ie << ", " << ilev << "]\n";
+      vyfile << "[" << ie << ", " << ilev << "]\n";
+      tfile  << "[" << ie << ", " << ilev << "]\n";
+      dpfile << "[" << ie << ", " << ilev << "]\n";
+
+      for (int igp=0; igp<np; ++igp)
+      {
+        for (int jgp=0; jgp<np; ++jgp)
+        {
+          vxfile << " " << AT_4D(v_np1,ilev,igp,jgp,0,np,np,2);
+          vyfile << " " << AT_4D(v_np1,ilev,igp,jgp,1,np,np,2);
+          tfile  << " " << AT_3D(T_np1,ilev,igp,jgp,np,np);
+          dpfile << " " << AT_3D(dp3d_np1,ilev,igp,jgp,np,np);
+        }
+        vxfile << "\n";
+        vyfile << "\n";
+        tfile  << "\n";
+        dpfile << "\n";
+      }
+    }
+  }
+
+  // Closing files
+  vxfile.close();
+  vyfile.close();
+  tfile.close();
+  dpfile.close();
+};
 
 } // Namespace Homme
