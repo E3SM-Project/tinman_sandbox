@@ -1,2 +1,2 @@
 
-ADD_SUBDIRECTORY(cxx_only)
+ADD_SUBDIRECTORY(basic)
