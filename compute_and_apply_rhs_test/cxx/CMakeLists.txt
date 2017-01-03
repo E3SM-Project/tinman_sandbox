@@ -1,2 +1,2 @@
-
 ADD_SUBDIRECTORY(basic)
+ADD_SUBDIRECTORY(kokkos_basic)
