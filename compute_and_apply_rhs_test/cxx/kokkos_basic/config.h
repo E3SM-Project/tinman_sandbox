@@ -1,10 +1,14 @@
+#ifndef TINMAN_CONFIG_H
+#define TINMAN_CONFIG_H
 
-/* Number of POINTS in the element (Default value is 4) */
-#define NP 4
+namespace Homme {
 
-/* Number of POINTS in the element (Default value is 1) */
-#define PLEV 72
+constexpr int NP              = 4;
+constexpr int NUM_LEV         = 72;
+constexpr int NUM_LEV_P       = NUM_LEV + 1;
+constexpr int QSIZE_D         = 4;
+constexpr int NUM_TIME_LEVELS = 3;
 
-#define QSIZE_D 4
+} // namespace Homme
 
-#define NUM_TIME_LEVELS 3
+#endif //TINMAN_CONFIG_H

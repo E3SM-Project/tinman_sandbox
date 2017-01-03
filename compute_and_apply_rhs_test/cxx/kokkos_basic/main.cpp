@@ -1,42 +1,23 @@
 #include <iostream>
 #include <cstdlib>
 
-
-//#include <mpi.h>
-
-#include "dimensions.hpp"
-#include "data_structures.hpp"
-#include "compute_and_apply_rhs.hpp"
-
-namespace Homme {
-
-int nelems = 10;
-
-} // ugly hack
-
+#include <Types.hpp>
 
 int main (int argc, char** argv)
 {
-  using namespace Homme;
-
-  //MPI_Init (argc, argv);
+  int nelems = 10;
 
   if (argc > 1) {
-    Homme::nelems = std::atoi(argv[1]);
+    nelems = std::atoi(argv[1]);
   }
 
-  TestData data;
+  if (nelems < 1) {
+    std::cerr << "Invalid number of elements: " << nelems << std::endl;
+    std::exit(1);
+  }
 
-  std::cout << " --- Initializing data...\n";
-  data.init_data();
+  Region region(nelems);
 
-  std::cout << " --- Performing computations...\n";
-  compute_and_apply_rhs(data);
-
-  std::cout << " --- Cleaning up data...\n";
-  data.cleanup_data ();
-
-  //MPI_Finalize ();
 
   return 0;
 }
