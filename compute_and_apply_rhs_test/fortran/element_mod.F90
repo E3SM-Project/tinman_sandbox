@@ -1,23 +1,17 @@
 
 module element_mod
 
+  use dimensions_mod, only: nlev, nlevp, np, qsize_d, nelemd
   use coordinate_systems_mod, only: spherical_polar_t, cartesian2D_t, cartesian3D_t
-  use kinds, only :   int_kind, long_kind, real_kind 
+  use kinds, only :   int_kind, long_kind, real_kind
 
   implicit none
   private
   integer, public, parameter :: timelevels = 3
 
 
-  integer, public, parameter :: np=4
-  integer, public, parameter :: nlev=3
-  integer, public, parameter :: nlevp=nlev+1
-  integer, public, parameter :: qsize_d=1
-  integer, public, parameter :: ntrac = 1
-  integer, public, parameter :: nelemd = 1
 
-
-!  real (kind=real_kind), allocatable, target, public :: state_Qdp                (:,:,:,:,:,:)    ! (np,np,nlev,qsize_d,2,nelemd)   
+!  real (kind=real_kind), allocatable, target, public :: state_Qdp                (:,:,:,:,:,:)    ! (np,np,nlev,qsize_d,2,nelemd)
 !  real (kind=real_kind), allocatable, target, public :: derived_vn0              (:,:,:,:,:)      ! (np,np,2,nlev,nelemd)                   velocity for SE tracer advection
 !  real (kind=real_kind), allocatable, target, public :: derived_divdp            (:,:,:,:)        ! (np,np,nlev,nelemd)                     divergence of dp
 !  real (kind=real_kind), allocatable, target, public :: derived_divdp_proj       (:,:,:,:)        ! (np,np,nlev,nelemd)                     DSSed divdp
@@ -61,7 +55,7 @@ module element_mod
     real (kind=real_kind) :: pecnd(np,np,nlev)                        ! pressure perturbation from condensate
 
   end type derived_state_t
-  
+
   !___________________________________________________________________
   type, public :: element_t
 
@@ -80,7 +74,7 @@ module element_mod
 
   end type element_t
 
- 
+
 contains
 
 
