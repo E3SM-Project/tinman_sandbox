@@ -14,24 +14,24 @@ namespace Homme
 void compute_and_apply_rhs (TestData& data)
 {
   // Create local arrays
-  real Ephi[np][np]                   = {};
-  real T_v[nlev][np][np]              = {};
-  real divdp[nlev][np][np]            = {};
-  real grad_p[nlev][np][np][2]        = {};
-  real eta_dot_dpdn_tmp[nlev][np][np] = {};
-  real kappa_star[nlev][np][np]       = {};
-  real omega_p_tmp[nlev][np][np]      = {};
-  real p[nlev][np][np]                = {};
-  real ttens[nlev][np][np]            = {};
-  real T_vadv[nlev][np][np]           = {};
-  real v_vadv[nlev][np][np][2]        = {};
-  real vdp[nlev][np][np][2]           = {};
-  real vgrad_T[np][np]                = {};
-  real vgrad_p[nlev][np][np]          = {};
-  real vort[nlev][np][np]             = {};
-  real vtemp[np][np][2]               = {};
-  real vtens1[nlev][np][np]           = {};
-  real vtens2[nlev][np][np]           = {};
+  real Ephi[np][np]                    = {};
+  real T_v[nlev][np][np]               = {};
+  real divdp[nlev][np][np]             = {};
+  real grad_p[nlev][np][np][2]         = {};
+  real eta_dot_dpdn_tmp[nlevp][np][np] = {};
+  real kappa_star[nlev][np][np]        = {};
+  real omega_p_tmp[nlev][np][np]       = {};
+  real p[nlev][np][np]                 = {};
+  real ttens[nlev][np][np]             = {};
+  real T_vadv[nlev][np][np]            = {};
+  real v_vadv[nlev][np][np][2]         = {};
+  real vdp[nlev][np][np][2]            = {};
+  real vgrad_T[np][np]                 = {};
+  real vgrad_p[nlev][np][np]           = {};
+  real vort[nlev][np][np]              = {};
+  real vtemp[np][np][2]                = {};
+  real vtens1[nlev][np][np]            = {};
+  real vtens2[nlev][np][np]            = {};
 
   // Get a pointer version so we can use single
   // subroutines interface for both ptrs and arrays
@@ -174,7 +174,7 @@ void compute_and_apply_rhs (TestData& data)
     preq_omega_ps (p_ptr,vgrad_p_ptr,divdp_ptr,omega_p_tmp_ptr);
 
     omega_p      = SLICE_4D(data.arrays.elem_derived_omega_p,ie,nlev,np,np);
-    eta_dot_dpdn = SLICE_4D(data.arrays.elem_derived_eta_dot_dpdn,ie,nlev,np,np);
+    eta_dot_dpdn = SLICE_4D(data.arrays.elem_derived_eta_dot_dpdn,ie,nlevp,np,np);
     for (int ilev=0; ilev<nlev; ++ilev)
     {
       for (int igp=0; igp<np; ++igp)
@@ -184,6 +184,13 @@ void compute_and_apply_rhs (TestData& data)
           AT_3D(eta_dot_dpdn,ilev,igp,jgp,np,np) += data.constants.eta_ave_w * eta_dot_dpdn_tmp[ilev][igp][jgp];
           AT_3D(omega_p,ilev,igp,jgp,np,np) += data.constants.eta_ave_w * omega_p_tmp[ilev][igp][jgp];
         }
+      }
+    }
+    for (int igp=0; igp<np; ++igp)
+    {
+      for (int jgp=0; jgp<np; ++jgp)
+      {
+        AT_3D(eta_dot_dpdn,nlev,igp,jgp,np,np) += data.constants.eta_ave_w * eta_dot_dpdn_tmp[nlev][igp][jgp];
       }
     }
 

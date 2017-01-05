@@ -37,11 +37,11 @@ void gradient_sphere (const real* const s, const TestData& data,
   {
     for (int i=0; i<np; ++i)
     {
-      AT_3D (ds, np, 2, i, j, 0) = AT_4D(Dinv,i,j,0,0,np,2,2)*v1[i][j]
-                                 + AT_4D(Dinv,i,j,1,0,np,2,2)*v1[i][j];
+      AT_3D (ds, i, j, 0, np, 2) = AT_4D(Dinv,i,j,0,0,np,2,2)*v1[i][j]
+                                 + AT_4D(Dinv,i,j,1,0,np,2,2)*v2[i][j];
 
-      AT_3D (ds, np, 2, i, j, 1) = AT_4D(Dinv,i,j,0,1,np,2,2)*v1[i][j]
-                                 + AT_4D(Dinv,i,j,1,1,np,2,2)*v1[i][j];
+      AT_3D (ds, i, j, 1, np, 2) = AT_4D(Dinv,i,j,0,1,np,2,2)*v1[i][j]
+                                 + AT_4D(Dinv,i,j,1,1,np,2,2)*v2[i][j];
     }
   }
 }

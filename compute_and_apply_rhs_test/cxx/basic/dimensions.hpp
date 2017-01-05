@@ -5,9 +5,8 @@
 
 namespace Homme {
 
-constexpr const int nelems     = NUM_ELEMS;
+extern int nelems;
 constexpr const int np         = NP;
-constexpr const int nc         = NC;
 constexpr const int qsize_d    = QSIZE_D;
 constexpr const int nlev       = PLEV;
 constexpr const int nlevp      = nlev + 1;

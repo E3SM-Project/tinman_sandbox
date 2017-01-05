@@ -3,7 +3,6 @@
 
 #include "test_macros.hpp"
 #include <random>
-#include <iostream>
 
 namespace
 {
@@ -17,31 +16,31 @@ double logistic_map(double x, const double r)
 namespace Homme
 {
 
+extern int num_elems;
+
 void Arrays::init_data ()
 {
-  elem_D                    = new real[nelems*np*np*2*2] {};
-  elem_Dinv                 = new real[nelems*np*np*2*2] {};
-  elem_fcor                 = new real[nelems*np*np]     {};
-  elem_spheremp             = new real[nelems*np*np]     {};
-  elem_metdet               = new real[nelems*np*np]     {};
-  elem_rmetdet              = new real[nelems*np*np]     {};
+  elem_D                    = new real[num_elems*np*np*2*2] {};
+  elem_Dinv                 = new real[num_elems*np*np*2*2] {};
+  elem_fcor                 = new real[num_elems*np*np]     {};
+  elem_spheremp             = new real[num_elems*np*np]     {};
+  elem_metdet               = new real[num_elems*np*np]     {};
+  elem_rmetdet              = new real[num_elems*np*np]     {};
 
-  elem_state_dp3d           = new real[nelems*timelevels*nlev*np*np]   {};
-  elem_state_v              = new real[nelems*timelevels*nlev*np*np*2] {};
-  elem_state_T              = new real[nelems*timelevels*nlev*np*np]   {};
-  elem_state_phis           = new real[nelems*np*np]                   {};
-  elem_state_Qdp            = new real[nelems*nlev*qsize_d*2*np*np]    {};
+  elem_state_dp3d           = new real[num_elems*timelevels*nlev*np*np]   {};
+  elem_state_v              = new real[num_elems*timelevels*nlev*np*np*2] {};
+  elem_state_T              = new real[num_elems*timelevels*nlev*np*np]   {};
+  elem_state_phis           = new real[num_elems*np*np]                   {};
+  elem_state_Qdp            = new real[num_elems*nlev*qsize_d*2*np*np]    {};
 
-  elem_derived_eta_dot_dpdn = new real[nelems*nlevp*np*np]  {};
-  elem_derived_omega_p      = new real[nelems*nlev*np*np]   {};
-  elem_derived_phi          = new real[nelems*nlev*np*np]   {};
-  elem_derived_pecnd        = new real[nelems*nlev*np*np]   {};
-  elem_derived_vn0          = new real[nelems*nlev*np*np*2] {};
+  elem_derived_eta_dot_dpdn = new real[num_elems*nlevp*np*np]  {};
+  elem_derived_omega_p      = new real[num_elems*nlev*np*np]   {};
+  elem_derived_phi          = new real[num_elems*nlev*np*np]   {};
+  elem_derived_pecnd        = new real[num_elems*nlev*np*np]   {};
+  elem_derived_vn0          = new real[num_elems*nlev*np*np*2] {};
 
   // Starting point for the logistic map
-  std::uniform_real_distribution<double> unid(0.0,1.0);
-  std::default_random_engine re;
-  double x = unid(re); // = 0.12345
+  double x = 0.123456789;
 
   // Logistic parameter: 4.0 gives the whole (0,1) as an attractor
   constexpr double r = 3.987654321;
@@ -49,129 +48,64 @@ void Arrays::init_data ()
   // Initialize arrays using logistic map. Although techically deterministic, if
   // r/gtrsim 3.57, it is a chaotic system. And it's easily portable across
   // different platforms and/or languages without relying on implementation details
-  for (int i=0; i<nelems*np*np*2*2; ++i)
-  {
-    x = elem_D[i] = logistic_map(x,r);
-  }
-  for (int i=0; i<nelems*np*np*2*2; ++i)
-  {
-    x = elem_Dinv[i] = logistic_map(x,r);
-  }
 
-  for (int i=0; i<nelems*np*np; ++i)
-  {
-    x = elem_fcor[i] = logistic_map(x,r);
-  }
-  for (int i=0; i<nelems*np*np; ++i)
-  {
-    x = elem_spheremp[i] = logistic_map(x,r);
-  }
-  for (int i=0; i<nelems*np*np; ++i)
-  {
-    x = elem_metdet[i] = logistic_map(x,r);
-  }
-  for (int i=0; i<nelems*np*np; ++i)
-  {
-    x = elem_rmetdet[i] = logistic_map(x,r);
-  }
-
-  for (int i=0; i<nelems*timelevels*nlev*np*np; ++i)
-  {
-    x = elem_state_dp3d[i] = logistic_map(x,r);
-  }
-  for (int i=0; i<nelems*timelevels*nlev*np*np; ++i)
-  {
-    x = elem_state_T[i] = logistic_map(x,r);
-  }
-  for (int i=0; i<nelems*timelevels*nlev*np*np*2; ++i)
-  {
-    x = elem_state_v[i] = logistic_map(x,r);
-  }
-  for (int i=0; i<nelems*np*np; ++i)
-  {
-    x = elem_state_phis[i] = logistic_map(x,r);
-  }
-  for (int i=0; i<nelems*nlev*qsize_d*2*np*np; ++i)
-  {
-    x = elem_state_Qdp[i] = logistic_map(x,r);
-  }
-
-  for (int i=0; i<nelems*nlevp*np*np; ++i)
-  {
-    x = elem_derived_eta_dot_dpdn[i] = logistic_map(x,r);
-  }
-  for (int i=0; i<nelems*nlev*np*np; ++i)
-  {
-    x = elem_derived_omega_p[i] = logistic_map(x,r);
-  }
-  for (int i=0; i<nelems*nlev*np*np; ++i)
-  {
-    x = elem_derived_phi[i] = logistic_map(x,r);
-  }
-  for (int i=0; i<nelems*nlev*np*np; ++i)
-  {
-    x = elem_derived_pecnd[i] = logistic_map(x,r);
-  }
-  for (int i=0; i<nelems*nlev*np*np*2; ++i)
-  {
-    x = elem_derived_vn0[i] = logistic_map(x,r);
-  }
-
-/*
-  for (int ie=0; ie<nelems; ++ie)
+  for (int ie=0; ie<num_elems; ++ie)
   {
     for (int ip=0; ip<np; ++ip)
     {
       for (int jp=0; jp<np; ++jp)
       {
-        AT_3D(elem_spheremp,  ie,ip,jp,np,np) = 1.0;
-        AT_3D(elem_metdet,    ie,ip,jp,np,np) = 1.0;
-        AT_3D(elem_rmetdet,   ie,ip,jp,np,np) = 1.0;
-        AT_3D(elem_fcor,      ie,ip,jp,np,np) = 1.0;
-        AT_3D(elem_state_phis,ie,ip,jp,np,np) = 1.0;
+        AT_5D(elem_D,ie,ip,jp,0,0,np,np,2,2) = x = logistic_map(x,r);
+        AT_5D(elem_D,ie,ip,jp,0,1,np,np,2,2) = x = logistic_map(x,r);
+        AT_5D(elem_D,ie,ip,jp,1,0,np,np,2,2) = x = logistic_map(x,r);
+        AT_5D(elem_D,ie,ip,jp,1,1,np,np,2,2) = x = logistic_map(x,r);
 
-        AT_5D(elem_D,ie,ip,jp,0,0,np,np,2,2) = 1.0;
-        AT_5D(elem_D,ie,ip,jp,0,1,np,np,2,2) = 0.0;
-        AT_5D(elem_D,ie,ip,jp,1,0,np,np,2,2) = 0.0;
-        AT_5D(elem_D,ie,ip,jp,1,1,np,np,2,2) = 1.0;
+        double detD = AT_5D(elem_D,ie,ip,jp,0,0,np,np,2,2)*AT_5D(elem_D,ie,ip,jp,1,1,np,np,2,2)
+                    - AT_5D(elem_D,ie,ip,jp,0,1,np,np,2,2)*AT_5D(elem_D,ie,ip,jp,1,0,np,np,2,2);
 
-        AT_5D(elem_Dinv,ie,ip,jp,0,0,np,np,2,2) = 1.0;
-        AT_5D(elem_Dinv,ie,ip,jp,0,1,np,np,2,2) = 0.0;
-        AT_5D(elem_Dinv,ie,ip,jp,1,0,np,np,2,2) = 0.0;
-        AT_5D(elem_Dinv,ie,ip,jp,1,1,np,np,2,2) = 1.0;
+        AT_5D(elem_Dinv,ie,ip,jp,0,0,np,np,2,2) =  AT_5D(elem_D,ie,ip,jp,1,1,np,np,2,2) / detD;
+        AT_5D(elem_Dinv,ie,ip,jp,0,1,np,np,2,2) = -AT_5D(elem_D,ie,ip,jp,0,1,np,np,2,2) / detD;
+        AT_5D(elem_Dinv,ie,ip,jp,1,0,np,np,2,2) = -AT_5D(elem_D,ie,ip,jp,1,0,np,np,2,2) / detD;
+        AT_5D(elem_Dinv,ie,ip,jp,1,1,np,np,2,2) =  AT_5D(elem_D,ie,ip,jp,0,0,np,np,2,2) / detD;
+
+        AT_3D(elem_fcor,      ie,ip,jp,np,np) = x = logistic_map(x,r);
+        AT_3D(elem_spheremp,  ie,ip,jp,np,np) = x = logistic_map(x,r);
+        AT_3D(elem_metdet,    ie,ip,jp,np,np) = x = logistic_map(x,r);
+        AT_3D(elem_state_phis,ie,ip,jp,np,np) = x = logistic_map(x,r);
+
+        AT_3D(elem_rmetdet,   ie,ip,jp,np,np) = 1./ AT_3D(elem_metdet,ie,ip,jp,np,np);
 
         for (int il=0; il<nlev; ++il)
         {
-          AT_4D (elem_derived_omega_p,ie,il,ip,jp,  nlev,np,np  ) = 1.0;
-          AT_4D (elem_derived_phi,    ie,il,ip,jp,  nlev,np,np  ) = 1.0;
-          AT_4D (elem_derived_pecnd,  ie,il,ip,jp,  nlev,np,np  ) = 1.0;
-          AT_5D (elem_derived_vn0,    ie,il,ip,jp,0,nlev,np,np,2) = 1.0;
-          AT_5D (elem_derived_vn0,    ie,il,ip,jp,1,nlev,np,np,2) = 1.0;
+          AT_4D (elem_derived_omega_p,ie,il,ip,jp,  nlev,np,np  ) = x = logistic_map(x,r);
+          AT_4D (elem_derived_pecnd,  ie,il,ip,jp,  nlev,np,np  ) = x = logistic_map(x,r);
+          AT_5D (elem_derived_vn0,    ie,il,ip,jp,0,nlev,np,np,2) = x = logistic_map(x,r);
+          AT_5D (elem_derived_vn0,    ie,il,ip,jp,1,nlev,np,np,2) = x = logistic_map(x,r);
+          AT_4D (elem_derived_phi,    ie,il,ip,jp,  nlev,np,np  ) = x = logistic_map(x,r);
 
           for (int iq=0; iq<qsize_d; ++iq)
           {
-            AT_6D(elem_state_Qdp,ie,il,ip,jp,iq,0,nlev,np,np,qsize_d,2) = 1.0;
-            AT_6D(elem_state_Qdp,ie,il,ip,jp,iq,1,nlev,np,np,qsize_d,2) = 1.0;
+            AT_6D(elem_state_Qdp,ie,il,ip,jp,iq,0,nlev,np,np,qsize_d,2) = x = logistic_map(x,r);
+            AT_6D(elem_state_Qdp,ie,il,ip,jp,iq,1,nlev,np,np,qsize_d,2) = x = logistic_map(x,r);
           }
 
           for (int it=0; it<timelevels; ++it)
           {
 
-            AT_5D(elem_state_dp3d,ie,it,il,ip,jp,  timelevels,nlev,np,np)   = 1.0;
-            AT_5D(elem_state_T,   ie,it,il,ip,jp,  timelevels,nlev,np,np)   = 1.0;
-            AT_6D(elem_state_v,   ie,it,il,ip,jp,0,timelevels,nlev,np,np,2) = 1.0;
-            AT_6D(elem_state_v,   ie,it,il,ip,jp,1,timelevels,nlev,np,np,2) = 1.0;
+            AT_5D(elem_state_dp3d,ie,it,il,ip,jp,  timelevels,nlev,np,np)   = x = logistic_map(x,r);
+            AT_5D(elem_state_T,   ie,it,il,ip,jp,  timelevels,nlev,np,np)   = x = logistic_map(x,r);
+            AT_6D(elem_state_v,   ie,it,il,ip,jp,0,timelevels,nlev,np,np,2) = x = logistic_map(x,r);
+            AT_6D(elem_state_v,   ie,it,il,ip,jp,1,timelevels,nlev,np,np,2) = x = logistic_map(x,r);
           }
         }
 
         for (int il=0; il<nlevp; ++il)
         {
-          AT_4D (elem_derived_eta_dot_dpdn,ie,il,ip,jp,nlevp,np,np) = 1.0;
+          AT_4D (elem_derived_eta_dot_dpdn,ie,il,ip,jp,nlevp,np,np) = x = logistic_map(x,r);
         }
       }
     }
   }
-*/
 }
 
 void Arrays::cleanup_data ()
@@ -207,7 +141,7 @@ void Constants::init_data ()
 void Control::init_data ()
 {
   nets = 0;
-  nete = nelems;
+  nete = num_elems;
   n0 = 0;
   np1 = 1;
   nm1 = 2;
@@ -218,17 +152,11 @@ void Control::init_data ()
 
 void HVCoord::init_data ()
 {
-  if (true)
+  ps0 = 1.0;
+
+  for (int i=0; i<nlevp; ++i)
   {
-    std::uniform_real_distribution<double> unid(1.0,2.0);
-    std::default_random_engine re;
-
-    ps0 = unid(re);
-
-    for (int i=0; i<nlevp; ++i)
-    {
-      hyai[i] = unid(re);
-    }
+    hyai[i] = 1.0;
   }
 }
 

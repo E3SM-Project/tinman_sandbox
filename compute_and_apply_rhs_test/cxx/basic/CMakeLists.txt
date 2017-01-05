@@ -1,4 +1,4 @@
-MESSAGE (STATUS "Building f90_vs_cxx_test (cxx version)")
+MESSAGE (STATUS "Building f90_vs_cxx_test (cxx_basic version)")
 
 SET (TEST_SRCS
   main.cpp
