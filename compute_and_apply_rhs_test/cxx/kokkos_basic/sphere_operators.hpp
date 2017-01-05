@@ -1,20 +1,28 @@
 #ifndef SPHERE_OPERATORS_HPP
 #define SPHERE_OPERATORS_HPP
 
-#include "data_structures.hpp"
+#include <config.h>
+#include <Types.hpp>
 
-namespace Homme
+namespace TinMan
 {
 
-void gradient_sphere (const real* const s, const TestData& data,
-                      int ielem, real* const ds);
+class TestData;
 
-void divergence_sphere (const real* const v, const TestData& data,
-                        int ielem, real* const div);
+void gradient_sphere (const ViewUnmanaged<Real[NP][NP]> s, const TestData& data,
+                      const ViewUnmanaged<Real[2][2][NP][NP]> DInv,
+                      ViewUnmanaged<Real[2][NP][NP]> grad_s);
 
-void vorticity_sphere (const real* const v, const TestData& data,
-                       int ielem, real* const vort);
+void divergence_sphere (const ViewUnmanaged<Real[2][NP][NP]> v, const TestData& data,
+                        const ViewUnmanaged<Real[NP][NP]> metDet,
+                        const ViewUnmanaged<Real[2][2][NP][NP]> DInv,
+                        ViewUnmanaged<Real[NP][NP]> div_v);
 
-} // Namespace Homme
+void vorticity_sphere (const ViewUnmanaged<Real[2][NP][NP]> v, const TestData& data,
+                       const ViewUnmanaged<Real[NP][NP]> metDet,
+                       const ViewUnmanaged<Real[2][2][NP][NP]> D,
+                       ViewUnmanaged<Real[NP][NP]> vort);
+
+} // Namespace TinMan
 
 #endif // SPHERE_OPERATORS_HPP

@@ -1,31 +1,30 @@
-#include "sphere_operators.hpp"
-#include "dimensions.hpp"
-#include "test_macros.hpp"
+#include <sphere_operators.hpp>
+#include <TestData.hpp>
 
-namespace Homme
+namespace TinMan
 {
 
-void gradient_sphere (const real* const s, const TestData& data,
-                      int ielem, real* const ds)
+void gradient_sphere (const ViewUnmanaged<Real[NP][NP]> s, const TestData& data,
+                      const ViewUnmanaged<Real[2][2][NP][NP]> DInv,
+                      ViewUnmanaged<Real[2][NP][NP]> grad_s)
 {
-  typedef real Dvv_type[np][np];
+  typedef Real Dvv_type[NP][NP];
 
-  const Dvv_type& Dvv = data.deriv.Dvv;
-  real rrearth = data.constants.rrearth;
-  real* Dinv = SLICE_5D (data.arrays.elem_Dinv,ielem,np,np,2,2);
+  const Dvv_type& Dvv = data.deriv().Dvv;
+  Real rrearth = data.constants().rrearth;
 
-  real dsdx, dsdy;
-  real v1[np][np];
-  real v2[np][np];
-  for (int j=0; j<np; ++j)
+  Real dsdx, dsdy;
+  Real v1[NP][NP];
+  Real v2[NP][NP];
+  for (int j=0; j<NP; ++j)
   {
-    for (int l=0; l<np; ++l)
+    for (int l=0; l<NP; ++l)
     {
       dsdx = dsdy = 0;
-      for (int i=0; i<np; ++i)
+      for (int i=0; i<NP; ++i)
       {
-        dsdx += Dvv[i][l]*AT_2D(s,i,j,np);
-        dsdy += Dvv[i][l]*AT_2D(s,j,i,np);
+        dsdx += Dvv[i][l]*s(i,j);
+        dsdy += Dvv[i][l]*s(j,i);
       }
 
       v1[l][j] = dsdx * rrearth;
@@ -33,98 +32,88 @@ void gradient_sphere (const real* const s, const TestData& data,
     }
   }
 
-  for (int j=0; j<np; ++j)
+  for (int j=0; j<NP; ++j)
   {
-    for (int i=0; i<np; ++i)
+    for (int i=0; i<NP; ++i)
     {
-      AT_3D (ds, np, 2, i, j, 0) = AT_4D(Dinv,i,j,0,0,np,2,2)*v1[i][j]
-                                 + AT_4D(Dinv,i,j,1,0,np,2,2)*v1[i][j];
-
-      AT_3D (ds, np, 2, i, j, 1) = AT_4D(Dinv,i,j,0,1,np,2,2)*v1[i][j]
-                                 + AT_4D(Dinv,i,j,1,1,np,2,2)*v1[i][j];
+      grad_s(0, i, j) = DInv(0,0,i,j)*v1[i][j]+ DInv(1,0,i,j)*v2[i][j];
+      grad_s(1, i, j) = DInv(0,1,i,j)*v1[i][j]+ DInv(1,1,i,j)*v2[i][j];
     }
   }
 }
 
-void divergence_sphere (const real* const v, const TestData& data,
-                        int ielem, real* const div)
+void divergence_sphere (const ViewUnmanaged<Real[2][NP][NP]> v, const TestData& data,
+                        const ViewUnmanaged<Real[NP][NP]> metDet,
+                        const ViewUnmanaged<Real[2][2][NP][NP]> DInv,
+                        ViewUnmanaged<Real[NP][NP]> div_v)
 {
-  typedef real Dvv_type[np][np];
+  typedef Real Dvv_type[NP][NP];
 
-  const Dvv_type& Dvv = data.deriv.Dvv;
-  real rrearth = data.constants.rrearth;
+  const Dvv_type& Dvv = data.deriv().Dvv;
+  Real rrearth = data.constants().rrearth;
 
-  real* Dinv    = SLICE_5D (data.arrays.elem_Dinv,ielem,np,np,2,2);
-  real* metdet  = SLICE_3D (data.arrays.elem_metdet,ielem,np,np);
-  real* rmetdet = SLICE_3D (data.arrays.elem_rmetdet,ielem,np,np);
-
-  real gv[np][np][2];
-  for (int igp=0; igp<np; ++igp)
+  Real gv[2][NP][NP];
+  for (int igp=0; igp<NP; ++igp)
   {
-    for (int jgp=0; jgp<np; ++jgp)
+    for (int jgp=0; jgp<NP; ++jgp)
     {
-      gv[igp][jgp][0] = AT_2D(metdet,igp,jgp,np)* ( AT_4D(Dinv,igp,jgp,0,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
-                                                   +AT_4D(Dinv,igp,jgp,0,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2) );
-      gv[igp][jgp][1] = AT_2D(metdet,igp,jgp,np)* ( AT_4D(Dinv,igp,jgp,1,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
-                                                   +AT_4D(Dinv,igp,jgp,1,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2) );
+      gv[0][igp][jgp] = metDet(igp,jgp) * ( DInv(0,0,igp,jgp)*v(0,igp,jgp) + DInv(0,1,igp,jgp)*v(1,igp,jgp) );
+      gv[1][igp][jgp] = metDet(igp,jgp) * ( DInv(1,0,igp,jgp)*v(0,igp,jgp) + DInv(1,1,igp,jgp)*v(1,igp,jgp) );
     }
   }
 
-  real dudx, dvdy;
-  for (int igp=0; igp<np; ++igp)
+  Real dudx, dvdy;
+  for (int igp=0; igp<NP; ++igp)
   {
-    for (int jgp=0; jgp<np; ++jgp)
+    for (int jgp=0; jgp<NP; ++jgp)
     {
       dudx = dvdy = 0.;
-      for (int kgp=0; kgp<np; ++kgp)
+      for (int kgp=0; kgp<NP; ++kgp)
       {
-        dudx += Dvv[kgp][igp] * gv[kgp][jgp][0];
-        dvdy += Dvv[kgp][jgp] * gv[igp][kgp][1];
+        dudx += Dvv[kgp][igp] * gv[0][kgp][jgp];
+        dvdy += Dvv[kgp][jgp] * gv[1][igp][kgp];
       }
 
-      AT_2D(div,igp,jgp,np) = (dudx + dvdy) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
+      div_v(igp,jgp) = rrearth * (dudx + dvdy) / metDet(igp,jgp);
     }
   }
 }
 
-void vorticity_sphere (const real* const v, const TestData& data,
-                       int ielem, real* const vort)
+void vorticity_sphere (const ViewUnmanaged<Real[2][NP][NP]> v, const TestData& data,
+                       const ViewUnmanaged<Real[NP][NP]> metDet,
+                       const ViewUnmanaged<Real[2][2][NP][NP]> D,
+                       ViewUnmanaged<Real[NP][NP]> vort)
 {
-  typedef real Dvv_type[np][np];
+  typedef Real Dvv_type[NP][NP];
 
-  const Dvv_type& Dvv = data.deriv.Dvv;
-  real rrearth = data.constants.rrearth;
+  const Dvv_type& Dvv = data.deriv().Dvv;
+  Real rrearth = data.constants().rrearth;
 
-  real* D       = SLICE_5D (data.arrays.elem_D,ielem,np,np,2,2);
-  real* rmetdet = SLICE_3D (data.arrays.elem_rmetdet,ielem,np,np);
-
-  real vcov[np][np][2];
-  for (int igp=0; igp<np; ++igp)
+  Real vcov[2][NP][NP];
+  for (int igp=0; igp<NP; ++igp)
   {
-    for (int jgp=0; jgp<np; ++jgp)
+    for (int jgp=0; jgp<NP; ++jgp)
     {
-      vcov[igp][jgp][0] = AT_4D(D,igp,jgp,0,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
-                        + AT_4D(D,igp,jgp,1,0,np,2,2)*AT_3D(v,igp,jgp,1,np,2);
-      vcov[igp][jgp][1] = AT_4D(D,igp,jgp,0,1,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
-                        + AT_4D(D,igp,jgp,1,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2);
+      vcov[0][igp][jgp] = D(0,0,igp,jgp)*v(0,igp,jgp) + D(1,0,igp,jgp)*v(1,igp,jgp);
+      vcov[1][igp][jgp] = D(0,1,igp,jgp)*v(0,igp,jgp) + D(1,1,igp,jgp)*v(1,igp,jgp);
     }
   }
 
-  real dudy, dvdx;
-  for (int igp=0; igp<np; ++igp)
+  Real dudy, dvdx;
+  for (int igp=0; igp<NP; ++igp)
   {
-    for (int jgp=0; jgp<np; ++jgp)
+    for (int jgp=0; jgp<NP; ++jgp)
     {
       dudy = dvdx = 0.;
-      for (int kgp=0; kgp<np; ++kgp)
+      for (int kgp=0; kgp<NP; ++kgp)
       {
         dudy += Dvv[kgp][jgp] * vcov[igp][kgp][1];
         dvdx += Dvv[kgp][igp] * vcov[kgp][jgp][0];
       }
 
-      AT_2D(vort,igp,jgp,np) = (dvdx - dudy) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
+      vort(igp,jgp) = rrearth * (dvdx - dudy) / metDet(igp,jgp);
     }
   }
 }
 
-} // Namespace Homme
+} // Namespace TinMan

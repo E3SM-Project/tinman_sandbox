@@ -1,4 +1,4 @@
-MESSAGE (STATUS "Building f90_vs_cxx_test (kokkos version)")
+MESSAGE (STATUS "Building f90_vs_cxx_test (cxx_kokkos version)")
 
 STRING (TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_UPPER)
 IF (${CMAKE_BUILD_TYPE_UPPER} MATCHES "RELEASE")

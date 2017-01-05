@@ -1,20 +1,23 @@
 #ifndef COMPUTE_AND_APPLY_RHS_HPP
 #define COMPUTE_AND_APPLY_RHS_HPP
 
-#include "data_structures.hpp"
+#include <config.h>
 
-namespace Homme
+#include <Types.hpp>
+
+namespace TinMan
 {
 
-void compute_and_apply_rhs (TestData& data);
+// Forward declarations
+class TestData;
+class Region;
 
-void preq_hydrostatic (const real* const phis, const real* const T_v,
-                       const real* const p, const real* dp,
-                       real Rgas, real* const phi);
+void compute_and_apply_rhs (const TestData& data, Region& region);
 
-void preq_omega_ps (const real* const p, const real* const vgrad_p,
-                   const real* const divdp, real* const omega_p);
+void print_results_2norm (const TestData& data, const Region& region);
 
-} // Namespace Homme
+void dump_results_to_file (const TestData& data, const Region& region);
+
+} // Namespace TinMan
 
 #endif  // COMPUTE_AND_APPLY_RHS_HPP
