@@ -1,5 +1,5 @@
-#include <sphere_operators.hpp>
-#include <TestData.hpp>
+#include "sphere_operators.hpp"
+#include "TestData.hpp"
 
 namespace TinMan
 {
@@ -71,6 +71,8 @@ void gradient_sphere (Kokkos::TeamPolicy<>::member_type &team,
     v2[j][l] - dsdy * rrearth;
   });
 
+  team.team_barrier();
+
   constexpr const int grad_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, grad_iters),
                        [&](const int loop_idx) {
@@ -79,6 +81,7 @@ void gradient_sphere (Kokkos::TeamPolicy<>::member_type &team,
     grad_s(0, i, j) = DInv(0,0,i,j)*v1[i][j]+ DInv(1,0,i,j)*v2[i][j];
     grad_s(1, i, j) = DInv(0,1,i,j)*v1[i][j]+ DInv(1,1,i,j)*v2[i][j];
   });
+  team.team_barrier();
 }
 
 void divergence_sphere (const ViewUnmanaged<Real[2][NP][NP]> v, const TestData& data,
@@ -138,6 +141,7 @@ void divergence_sphere (Kokkos::TeamPolicy<>::member_type &team,
     const int kgp = loop_idx % 2;
     gv[kgp][igp][jgp] = metDet(igp,jgp) * ( DInv(kgp,0,igp,jgp)*v(0,igp,jgp) + DInv(kgp,1,igp,jgp)*v(1,igp,jgp) );
   });
+  team.team_barrier();
 
   Real dudx, dvdy;
   constexpr const int div_iters = NP * NP;
@@ -154,6 +158,7 @@ void divergence_sphere (Kokkos::TeamPolicy<>::member_type &team,
 
     div_v(igp,jgp) = rrearth * (dudx + dvdy) / metDet(igp,jgp);
   });
+  team.team_barrier();
 }
 
 void vorticity_sphere (const ViewUnmanaged<Real[2][NP][NP]> v, const TestData& data,
@@ -184,8 +189,8 @@ void vorticity_sphere (const ViewUnmanaged<Real[2][NP][NP]> v, const TestData& d
       dudy = dvdx = 0.;
       for (int kgp=0; kgp<NP; ++kgp)
       {
-        dudy += Dvv[kgp][jgp] * vcov[igp][kgp][1];
-        dvdx += Dvv[kgp][igp] * vcov[kgp][jgp][0];
+        dudy += Dvv[kgp][jgp] * vcov[1][igp][kgp];
+        dvdx += Dvv[kgp][igp] * vcov[0][kgp][jgp];
       }
 
       vort(igp,jgp) = rrearth * (dvdx - dudy) / metDet(igp,jgp);
@@ -213,6 +218,7 @@ void vorticity_sphere (Kokkos::TeamPolicy<>::member_type &team,
     vcov[0][igp][jgp] = D(0,0,igp,jgp)*v(0,igp,jgp) + D(1,0,igp,jgp)*v(1,igp,jgp);
     vcov[1][igp][jgp] = D(0,1,igp,jgp)*v(0,igp,jgp) + D(1,1,igp,jgp)*v(1,igp,jgp);
   });
+  team.team_barrier();
 
   Real dudy, dvdx;
   constexpr const int vort_iters = NP * NP;
@@ -223,12 +229,13 @@ void vorticity_sphere (Kokkos::TeamPolicy<>::member_type &team,
     dudy = dvdx = 0.;
     for (int kgp=0; kgp<NP; ++kgp)
     {
-      dudy += Dvv[kgp][jgp] * vcov[igp][kgp][1];
-      dvdx += Dvv[kgp][igp] * vcov[kgp][jgp][0];
+      dudy += Dvv[kgp][jgp] * vcov[1][igp][kgp];
+      dvdx += Dvv[kgp][igp] * vcov[0][kgp][jgp];
     }
 
     vort(igp,jgp) = rrearth * (dvdx - dudy) / metDet(igp,jgp);
   });
+  team.team_barrier();
 }
 
 } // Namespace TinMan

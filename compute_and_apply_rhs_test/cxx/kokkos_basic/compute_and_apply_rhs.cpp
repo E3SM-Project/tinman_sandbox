@@ -1,9 +1,9 @@
-#include <compute_and_apply_rhs.hpp>
+#include "compute_and_apply_rhs.hpp"
 
-#include <Types.hpp>
-#include <Region.hpp>
-#include <TestData.hpp>
-#include <sphere_operators.hpp>
+#include "Types.hpp"
+#include "Region.hpp"
+#include "TestData.hpp"
+#include "sphere_operators.hpp"
 
 namespace TinMan
 {
@@ -29,7 +29,7 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
   ViewManaged<Real[NUM_LEV][NP][NP]>    div_vdp("div_vdp");
   ViewManaged<Real[NP][NP]>             Ephi("ephi");
   ViewManaged<Real[NUM_LEV_P][NP][NP]>  eta_dot_dpdn("eta_dot_dpdn");
-  ViewManaged<Real[NUM_LEV][2][NP][NP]> grad_p("grad)p");
+  ViewManaged<Real[NUM_LEV][2][NP][NP]> grad_p("grad_p");
   ViewManaged<Real[NUM_LEV][NP][NP]>    kappa_star("kappa_star");
   ViewManaged<Real[NUM_LEV][NP][NP]>    omega_p("omega_p");
   ViewManaged<Real[NUM_LEV][NP][NP]>    p("p");
@@ -38,22 +38,6 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
   ViewManaged<Real[NUM_LEV][NP][NP]>    vort("vort");
   ViewManaged<Real[NUM_LEV][2][NP][NP]> vdp("vdp");
   ViewManaged<Real[2][NP][NP]>          grad_tmp("grad_tmp");
-
-  // Serivce arrays
-  Real vgrad_T[NP][NP]                   = {};
-  Real ttens[NUM_LEV][NP][NP]            = {};
-  Real T_vadv[NUM_LEV][NP][NP]           = {};
-  Real v_vadv[NUM_LEV][NP][NP][2]        = {};
-  Real vtens1[NUM_LEV][NP][NP]           = {};
-  Real vtens2[NUM_LEV][NP][NP]           = {};
-
-  // Other accessory variables
-  Real v1     = 0;
-  Real v2     = 0;
-  Real Qt     = 0;
-  Real glnps1 = 0;
-  Real glnps2 = 0;
-  Real gpterm = 0;
 
   // Input parameters
   const int nets = data.control().nets;
@@ -64,162 +48,179 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
   const int qn0  = data.control().qn0;
   const Real dt2 = data.control().dt2;
 
-  // Loop over elements
-  for (int ie=nets; ie<nete; ++ie)
-  {
-    for (int igp=0; igp<NP; ++igp)
-    {
-      for (int jgp=0; jgp<NP; ++jgp)
-      {
-        p(0,igp,jgp) = data.hvcoord().hyai[0]*data.hvcoord().ps0 + 0.5*region.dp3d(ie,n0,0,igp,jgp);
-      }
-    }
+  Kokkos::parallel_for(Kokkos::TeamPolicy<>(nete - nets + 1, Kokkos::AUTO),
+                       KOKKOS_LAMBDA(const Kokkos::TeamPolicy<>::member_type &team) {
+    const int ie = nets + team.league_rank();
 
-    for (int ilev=1; ilev<NUM_LEV; ++ilev)
-    {
+    // Serivce arrays
+    Real vgrad_T[NP][NP]                   = {};
+    Real ttens[NUM_LEV][NP][NP]            = {};
+    Real T_vadv[NUM_LEV][NP][NP]           = {};
+    Real v_vadv[NUM_LEV][NP][NP][2]        = {};
+    Real vtens1[NUM_LEV][NP][NP]           = {};
+    Real vtens2[NUM_LEV][NP][NP]           = {};
+
+    // Other accessory variables
+    Real v1     = 0;
+    Real v2     = 0;
+    Real Qt     = 0;
+    Real glnps1 = 0;
+    Real glnps2 = 0;
+    Real gpterm = 0;
+
+    if(ie < nete) {
       for (int igp=0; igp<NP; ++igp)
       {
         for (int jgp=0; jgp<NP; ++jgp)
         {
-          p(ilev,igp,jgp) = p(ilev-1,igp,jgp)
-                            + 0.5*region.dp3d(ie,n0,ilev-1,igp,jgp)
-                            + 0.5*region.dp3d(ie,n0,ilev,igp,jgp);
+          p(0,igp,jgp) = data.hvcoord().hyai[0]*data.hvcoord().ps0 + 0.5*region.dp3d(ie,n0,0,igp,jgp);
         }
       }
-    }
 
-    for (int ilev=0; ilev<NUM_LEV; ++ilev)
-    {
-      gradient_sphere (subview(p,ilev,ALL(),ALL()), data, region.DInv(ie), subview(grad_p,ilev,ALL(),ALL(),ALL()));
-
-      for (int igp=0; igp<NP; ++igp)
+      for (int ilev=1; ilev<NUM_LEV; ++ilev)
       {
-        for (int jgp=0; jgp<NP; ++jgp)
+        for (int igp=0; igp<NP; ++igp)
         {
-          v1 = region.V(ie,n0,ilev,igp,jgp,0);
-          v2 = region.V(ie,n0,ilev,igp,jgp,1);
-          vgrad_p(ilev,igp,jgp) = v1*grad_p(ilev,0,igp,jgp) + v2*grad_p(ilev,1,igp,jgp);
+          for (int jgp=0; jgp<NP; ++jgp)
+          {
+            p(ilev,igp,jgp) = p(ilev-1,igp,jgp)
+                              + 0.5*region.dp3d(ie,n0,ilev-1,igp,jgp)
+                              + 0.5*region.dp3d(ie,n0,ilev,igp,jgp);
+          }
+        }
 
-          vdp(ilev,0,igp,jgp) = v1*region.dp3d(ie,n0,ilev,igp,jgp);
-          vdp(ilev,1,igp,jgp) = v2*region.dp3d(ie,n0,ilev,igp,jgp);
+        gradient_sphere (subview(p, ilev, ALL(), ALL()),
+                         data, region.DInv(ie),
+                         subview(grad_p, ilev, ALL(), ALL(), ALL()));
 
-          region.Vn0(ie,ilev,igp,jgp,0) += data.constants().eta_ave_w * vdp(ilev,0,igp,jgp);
-          region.Vn0(ie,ilev,igp,jgp,1) += data.constants().eta_ave_w * vdp(ilev,1,igp,jgp);
+        for (int igp=0; igp<NP; ++igp)
+        {
+          for (int jgp=0; jgp<NP; ++jgp)
+          {
+            v1 = region.V(ie, n0, ilev, 0, igp, jgp);
+            v2 = region.V(ie, n0, ilev, 1, igp, jgp);
+            vgrad_p(ilev,igp,jgp) = v1*grad_p(ilev,0,igp,jgp) + v2*grad_p(ilev,1,igp,jgp);
+
+            vdp(ilev,0,igp,jgp) = v1*region.dp3d(ie,n0,ilev,igp,jgp);
+            vdp(ilev,1,igp,jgp) = v2*region.dp3d(ie,n0,ilev,igp,jgp);
+
+            region.Vn0(ie,ilev,igp,jgp,0) += data.constants().eta_ave_w * vdp(ilev,0,igp,jgp);
+            region.Vn0(ie,ilev,igp,jgp,1) += data.constants().eta_ave_w * vdp(ilev,1,igp,jgp);
+          }
+        }
+
+        divergence_sphere(subview(vdp,ilev,ALL(),ALL(),ALL()), data, region.metDet(ie), region.DInv(ie), subview(div_vdp,ilev,ALL(),ALL()));
+        vorticity_sphere(region.Vn0(ie,ilev), data, region.metDet(ie), region.D(ie), subview(vort,ilev,ALL(),ALL()));
+      }
+
+      if (qn0==-1)
+      {
+        for (int ilev=0; ilev<NUM_LEV; ++ilev)
+        {
+          for (int igp=0; igp<NP; ++igp)
+          {
+            for (int jgp=0; jgp<NP; ++jgp)
+            {
+              T_v(ilev,igp,jgp) = region.T(ie,n0,ilev,igp,jgp);
+              kappa_star(ilev,igp,jgp) = data.constants().kappa;
+            }
+          }
+        }
+      }
+      else
+      {
+        for (int ilev=0; ilev<NUM_LEV; ++ilev)
+        {
+          for (int igp=0; igp<NP; ++igp)
+          {
+            for (int jgp=0; jgp<NP; ++jgp)
+            {
+              Qt = region.Qdp(ie,qn0,1,ilev,igp,jgp) / region.dp3d(ie,n0,ilev,igp,jgp);
+              T_v(ilev,igp,jgp) = region.T(ie,n0,ilev,igp,jgp)*(1.0+ (data.constants().Rwater_vapor/data.constants().Rgas - 1.0)*Qt);
+              kappa_star(ilev,igp,jgp) = data.constants().kappa;
+            }
+          }
         }
       }
 
-      divergence_sphere(subview(vdp,ilev,ALL(),ALL(),ALL()), data, region.metDet(ie), region.DInv(ie), subview(div_vdp,ilev,ALL(),ALL()));
-      vorticity_sphere(region.Vn0(ie,ilev), data, region.metDet(ie), region.D(ie), subview(vort,ilev,ALL(),ALL()));
-    }
+      preq_hydrostatic (region.phis(ie), T_v, p, region.dp3d(ie,n0), data.constants().Rgas, region.phi(ie));
+      preq_omega_ps (p, vgrad_p, div_vdp, omega_p);
 
-    if (qn0==-1)
-    {
+      for (int ilev=0; ilev<NUM_LEV_P; ++ilev)
+      {
+        for (int igp=0; igp<NP; ++igp)
+        {
+          for (int jgp=0; jgp<NP; ++jgp)
+          {
+            region.eta_dot_dpdn(ie,ilev,igp,jgp) += data.constants().eta_ave_w * eta_dot_dpdn(ilev,igp,jgp);
+            region.omega_p(ie,ilev,igp,jgp)      += data.constants().eta_ave_w * omega_p(ilev,igp,jgp);
+          }
+        }
+      }
+
       for (int ilev=0; ilev<NUM_LEV; ++ilev)
       {
         for (int igp=0; igp<NP; ++igp)
         {
           for (int jgp=0; jgp<NP; ++jgp)
           {
-            T_v(ilev,igp,jgp) = region.T(ie,n0,ilev,igp,jgp);
-            kappa_star(ilev,igp,jgp) = data.constants().kappa;
+            v1 = region.V(ie,n0,ilev,0,igp,jgp);
+            v2 = region.V(ie,n0,ilev,1,igp,jgp);
+
+            Ephi(igp,jgp) = 0.5 * (v1*v1 + v2*v2) + region.phi(ie,ilev,igp,jgp) + region.pecnd(ie,ilev,igp,jgp);
+          }
+        }
+
+        gradient_sphere (region.T(ie,n0,ilev), data, region.DInv(ie), grad_tmp);
+
+        for (int igp=0; igp<NP; ++igp)
+        {
+          for (int jgp=0; jgp<NP; ++jgp)
+          {
+            v1 = region.V(ie,n0,ilev,0,igp,jgp);
+            v2 = region.V(ie,n0,ilev,1,igp,jgp);
+
+            vgrad_T[igp][jgp] = v1*grad_tmp(0,igp,jgp) + v2*grad_tmp(1,igp,jgp);
+          }
+        }
+
+        gradient_sphere (Ephi, data, region.DInv(ie), grad_tmp);
+
+        for (int igp=0; igp<NP; ++igp)
+        {
+          for (int jgp=0; jgp<NP; ++jgp)
+          {
+            gpterm = T_v(ilev,igp,jgp) / p(ilev,igp,jgp);
+
+            glnps1 = data.constants().Rgas*gpterm*grad_p(ilev,0,igp,jgp);
+            glnps2 = data.constants().Rgas*gpterm*grad_p(ilev,1,igp,jgp);
+
+            v1 = region.V(ie,n0,ilev,0,igp,jgp);
+            v2 = region.V(ie,n0,ilev,1,igp,jgp);
+
+            vtens1[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][0] + v2 * (region.fcor(ie,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps1;
+            vtens2[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][1] - v1 * (region.fcor(ie,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps2;
+
+            ttens[ilev][igp][jgp]  = T_vadv[ilev][igp][jgp] - vgrad_T[igp][jgp] + kappa_star(ilev,igp,jgp)*T_v(ilev,igp,jgp)*omega_p(ilev,igp,jgp);
           }
         }
       }
-    }
-    else
-    {
+
       for (int ilev=0; ilev<NUM_LEV; ++ilev)
       {
         for (int igp=0; igp<NP; ++igp)
         {
           for (int jgp=0; jgp<NP; ++jgp)
           {
-            Qt = region.Qdp(ie,qn0,1,ilev,igp,jgp) / region.dp3d(ie,n0,ilev,igp,jgp);
-            T_v(ilev,igp,jgp) = region.T(ie,n0,ilev,igp,jgp)*(1.0+ (data.constants().Rwater_vapor/data.constants().Rgas - 1.0)*Qt);
-            kappa_star(ilev,igp,jgp) = data.constants().kappa;
+            region.V(ie,np1,ilev,0,igp,jgp)  = region.spheremp(ie,igp,jgp) * ( region.V(ie,nm1,ilev,0,igp,jgp)  + dt2*vtens1 [ilev][igp][jgp] );
+            region.V(ie,np1,ilev,1,igp,jgp)  = region.spheremp(ie,igp,jgp) * ( region.V(ie,nm1,ilev,1,igp,jgp)  + dt2*vtens1 [ilev][igp][jgp] );
+            region.T(ie,np1,ilev,igp,jgp)    = region.spheremp(ie,igp,jgp) * ( region.T(ie,nm1,ilev,igp,jgp)    + dt2*ttens  [ilev][igp][jgp] );
+            region.dp3d(ie,np1,ilev,igp,jgp) = region.spheremp(ie,igp,jgp) * ( region.dp3d(ie,nm1,ilev,igp,jgp) + dt2*div_vdp(ilev,igp,jgp)   );
           }
         }
       }
     }
-
-    preq_hydrostatic (region.phis(ie), T_v, p, region.dp3d(ie,n0), data.constants().Rgas, region.phi(ie));
-    preq_omega_ps (p, vgrad_p, div_vdp, omega_p);
-
-    for (int ilev=0; ilev<NUM_LEV_P; ++ilev)
-    {
-      for (int igp=0; igp<NP; ++igp)
-      {
-        for (int jgp=0; jgp<NP; ++jgp)
-        {
-          region.eta_dot_dpdn(ie,ilev,igp,jgp) += data.constants().eta_ave_w * eta_dot_dpdn(ilev,igp,jgp);
-          region.omega_p(ie,ilev,igp,jgp)      += data.constants().eta_ave_w * omega_p(ilev,igp,jgp);
-        }
-      }
-    }
-
-//    fcor  = SLICE_3D(data.arrays.elem_fcor,ie,NP,NP);
-    for (int ilev=0; ilev<NUM_LEV; ++ilev)
-    {
-      for (int igp=0; igp<NP; ++igp)
-      {
-        for (int jgp=0; jgp<NP; ++jgp)
-        {
-          v1 = region.V(ie,n0,ilev,0,igp,jgp);
-          v2 = region.V(ie,n0,ilev,1,igp,jgp);
-
-          Ephi(igp,jgp) = 0.5 * (v1*v1 + v2*v2) + region.phi(ie,ilev,igp,jgp) + region.pecnd(ie,ilev,igp,jgp);
-        }
-      }
-
-      gradient_sphere (region.T(ie,n0,ilev), data, region.DInv(ie), grad_tmp);
-
-      for (int igp=0; igp<NP; ++igp)
-      {
-        for (int jgp=0; jgp<NP; ++jgp)
-        {
-          v1 = region.V(ie,n0,ilev,0,igp,jgp);
-          v2 = region.V(ie,n0,ilev,1,igp,jgp);
-
-          vgrad_T[igp][jgp] = v1*grad_tmp(0,igp,jgp) + v2*grad_tmp(1,igp,jgp);
-        }
-      }
-
-      gradient_sphere (Ephi, data, region.DInv(ie), grad_tmp);
-
-      for (int igp=0; igp<NP; ++igp)
-      {
-        for (int jgp=0; jgp<NP; ++jgp)
-        {
-          gpterm = T_v(ilev,igp,jgp) / p(ilev,igp,jgp);
-
-          glnps1 = data.constants().Rgas*gpterm*grad_p(ilev,0,igp,jgp);
-          glnps2 = data.constants().Rgas*gpterm*grad_p(ilev,1,igp,jgp);
-
-          v1 = region.V(ie,n0,ilev,0,igp,jgp);
-          v2 = region.V(ie,n0,ilev,1,igp,jgp);
-
-          vtens1[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][0] + v2 * (region.fcor(ie,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps1;
-          vtens2[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][1] - v1 * (region.fcor(ie,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps2;
-
-          ttens[ilev][igp][jgp]  = T_vadv[ilev][igp][jgp] - vgrad_T[igp][jgp] + kappa_star(ilev,igp,jgp)*T_v(ilev,igp,jgp)*omega_p(ilev,igp,jgp);
-        }
-      }
-    }
-
-    for (int ilev=0; ilev<NUM_LEV; ++ilev)
-    {
-      for (int igp=0; igp<NP; ++igp)
-      {
-        for (int jgp=0; jgp<NP; ++jgp)
-        {
-          region.V(ie,np1,ilev,0,igp,jgp)  = region.spheremp(ie,igp,jgp) * ( region.V(ie,nm1,ilev,0,igp,jgp)  + dt2*vtens1 [ilev][igp][jgp] );
-          region.V(ie,np1,ilev,1,igp,jgp)  = region.spheremp(ie,igp,jgp) * ( region.V(ie,nm1,ilev,1,igp,jgp)  + dt2*vtens1 [ilev][igp][jgp] );
-          region.T(ie,np1,ilev,igp,jgp)    = region.spheremp(ie,igp,jgp) * ( region.T(ie,nm1,ilev,igp,jgp)    + dt2*ttens  [ilev][igp][jgp] );
-          region.dp3d(ie,np1,ilev,igp,jgp) = region.spheremp(ie,igp,jgp) * ( region.dp3d(ie,nm1,ilev,igp,jgp) + dt2*div_vdp(ilev,igp,jgp)   );
-        }
-      }
-    }
-  }
+  });
 }
 
 void preq_hydrostatic (const ViewUnmanaged<Real[NP][NP]> phis,

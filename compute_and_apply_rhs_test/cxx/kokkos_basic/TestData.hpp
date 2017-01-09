@@ -1,9 +1,9 @@
 #ifndef DATA_STRUCTURES_HPP
 #define DATA_STRUCTURES_HPP
 
-#include <config.h>
+#include "config.h"
 
-#include <Types.hpp>
+#include "Types.hpp"
 
 namespace TinMan
 {

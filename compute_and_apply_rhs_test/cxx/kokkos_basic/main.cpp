@@ -1,7 +1,7 @@
-#include <compute_and_apply_rhs.hpp>
-#include <Region.hpp>
-#include <TestData.hpp>
-#include <Kokkos_Core.hpp>
+#include "compute_and_apply_rhs.hpp"
+#include "Region.hpp"
+#include "TestData.hpp"
+#include "Kokkos_Core.hpp"
 
 #include <iostream>
 #include <cstring>

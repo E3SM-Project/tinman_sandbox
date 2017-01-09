@@ -1,9 +1,9 @@
 #ifndef TINMAN_REGION_HPP
 #define TINMAN_REGION_HPP
 
-#include <config.h>
+#include "config.h"
 
-#include <Types.hpp>
+#include "Types.hpp"
 
 #include <Kokkos_Core.hpp>
 
@@ -67,9 +67,9 @@ public:
   // Getters for m_elements sub arrays
   template <typename iElem>
   KOKKOS_FORCEINLINE_FUNCTION
-  ViewUnmanaged<double[2][2][NP][NP]> DInv(iElem ie) const
+  ViewUnmanaged<Real[2][2][NP][NP]> DInv(iElem ie) const
   {
-    ViewUnmanaged<double[2][2][NP][NP]> DInv_ie(&(m_elements(ie).DInv[0][0][0][0]));
+    ViewUnmanaged<Real[2][2][NP][NP]> DInv_ie(&(m_elements(ie).DInv[0][0][0][0]));
     return DInv_ie;
   }
 
