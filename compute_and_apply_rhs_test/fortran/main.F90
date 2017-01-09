@@ -19,6 +19,7 @@ type (hvcoord_t)   :: hvcoord
 integer :: nets, nete, nelem, np1,nm1,n0,qn0
 real*8 :: dt2
 real (kind=real_kind) :: eta_ave_w 
+real (kind=real_kind) :: ii, jj, kk, iee
 
 ! local
 integer :: i,j,k,ie
@@ -50,43 +51,58 @@ integer :: i,j,k,ie
 
   do ie = nets,nete
   do k = 1,nlev
-   do j =1 , np
-    do i = 1, np
+   do j = 1,np
+    do i = 1,np
+      ii = i
+      jj = j
+      kk = k
+      iee = ie
 !not nlev arrays
-      elem(ie)%fcor(i,j) = 1.0
-      elem(ie)%metdet(i,j) = 1.0
-      elem(ie)%rmetdet(i,j) = 1.0
-      elem(ie)%spheremp(i,j) = 1.0
-!      elem(ie)%rspheremp(i,j) = 1.0 
+      elem(ie)%fcor(i,j) = SIN(ii+jj) 
+      elem(ie)%metdet(i,j) = ii*jj
+      elem(ie)%rmetdet(i,j) = 1.0d0/elem(ie)%metdet(i,j)
+      elem(ie)%spheremp(i,j) = 2*ii
+      elem(ie)%rspheremp(i,j) = 1.0d0/elem(ie)%spheremp(i,j)
       
-      elem(ie)%derived%phi(i,j,k) = 1.0
+      elem(ie)%derived%phi(i,j,k) = COS(ii+3*jj)+kk
       elem(ie)%derived%vn0(i,j,1:2,k) = 1.0
       elem(ie)%derived%pecnd(i,j,k) = 1.0
-      elem(ie)%derived%omega_p(i,j,k) = 1.0
+      elem(ie)%derived%omega_p(i,j,k) = jj*jj
 
-      elem(ie)%state%dp3d(i,j,k,1:timelevels) = 1.0
-      elem(ie)%state%v(i,j,1:2,k,1:timelevels) = 1.0
-      elem(ie)%state%T(i,j,k,1:timelevels) = 1.0
+      elem(ie)%state%dp3d(i,j,k,1:timelevels) = 10*kk+iee+ii+jj
+      elem(ie)%state%v(i,j,1:2,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5
+      elem(ie)%state%T(i,j,k,1:timelevels) = 1000-kk-ii-jj+iee/10
 
 !only vapor
-      elem(ie)%state%Qdp(i,j,k,1,qn0) = 1.0
+      elem(ie)%state%Qdp(i,j,k,1,qn0) = 1.0+SIN(ii*jj*kk)
 
       elem(ie)%Dinv(i,j,1,1) = 1.0
       elem(ie)%Dinv(i,j,1,2) = 0.0
       elem(ie)%Dinv(i,j,2,1) = 0.0
-      elem(ie)%Dinv(i,j,2,2) = 1.0
+      elem(ie)%Dinv(i,j,2,2) = 0.5
 
       elem(ie)%D(i,j,1,1) = 1.0
       elem(ie)%D(i,j,1,2) = 0.0
       elem(ie)%D(i,j,2,1) = 0.0
-      elem(ie)%D(i,j,2,2) = 1.0
+      elem(ie)%D(i,j,2,2) = 2.0
     enddo
    enddo 
   enddo
   enddo
 
-! init hybrid!!!!!!!!!!!!!!!!!!!!!!
+! Init hybrid
+! Actually, most of hvcoord does not matter since only Lagrangian code is present.
+! What about ps0?
+  hvcoord%ps0 = 10.0
+  hvcoord%nprlev = 1 ! does this matter?
 
+  do k = 1, nlev + 1
+    hvcoord%hyai(k) = nlev + 2 - k
+    hvcoord%hybi(k) = k - 1
+  enddo
+  hvcoord%hyam(1:nlev) = (hvcoord%hyai(1:nlev) + hvcoord%hyai(2:nlev+1))/2.0
+  hvcoord%hybm(1:nlev) = (hvcoord%hybi(1:nlev) + hvcoord%hybi(2:nlev+1))/2.0
+  hvcoord%hybd(1:nlev) = (hvcoord%hybi(2:nlev+1) - hvcoord%hybi(1:nlev))/2.0
 
 !----------------- END OF INIT
 
