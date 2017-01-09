@@ -8,17 +8,31 @@
 namespace TinMan
 {
 
-void preq_hydrostatic (const ViewUnmanaged<Real[NP][NP]> phis,
-                       const ViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v,
-                       const ViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
-                       const ViewUnmanaged<Real[NUM_LEV][NP][NP]> dp,
-                       Real Rgas,
-                       ViewUnmanaged<Real[NUM_LEV][NP][NP]> phi);
+void preq_hydrostatic(const ViewUnmanaged<Real[NP][NP]> phis,
+                      const ViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v,
+                      const ViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
+                      const ViewUnmanaged<Real[NUM_LEV][NP][NP]> dp,
+                      Real Rgas,
+                      ViewUnmanaged<Real[NUM_LEV][NP][NP]> phi);
 
-void preq_omega_ps (const ViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
-                    const ViewUnmanaged<Real[NUM_LEV][NP][NP]> vgrad_p,
-                    const ViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp,
-                    ViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p);
+void preq_hydrostatic(const Kokkos::TeamPolicy<>::member_type &team,
+                      const ViewUnmanaged<Real[NP][NP]> phis,
+                      const ViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v,
+                      const ViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
+                      const ViewUnmanaged<Real[NUM_LEV][NP][NP]> dp,
+                      Real Rgas,
+                      ViewUnmanaged<Real[NUM_LEV][NP][NP]> phi);
+
+void preq_omega_ps(const Kokkos::TeamPolicy<>::member_type &team,
+                   const ViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
+                   const ViewUnmanaged<Real[NUM_LEV][NP][NP]> vgrad_p,
+                   const ViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp,
+                   ViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p);
+
+void preq_omega_ps(const ViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
+                   const ViewUnmanaged<Real[NUM_LEV][NP][NP]> vgrad_p,
+                   const ViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp,
+                   ViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p);
 
 void compute_and_apply_rhs (const TestData& data, Region& region)
 {
@@ -139,8 +153,8 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
 
       team.team_barrier();
 
-      preq_hydrostatic (region.phis(ie), T_v, p, region.dp3d(ie,n0), data.constants().Rgas, region.phi(ie));
-      preq_omega_ps (p, vgrad_p, div_vdp, omega_p);
+      preq_hydrostatic(team, region.phis(ie), T_v, p, region.dp3d(ie,n0), data.constants().Rgas, region.phi(ie));
+      preq_omega_ps(p, vgrad_p, div_vdp, omega_p);
 
       Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV_P), [&](const int ilev) {
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
@@ -210,6 +224,38 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
   });
 }
 
+void preq_hydrostatic (const Kokkos::TeamPolicy<>::member_type &team,
+                       const ViewUnmanaged<Real[NP][NP]> phis,
+                       const ViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v,
+                       const ViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
+                       const ViewUnmanaged<Real[NUM_LEV][NP][NP]> dp,
+                       Real Rgas,
+                       ViewUnmanaged<Real[NUM_LEV][NP][NP]> phi)
+{
+  Real hkk, hkl;
+  Real phii[NUM_LEV][NP][NP];
+  Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
+                       [&](const int loop_idx) {
+    const int jgp = loop_idx / NP;
+    const int igp = loop_idx % NP;
+    hkk = 0.5 * dp(NUM_LEV-1, igp, jgp) / p(NUM_LEV - 1, igp, jgp);
+    hkl = 2.0 * hkk;
+    phii[NUM_LEV - 1][igp][jgp] = Rgas * T_v(NUM_LEV - 1, igp, jgp) * hkl;
+    phi(NUM_LEV - 1, igp, jgp) = phis(igp, jgp) + Rgas * T_v(NUM_LEV - 1, igp, jgp) * hkk;
+
+    for(int ilev = NUM_LEV - 2; ilev > 1; --ilev) {
+      hkk = 0.5 * dp(ilev,igp,jgp) / p(ilev,igp,jgp);
+      hkl = 2.0 * hkk;
+      phii[ilev][igp][jgp] = phii[ilev + 1][igp][jgp] + Rgas * T_v(ilev, igp, jgp)*hkl;
+      phi(ilev, igp, jgp) = phis(igp, jgp) + phii[ilev + 1][igp][jgp] + Rgas*T_v(ilev, igp, jgp)*hkk;
+    }
+
+    hkk = 0.5 * dp(0, igp, jgp) / p(0, igp, jgp);
+    phi(0, igp, jgp) = phis(igp, jgp) + phii[1][igp][jgp] + Rgas * T_v(0, igp, jgp) * hkk;
+  });
+  team.team_barrier();
+}
+
 void preq_hydrostatic (const ViewUnmanaged<Real[NP][NP]> phis,
                        const ViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v,
                        const ViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
@@ -246,10 +292,45 @@ void preq_hydrostatic (const ViewUnmanaged<Real[NP][NP]> phis,
   }
 }
 
-void preq_omega_ps (const ViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
-                    const ViewUnmanaged<Real[NUM_LEV][NP][NP]> vgrad_p,
-                    const ViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp,
-                    ViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p)
+void preq_omega_ps(const Kokkos::TeamPolicy<>::member_type &team,
+                   const ViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
+                   const ViewUnmanaged<Real[NUM_LEV][NP][NP]> vgrad_p,
+                   const ViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp,
+                   ViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p)
+{
+  Real ckk, ckl, term;
+  Real suml[NP][NP];
+  Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
+                       [&](const int loop_idx) {
+    const int jgp = loop_idx / NP;
+    const int igp = loop_idx % NP;
+
+    ckk = 0.5 / p(0, igp, jgp);
+    term  = div_vdp(0, igp, jgp);
+    omega_p(0, igp, jgp) = vgrad_p(0, igp, jgp) / p(0, igp, jgp) - ckk * term;
+    suml[igp][jgp] = term;
+    for(int ilev = 1; ilev < NUM_LEV - 1; ++ilev)
+    {
+      ckk = 0.5 / p(ilev, igp, jgp);
+      ckl = 2.0 * ckk;
+      term  = div_vdp(ilev, igp, jgp);
+      omega_p(ilev, igp, jgp) = vgrad_p(ilev, igp, jgp) / p(ilev, igp, jgp) - ckl * suml[igp][jgp] - ckk * term;
+
+      suml[igp][jgp] += term;
+    }
+
+    ckk = 0.5 / p(NUM_LEV - 1, igp, jgp);
+    ckl = 2.0 * ckk;
+    term = div_vdp(NUM_LEV - 1, igp, jgp);
+    omega_p(NUM_LEV - 1, igp, jgp) = vgrad_p(NUM_LEV - 1, igp, jgp) / p(NUM_LEV - 1, igp, jgp) - ckl * suml[igp][jgp] - ckk * term;
+  });
+  team.team_barrier();
+}
+
+void preq_omega_ps(const ViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
+                   const ViewUnmanaged<Real[NUM_LEV][NP][NP]> vgrad_p,
+                   const ViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp,
+                   ViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p)
 {
   Real ckk, ckl, term;
   Real suml[NP][NP];
