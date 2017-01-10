@@ -25,6 +25,8 @@ int main (int argc, char** argv)
 {
   using namespace Homme;
 
+  bool dump_res = false;
+
   if (argc > 1) {
     int iarg = 1;
     while (iarg<argc)
@@ -43,8 +45,15 @@ int main (int argc, char** argv)
         ++iarg;
         continue;
       }
+      else if (strncmp(argv[iarg],"--tinman-dump-res=",18) == 0)
+      {
+        char* val = strchr(argv[iarg],'=')+1;
+        dump_res = std::stoi(val);
 
-      if (strncmp(argv[iarg],"--tinman-help",13) == 0)
+        ++iarg;
+        continue;
+      }
+      else if (strncmp(argv[iarg],"--tinman-help",13) == 0)
       {
         std::cout << "+---------------------------------------------------------------+\n"
                   << "|                 TinMan command line arguments                 |\n"
@@ -84,8 +93,11 @@ int main (int argc, char** argv)
 
   print_results_2norm (data);
 
-  std::cout << " --- Dumping results to file...\n";
-  dump_results_to_file (data);
+  if (dump_res)
+  {
+    std::cout << " --- Dumping results to file...\n";
+    dump_results_to_file (data);
+  }
 
   std::cout << " --- Cleaning up data...\n";
   data.cleanup_data ();
