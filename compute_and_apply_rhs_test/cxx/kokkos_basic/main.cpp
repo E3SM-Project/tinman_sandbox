@@ -21,6 +21,7 @@ bool is_unsigned_int(const char* str)
 int main (int argc, char** argv)
 {
   int num_elems = 10;
+  bool dump_res = false;
 
   if (argc > 1) {
     int iarg = 1;
@@ -28,7 +29,7 @@ int main (int argc, char** argv)
     {
       if (strncmp(argv[iarg],"--tinman-num-elems=",18) == 0)
       {
-        char* number =  strchr(argv[iarg],'=')+1;
+        char* number = strchr(argv[iarg],'=')+1;
         if (!is_unsigned_int(number))
         {
           std::cerr << "Expecting an unsigned integer after '--tinman-num-elems='.\n";
@@ -40,16 +41,24 @@ int main (int argc, char** argv)
         ++iarg;
         continue;
       }
-
-      if (strncmp(argv[iarg],"--tinman-help",13) == 0)
+      else if (strncmp(argv[iarg],"--tinman-dump-res=",18) == 0)
       {
-        std::cout << "+---------------------------------------------------------------+\n"
-                  << "|                 TinMan command line arguments                 |\n"
-                  << "+---------------------------------------------------------------+\n"
-                  << "|  --tinman-num-elems  : the number of elements (default=10)    |\n"
-                  << "|  --tinman-help       : prints this message                    |\n"
-                  << "|  --kokkos-help       : prints kokkos help                     |\n"
-                  << "+---------------------------------------------------------------+\n";
+        char* val = strchr(argv[iarg],'=')+1;
+        dump_res = std::stoi(val);
+
+        ++iarg;
+        continue;
+      }
+      else if (strncmp(argv[iarg],"--tinman-help",13) == 0)
+      {
+        std::cout << "+------------------------------------------------------------------+\n"
+                  << "|                   TinMan command line arguments                  |\n"
+                  << "+------------------------------------------------------------------+\n"
+                  << "|  --tinman-num-elems  : the number of elements (def=10)           |\n"
+                  << "|  --tinman-dump-res   : whether to dump results to file (def=NO)  |\n"
+                  << "|  --tinman-help       : prints this message                       |\n"
+                  << "|  --kokkos-help       : prints kokkos help                        |\n"
+                  << "+------------------------------------------------------------------+\n";
 
         std::exit(0);
       }
@@ -83,8 +92,11 @@ int main (int argc, char** argv)
   std::cout << "   ---> compute_and_apply_rhs execution time: " << delta << " seconds.\n";
   print_results_2norm (data,*region);
 
-  std::cout << " --- Dumping results to file...\n";
-  dump_results_to_file (data,*region);
+  if (dump_res)
+  {
+    std::cout << " --- Dumping results to file...\n";
+    dump_results_to_file (data,*region);
+  }
 
   std::cout << " --- Cleaning up data...\n";
   delete region;

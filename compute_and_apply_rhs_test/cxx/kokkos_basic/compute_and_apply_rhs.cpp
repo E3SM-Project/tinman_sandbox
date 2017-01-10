@@ -111,15 +111,15 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
-          v1 = region.V(ie, n0, ilev, 0, igp, jgp);
-          v2 = region.V(ie, n0, ilev, 1, igp, jgp);
+          v1 = region.U(ie, n0, ilev, igp, jgp);
+          v2 = region.V(ie, n0, ilev, igp, jgp);
           vgrad_p(ilev, igp, jgp) = v1*grad_p(ilev, 0, igp, jgp) + v2 * grad_p(ilev, 1, igp, jgp);
 
           vdp(ilev, 0, igp, jgp) = v1 * region.dp3d(ie, n0, ilev, igp, jgp);
           vdp(ilev, 1, igp, jgp) = v2 * region.dp3d(ie, n0, ilev, igp, jgp);
 
-          region.Vn0(ie, ilev, igp, jgp, 0) += data.constants().eta_ave_w * vdp(ilev, 0, igp, jgp);
-          region.Vn0(ie, ilev, igp, jgp, 1) += data.constants().eta_ave_w * vdp(ilev, 1, igp, jgp);
+          region.Un0(ie, ilev, igp, jgp) += data.constants().eta_ave_w * vdp(ilev, 0, igp, jgp);
+          region.Vn0(ie, ilev, igp, jgp) += data.constants().eta_ave_w * vdp(ilev, 1, igp, jgp);
         });
 
         divergence_sphere(team, subview(vdp, ilev, ALL(), ALL(), ALL()), data, region.metDet(ie), region.DInv(ie), subview(div_vdp, ilev, ALL(), ALL()));
@@ -171,8 +171,8 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
-          v1 = region.V(ie,n0,ilev,0,igp,jgp);
-          v2 = region.V(ie,n0,ilev,1,igp,jgp);
+          v1 = region.U(ie,n0,ilev,igp,jgp);
+          v2 = region.V(ie,n0,ilev,igp,jgp);
 
           Ephi(igp,jgp) = 0.5 * (v1*v1 + v2*v2) + region.phi(ie,ilev,igp,jgp) + region.pecnd(ie,ilev,igp,jgp);
         });
@@ -182,8 +182,8 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
-          v1 = region.V(ie,n0,ilev,0,igp,jgp);
-          v2 = region.V(ie,n0,ilev,1,igp,jgp);
+          v1 = region.U(ie,n0,ilev,igp,jgp);
+          v2 = region.V(ie,n0,ilev,igp,jgp);
 
           vgrad_T[igp][jgp] = v1*grad_tmp(0,igp,jgp) + v2*grad_tmp(1,igp,jgp);
         });
@@ -198,8 +198,8 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
           glnps1 = data.constants().Rgas*gpterm*grad_p(ilev,0,igp,jgp);
           glnps2 = data.constants().Rgas*gpterm*grad_p(ilev,1,igp,jgp);
 
-          v1 = region.V(ie,n0,ilev,0,igp,jgp);
-          v2 = region.V(ie,n0,ilev,1,igp,jgp);
+          v1 = region.U(ie,n0,ilev,igp,jgp);
+          v2 = region.V(ie,n0,ilev,igp,jgp);
 
           vtens1[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][0] + v2 * (region.fcor(ie,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps1;
           vtens2[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][1] - v1 * (region.fcor(ie,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps2;
@@ -214,8 +214,8 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
-          region.V(ie, np1, ilev, 0, igp, jgp) = region.spheremp(ie, igp, jgp) * (region.V(ie, nm1, ilev, 0, igp, jgp) + dt2 * vtens1[ilev][igp][jgp]);
-          region.V(ie, np1, ilev, 1, igp, jgp) = region.spheremp(ie, igp, jgp) * (region.V(ie, nm1, ilev, 1, igp, jgp) + dt2 * vtens1[ilev][igp][jgp]);
+          region.U(ie, np1, ilev, igp, jgp) = region.spheremp(ie, igp, jgp) * (region.U(ie, nm1, ilev, igp, jgp) + dt2 * vtens1[ilev][igp][jgp]);
+          region.V(ie, np1, ilev, igp, jgp) = region.spheremp(ie, igp, jgp) * (region.V(ie, nm1, ilev, igp, jgp) + dt2 * vtens1[ilev][igp][jgp]);
           region.T(ie, np1, ilev, igp, jgp) = region.spheremp(ie, igp, jgp) * (region.T(ie, nm1, ilev, igp, jgp) + dt2 * ttens[ilev][igp][jgp]);
           region.dp3d(ie, np1, ilev, igp, jgp) = region.spheremp(ie, igp, jgp) * (region.dp3d(ie, nm1, ilev, igp, jgp) + dt2 * div_vdp(ilev, igp, jgp));
         });
@@ -381,8 +381,8 @@ void print_results_2norm (const TestData& data, const Region& region)
       {
         for (int jgp=0; jgp<NP; ++jgp)
         {
-          vnorm  += std::pow( region.V(ie,np1,ilev,0,igp,jgp) , 2 );
-          vnorm  += std::pow( region.V(ie,np1,ilev,1,igp,jgp) , 2 );
+          vnorm  += std::pow( region.U(ie,np1,ilev,igp,jgp)   , 2 );
+          vnorm  += std::pow( region.V(ie,np1,ilev,igp,jgp)   , 2 );
           tnorm  += std::pow( region.T(ie,np1,ilev,igp,jgp)   , 2 );
           dpnorm += std::pow( region.dp3d(ie,np1,ilev,igp,jgp), 2 );
         }
@@ -456,8 +456,8 @@ void dump_results_to_file (const TestData& data, const Region& region)
       {
         for (int jgp=0; jgp<NP; ++jgp)
         {
-          vxfile << " " << region.V(ie,np1,ilev,0,igp,jgp);
-          vyfile << " " << region.V(ie,np1,ilev,1,igp,jgp);
+          vxfile << " " << region.U(ie,np1,ilev,igp,jgp);
+          vyfile << " " << region.V(ie,np1,ilev,igp,jgp);
           tfile  << " " << region.T(ie,np1,ilev,igp,jgp);
           dpfile << " " << region.dp3d(ie,np1,ilev,igp,jgp);
         }

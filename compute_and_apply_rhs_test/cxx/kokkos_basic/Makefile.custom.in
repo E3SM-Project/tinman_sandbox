@@ -30,7 +30,7 @@ INC_DIRS = -I$(SRC_DIR) -I$(OBJ_DIR)
 
 DEPFLAGS = -M
 
-OBJ = $(sort $(patsubst $(SRC_DIR)/%.cpp,%.o,$(SRC)))
+OBJ = $(addprefix obj_files/, $(sort $(patsubst $(SRC_DIR)/%.cpp,%.o,$(SRC))))
 LIB =
 
 include $(KOKKOS_PATH)/Makefile.kokkos
@@ -54,6 +54,5 @@ clean: kokkos-clean rm_obj_dir
 
 # Compilation rules
 
-%.o:$(SRC_DIR)/%.cpp $(KOKKOS_CPP_DEPENDS)
-	$(CXX) $(KOKKOS_CPPFLAGS) $(KOKKOS_CXXFLAGS) $(INC_DIRS) $(CXXFLAGS) $(EXTRA_INC) -c $< -o $(notdir $@)
-
+obj_files/%.o:$(SRC_DIR)/%.cpp $(KOKKOS_CPP_DEPENDS)
+	$(CXX) $(KOKKOS_CPPFLAGS) $(KOKKOS_CXXFLAGS) $(INC_DIRS) $(CXXFLAGS) $(EXTRA_INC) -c $< -o $@
