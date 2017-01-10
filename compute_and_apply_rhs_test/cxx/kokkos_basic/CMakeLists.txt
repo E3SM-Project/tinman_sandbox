@@ -15,5 +15,6 @@ ADD_CUSTOM_TARGET(kokkos COMMAND $(MAKE) -f Makefile.custom
 SET_TARGET_PROPERTIES(kokkos PROPERTIES EXCLUDE_FROM_ALL FALSE)
 
 # Hack, to forward 'clean' to our makefile
-ADD_CUSTOM_TARGET(clean COMMAND $(MAKE) -f Makefile.custom clean
-                  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+ADD_CUSTOM_TARGET(really-clean
+                  COMMAND "$(MAKE)" clean
+                  COMMAND "$(MAKE)" -f Makefile.custom clean WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
