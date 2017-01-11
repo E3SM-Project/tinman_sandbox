@@ -1,6 +1,10 @@
 # KOKKOS_PATH (root directory of the kokkos repo) must be passed in
 KOKKOS_PATH = ${TINMAN_KOKKOS_PATH}
 KOKKOS_SRC_PATH = $(KOKKOS_PATH)
+HWLOC_PATH=${TINMAN_HWLOC_PATH}
+ifneq ($(HWLOC_PATH),)
+KOKKOS_USE_TPLS=hwloc
+endif
 KOKKOS_DEVICES = "OpenMP"
 EXE_NAME = kokkos_basic
 
