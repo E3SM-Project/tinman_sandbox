@@ -22,6 +22,7 @@ int main (int argc, char** argv)
 {
   int num_elems = 10;
   bool dump_res = false;
+  int num_exec = 1;
 
   if (argc > 1) {
     int iarg = 1;
@@ -41,6 +42,14 @@ int main (int argc, char** argv)
         ++iarg;
         continue;
       }
+      else if (strncmp(argv[iarg],"--tinman-num-exec=",18) == 0)
+      {
+        char* val = strchr(argv[iarg],'=')+1;
+        num_exec = std::stoi(val);
+
+        ++iarg;
+        continue;
+      }
       else if (strncmp(argv[iarg],"--tinman-dump-res=",18) == 0)
       {
         char* val = strchr(argv[iarg],'=')+1;
@@ -56,6 +65,7 @@ int main (int argc, char** argv)
                   << "+------------------------------------------------------------------+\n"
                   << "|  --tinman-num-elems  : the number of elements (def=10)           |\n"
                   << "|  --tinman-dump-res   : whether to dump results to file (def=NO)  |\n"
+                  << "|  --tinman-num-exec   : number of times to execute (def=1)        |\n"
                   << "|  --tinman-help       : prints this message                       |\n"
                   << "|  --kokkos-help       : prints kokkos help                        |\n"
                   << "+------------------------------------------------------------------+\n";
@@ -74,6 +84,7 @@ int main (int argc, char** argv)
 
   Kokkos::initialize (argc, argv);
 
+Kokkos::OpenMP::print_configuration(std::cout,true);
   std::cout << " --- Initializing data...\n";
   TinMan::TestData data(num_elems);
   TinMan::Region* region = new TinMan::Region(num_elems); // A pointer, so the views are destryed before Kokkos::finalize
@@ -83,7 +94,10 @@ int main (int argc, char** argv)
 
   struct timeval start, end;
   gettimeofday(&start, NULL);
-  TinMan::compute_and_apply_rhs(data,*region);
+  for (int i=0; i<num_exec; ++i)
+  {
+    TinMan::compute_and_apply_rhs(data,*region);
+  }
   gettimeofday(&end, NULL);
 
   double delta = ((end.tv_sec  - start.tv_sec) * 1000000u +

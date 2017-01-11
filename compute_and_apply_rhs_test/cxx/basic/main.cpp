@@ -26,6 +26,7 @@ int main (int argc, char** argv)
   using namespace Homme;
 
   bool dump_res = false;
+  int num_exec = 1;
 
   if (argc > 1) {
     int iarg = 1;
@@ -45,6 +46,14 @@ int main (int argc, char** argv)
         ++iarg;
         continue;
       }
+      else if (strncmp(argv[iarg],"--tinman-num-exec=",18) == 0)
+      {
+        char* val = strchr(argv[iarg],'=')+1;
+        num_exec = std::stoi(val);
+
+        ++iarg;
+        continue;
+      }
       else if (strncmp(argv[iarg],"--tinman-dump-res=",18) == 0)
       {
         char* val = strchr(argv[iarg],'=')+1;
@@ -55,12 +64,14 @@ int main (int argc, char** argv)
       }
       else if (strncmp(argv[iarg],"--tinman-help",13) == 0)
       {
-        std::cout << "+---------------------------------------------------------------+\n"
-                  << "|                 TinMan command line arguments                 |\n"
-                  << "+---------------------------------------------------------------+\n"
-                  << "|  --tinman-num-elems  : the number of elements (default=10)    |\n"
-                  << "|  --tinman-help       : prints this message                    |\n"
-                  << "+---------------------------------------------------------------+\n";
+        std::cout << "+------------------------------------------------------------------+\n"
+                  << "|                   TinMan command line arguments                  |\n"
+                  << "+------------------------------------------------------------------+\n"
+                  << "|  --tinman-num-elems  : the number of elements (def=10)           |\n"
+                  << "|  --tinman-dump-res   : whether to dump results to file (def=NO)  |\n"
+                  << "|  --tinman-num-exec   : number of times to execute (def=1)        |\n"
+                  << "|  --tinman-help       : prints this message                       |\n"
+                  << "+------------------------------------------------------------------+\n";
 
         std::exit(0);
       }
@@ -85,7 +96,10 @@ int main (int argc, char** argv)
 
   std::cout << " --- Performing computations...\n";
   gettimeofday(&start, NULL);
-  compute_and_apply_rhs(data);
+  for (int i=0; i<num_exec; ++i)
+  {
+    compute_and_apply_rhs(data);
+  }
   gettimeofday(&end, NULL);
   double delta = ((end.tv_sec  - start.tv_sec) * 1000000u +
                    end.tv_usec - start.tv_usec) / 1.e6;
