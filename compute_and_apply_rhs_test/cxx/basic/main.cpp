@@ -1,9 +1,10 @@
 #include "data_structures.hpp"
 #include "compute_and_apply_rhs.hpp"
+#include "timer.hpp"
 
 #include <iostream>
 #include <cstring>
-#include <sys/time.h>
+#include <vector>
 
 namespace Homme
 {
@@ -85,35 +86,30 @@ int main (int argc, char** argv)
     std::exit(1);
   }
 
-  struct timeval start, end;
-
   TestData data;
 
-  std::cout << " --- Initializing data...\n";
   data.init_data();
 
-  print_results_2norm (data);
+  // Burn in to avoid cache effects
+  compute_and_apply_rhs(data);
 
-  std::cout << " --- Performing computations...\n";
-  gettimeofday(&start, NULL);
+  std::vector<Timer::Timer> timers(num_exec);
   for (int i=0; i<num_exec; ++i)
   {
+    timers[i].startTimer();
     compute_and_apply_rhs(data);
+    timers[i].stopTimer();
   }
-  gettimeofday(&end, NULL);
-  double delta = ((end.tv_sec  - start.tv_sec) * 1000000u +
-                   end.tv_usec - start.tv_usec) / 1.e6;
-  std::cout << "   ---> compute_and_apply_rhs execution time: " << delta << " seconds.\n";
 
-  print_results_2norm (data);
+  for(int i = 0; i < num_exec; ++i) {
+    std::cout << timers[i] << std::endl;
+  }
 
   if (dump_res)
   {
-    std::cout << " --- Dumping results to file...\n";
     dump_results_to_file (data);
   }
 
-  std::cout << " --- Cleaning up data...\n";
   data.cleanup_data ();
 
   return 0;

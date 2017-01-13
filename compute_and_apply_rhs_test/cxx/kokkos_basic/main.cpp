@@ -1,11 +1,12 @@
 #include "compute_and_apply_rhs.hpp"
 #include "Region.hpp"
 #include "TestData.hpp"
+#include "timer.hpp"
 #include "Kokkos_Core.hpp"
 
 #include <iostream>
 #include <cstring>
-#include <sys/time.h>
+#include <vector>
 
 bool is_unsigned_int(const char* str)
 {
@@ -84,35 +85,26 @@ int main (int argc, char** argv)
 
   Kokkos::initialize (argc, argv);
 
-Kokkos::OpenMP::print_configuration(std::cout,true);
-  std::cout << " --- Initializing data...\n";
+  // Kokkos::OpenMP::print_configuration(std::cout,true);
+  // std::cout << " --- Initializing data...\n";
   TinMan::TestData data(num_elems);
-  TinMan::Region* region = new TinMan::Region(num_elems); // A pointer, so the views are destryed before Kokkos::finalize
-  print_results_2norm (data, *region);
+  TinMan::Region* region = new TinMan::Region(num_elems); // A pointer, so the views are destroyed before Kokkos::finalize
 
-  std::cout << " --- Performing computations...\n";
+  // Burn in before timing to reduce cache effect
+  TinMan::compute_and_apply_rhs(data,*region);
 
-  struct timeval start, end;
-  gettimeofday(&start, NULL);
+  std::vector<Timer::Timer> timers(num_exec);
   for (int i=0; i<num_exec; ++i)
   {
+    timers[i].startTimer();
     TinMan::compute_and_apply_rhs(data,*region);
-  }
-  gettimeofday(&end, NULL);
-
-  double delta = ((end.tv_sec  - start.tv_sec) * 1000000u +
-                   end.tv_usec - start.tv_usec) / 1.e6;
-
-  std::cout << "   ---> compute_and_apply_rhs execution time: " << delta << " seconds.\n";
-  print_results_2norm (data,*region);
-
-  if (dump_res)
-  {
-    std::cout << " --- Dumping results to file...\n";
-    dump_results_to_file (data,*region);
+    timers[i].stopTimer();
   }
 
-  std::cout << " --- Cleaning up data...\n";
+  for(int i = 0; i < num_exec; ++i) {
+    std::cout << timers[i] << std::endl;
+  }
+
   delete region;
 
   Kokkos::finalize ();
