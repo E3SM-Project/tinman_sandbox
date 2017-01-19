@@ -1,6 +1,8 @@
 #include "sphere_operators.hpp"
 #include "TestData.hpp"
 
+#include <Kokkos_Array.hpp>
+
 namespace TinMan
 {
 
@@ -28,7 +30,7 @@ void gradient_sphere (const ViewUnmanaged<Real[NP][NP]> s, const TestData& data,
       }
 
       v1[l][j] = dsdx * rrearth;
-      v2[j][l] - dsdy * rrearth;
+      v2[j][l] = dsdy * rrearth;
     }
   }
 
@@ -52,14 +54,15 @@ void gradient_sphere (Kokkos::TeamPolicy<>::member_type &team,
   const Dvv_type& Dvv = data.deriv().Dvv;
   Real rrearth = data.constants().rrearth;
 
-  Real dsdx, dsdy;
   Real v1[NP][NP];
   Real v2[NP][NP];
   constexpr const int contra_iters = NP * NP;
+  constexpr const int mmul_iters = contra_iters * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, contra_iters),
                        [&](const int loop_idx) {
     const int j = loop_idx / NP;
     const int l = loop_idx % NP;
+    Real dsdx, dsdy;
     dsdx = dsdy = 0;
     for (int i=0; i<NP; ++i)
     {
@@ -68,16 +71,16 @@ void gradient_sphere (Kokkos::TeamPolicy<>::member_type &team,
     }
 
     v1[l][j] = dsdx * rrearth;
-    v2[j][l] - dsdy * rrearth;
+    v2[j][l] = dsdy * rrearth;
   });
 
   constexpr const int grad_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, grad_iters),
-                       [&](const int loop_idx) {
-    const int j = loop_idx / NP;
-    const int i = loop_idx % NP;
-    grad_s(0, i, j) = DInv(0,0,i,j)*v1[i][j]+ DInv(1,0,i,j)*v2[i][j];
-    grad_s(1, i, j) = DInv(0,1,i,j)*v1[i][j]+ DInv(1,1,i,j)*v2[i][j];
+                       KOKKOS_LAMBDA(const int loop_idx) {
+    const int j = loop_idx % NP;
+    const int i = loop_idx / NP;
+    grad_s(0, i, j) = DInv(0,0,i,j) * v1[i][j] + DInv(1,0,i,j) * v2[i][j]; // Poor performance here
+    grad_s(1, i, j) = DInv(0,1,i,j) * v1[i][j] + DInv(1,1,i,j) * v2[i][j]; // Poor performance here
   });
 }
 
