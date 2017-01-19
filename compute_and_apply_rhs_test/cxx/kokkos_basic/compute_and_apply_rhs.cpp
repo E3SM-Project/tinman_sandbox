@@ -5,6 +5,8 @@
 #include "TestData.hpp"
 #include "sphere_operators.hpp"
 
+#include <Kokkos_Array.hpp>
+
 namespace TinMan
 {
 
@@ -65,7 +67,6 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
   Kokkos::parallel_for(Kokkos::TeamPolicy<>(nete - nets + 1, Kokkos::AUTO),
                        KOKKOS_LAMBDA(Kokkos::TeamPolicy<>::member_type &team) {
     const int ie = nets + team.league_rank();
-
     // Serivce arrays
     Real vgrad_T[NP][NP]                   = {};
     Real ttens[NUM_LEV][NP][NP]            = {};
@@ -75,33 +76,45 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
     Real vtens2[NUM_LEV][NP][NP]           = {};
 
     // Other accessory variables
-    Real v1     = 0;
-    Real v2     = 0;
     Real Qt     = 0;
     Real glnps1 = 0;
     Real glnps2 = 0;
     Real gpterm = 0;
 
     if(ie < nete) {
-      for (int igp=0; igp<NP; ++igp)
-      {
-        for (int jgp=0; jgp<NP; ++jgp)
-        {
-          p(0,igp,jgp) = data.hvcoord().hyai[0]*data.hvcoord().ps0 + 0.5*region.dp3d(ie,n0,0,igp,jgp);
-        }
-      }
+      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), KOKKOS_LAMBDA(const int idx) {
+        const int igp = idx / NP;
+        const int jgp = idx % NP;
+        p(0,igp,jgp) = data.hvcoord().hyai[0]*data.hvcoord().ps0 + 0.5*region.dp3d(ie,n0,0,igp,jgp);
+      });
 
-      Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV - 1), [&](const int ilev) {
+      // Future Kokkos feature - can't parallelize over ilev without it
+      // Kokkos::parallel_scan(Kokkos::TeamThreadRange(team, NUM_LEV - 1),
+      //                       KOKKOS_LAMBDA(const int ilev, Kokkos::Array<Real, NP * NP> & prev_sum, const bool fin) {
+      //   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+      //     const int igp = idx / NP;
+      //     const int jgp = idx % NP;
+      //     if(!fin) {
+      //       if(ilev == 0) {
+      //         prev_sum[idx] = p(0, igp, jgp);
+      //       }
+      //       prev_sum[idx] += 0.5 * region.dp3d(ie, n0, ilev, igp, jgp) + 0.5 * region.dp3d(ie, n0, ilev + 1, igp, jgp);
+      //     } else {
+      //       p(ilev + 1, igp, jgp) = prev_sum[idx];
+      //     }
+      //   });
+      // });
+      // team.team_barrier();
+
+      for(int ilev = 0; ilev < NUM_LEV - 1; ilev++) {
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), KOKKOS_LAMBDA(const int idx) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
           p(ilev + 1, igp, jgp) = p(ilev, igp, jgp)
-                            + 0.5*region.dp3d(ie, n0, ilev, igp, jgp)
-                            + 0.5*region.dp3d(ie, n0, ilev + 1, igp, jgp);
+            + 0.5 * (region.dp3d(ie, n0, ilev, igp, jgp)
+                     + region.dp3d(ie, n0, ilev + 1, igp, jgp));
         });
-      });
-
-      team.team_barrier();
+      }
 
       Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
         gradient_sphere(team, subview(p, ilev, ALL(), ALL()),
@@ -111,21 +124,25 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
-          v1 = region.U(ie, n0, ilev, igp, jgp);
-          v2 = region.V(ie, n0, ilev, igp, jgp);
+          const Real v1 = region.U(ie, n0, ilev, igp, jgp);
+          const Real v2 = region.V(ie, n0, ilev, igp, jgp);
           vgrad_p(ilev, igp, jgp) = v1*grad_p(ilev, 0, igp, jgp) + v2 * grad_p(ilev, 1, igp, jgp);
 
-          vdp(ilev, 0, igp, jgp) = v1 * region.dp3d(ie, n0, ilev, igp, jgp);
-          vdp(ilev, 1, igp, jgp) = v2 * region.dp3d(ie, n0, ilev, igp, jgp);
+          const Real vdp_0 = v1 * region.dp3d(ie, n0, ilev, igp, jgp);
+          vdp(ilev, 0, igp, jgp) = vdp_0;
+          const Real vdp_1 = v2 * region.dp3d(ie, n0, ilev, igp, jgp);
+          vdp(ilev, 1, igp, jgp) = vdp_1;
 
-          region.Un0(ie, ilev, igp, jgp) += data.constants().eta_ave_w * vdp(ilev, 0, igp, jgp);
-          region.Vn0(ie, ilev, igp, jgp) += data.constants().eta_ave_w * vdp(ilev, 1, igp, jgp);
+          region.Un0(ie, ilev, igp, jgp) += data.constants().eta_ave_w * vdp_0;
+          region.Vn0(ie, ilev, igp, jgp) += data.constants().eta_ave_w * vdp_1;
         });
 
         divergence_sphere(team, subview(vdp, ilev, ALL(), ALL(), ALL()), data, region.metDet(ie), region.DInv(ie), subview(div_vdp, ilev, ALL(), ALL()));
 
         vorticity_sphere(team, region.Vn0(ie, ilev), data, region.metDet(ie), region.D(ie), subview(vort, ilev, ALL(), ALL()));
       });
+
+      team.team_barrier();
 
       if (qn0==-1)
       {
@@ -144,7 +161,7 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
           Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
             const int igp = idx / NP;
             const int jgp = idx % NP;
-            Qt = region.Qdp(ie,qn0,1,ilev,igp,jgp) / region.dp3d(ie,n0,ilev,igp,jgp);
+            Qt = region.Qdp(ie,qn0,1,ilev,igp,jgp) / region.dp3d(ie,n0,ilev,igp,jgp); //
             T_v(ilev,igp,jgp) = region.T(ie,n0,ilev,igp,jgp)*(1.0+ (data.constants().Rwater_vapor/data.constants().Rgas - 1.0)*Qt);
             kappa_star(ilev,igp,jgp) = data.constants().kappa;
           });
@@ -171,40 +188,40 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
-          v1 = region.U(ie,n0,ilev,igp,jgp);
-          v2 = region.V(ie,n0,ilev,igp,jgp);
+          Real v1 = region.U(ie,n0,ilev,igp,jgp);
+          Real v2 = region.V(ie,n0,ilev,igp,jgp);
 
           Ephi(igp,jgp) = 0.5 * (v1*v1 + v2*v2) + region.phi(ie,ilev,igp,jgp) + region.pecnd(ie,ilev,igp,jgp);
         });
 
-        gradient_sphere(team, region.T(ie,n0,ilev), data, region.DInv(ie), grad_tmp);
+        gradient_sphere(team, region.T(ie,n0,ilev), data, region.DInv(ie), grad_tmp); // Performance importance: 3
 
-        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) { // Performance importance: 2
           const int igp = idx / NP;
           const int jgp = idx % NP;
-          v1 = region.U(ie,n0,ilev,igp,jgp);
-          v2 = region.V(ie,n0,ilev,igp,jgp);
+          Real v1 = region.U(ie,n0,ilev,igp,jgp);
+          Real v2 = region.V(ie,n0,ilev,igp,jgp); // Terrible performance here
 
-          vgrad_T[igp][jgp] = v1*grad_tmp(0,igp,jgp) + v2*grad_tmp(1,igp,jgp);
+          vgrad_T[igp][jgp] = v1*grad_tmp(0,igp,jgp) + v2*grad_tmp(1,igp,jgp); // Terrible performance here
         });
 
-        gradient_sphere(team, Ephi, data, region.DInv(ie), grad_tmp);
+        gradient_sphere(team, Ephi, data, region.DInv(ie), grad_tmp); // Performance cost: 4, least expensive call, but both calls together are the most expensive
 
-        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) { // Performance cost: 1, single most expensive function call
           const int igp = idx / NP;
           const int jgp = idx % NP;
           gpterm = T_v(ilev,igp,jgp) / p(ilev,igp,jgp);
 
-          glnps1 = data.constants().Rgas*gpterm*grad_p(ilev,0,igp,jgp);
-          glnps2 = data.constants().Rgas*gpterm*grad_p(ilev,1,igp,jgp);
+          glnps1 = data.constants().Rgas*gpterm*grad_p(ilev,0,igp,jgp); // Meh performance here
+          glnps2 = data.constants().Rgas*gpterm*grad_p(ilev,1,igp,jgp); // Meh performance here
 
-          v1 = region.U(ie,n0,ilev,igp,jgp);
-          v2 = region.V(ie,n0,ilev,igp,jgp);
+          Real v1 = region.U(ie,n0,ilev,igp,jgp); // Poor performance here
+          Real v2 = region.V(ie,n0,ilev,igp,jgp);
 
-          vtens1[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][0] + v2 * (region.fcor(ie,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps1;
-          vtens2[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][1] - v1 * (region.fcor(ie,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps2;
+          vtens1[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][0] + v2 * (region.fcor(ie,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps1; // Poor performance here, mostly in the fma
+          vtens2[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][1] - v1 * (region.fcor(ie,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps2; // Poor performance here
 
-          ttens[ilev][igp][jgp]  = T_vadv[ilev][igp][jgp] - vgrad_T[igp][jgp] + kappa_star(ilev,igp,jgp)*T_v(ilev,igp,jgp)*omega_p(ilev,igp,jgp);
+          ttens[ilev][igp][jgp]  = T_vadv[ilev][igp][jgp] - vgrad_T[igp][jgp] + kappa_star(ilev,igp,jgp)*T_v(ilev,igp,jgp)*omega_p(ilev,igp,jgp); // Meh performance here
         });
       });
 
