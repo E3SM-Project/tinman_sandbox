@@ -70,19 +70,27 @@ void divergence_sphere (const real* const v, const TestData& data,
     }
   }
 
-  real dudx, dvdy;
+  real dudy[np][np], dvdx[np][np];
+  SIMD
   for (int igp=0; igp<np; ++igp)
   {
     for (int jgp=0; jgp<np; ++jgp)
     {
-      dudx = dvdy = 0.;
+      dudy[igp][jgp] = dvdx[igp][jgp] = 0.;
       for (int kgp=0; kgp<np; ++kgp)
       {
-        dudx += Dvv[kgp][igp] * gv[kgp][jgp][0];
-        dvdy += Dvv[kgp][jgp] * gv[igp][kgp][1];
+        dudy[igp][jgp] += Dvv[kgp][jgp] * gv[kgp][jgp][1];
+        dvdx[igp][jgp] += Dvv[kgp][igp] * gv[igp][kgp][0];
       }
 
-      AT_2D(div,igp,jgp,np) = (dudx + dvdy) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
+    }
+  }
+  SIMD
+  for (int igp=0; igp<np; ++igp)
+  {
+    for (int jgp=0; jgp<np; ++jgp)
+    {
+      AT_2D(div,igp,jgp,np) = (dvdx[igp][jgp] + dudy[igp][jgp]) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
     }
   }
 }
@@ -110,19 +118,27 @@ void vorticity_sphere (const real* const v, const TestData& data,
     }
   }
 
-  real dudy, dvdx;
+  real dudy[np][np], dvdx[np][np];
+  SIMD
   for (int igp=0; igp<np; ++igp)
   {
     for (int jgp=0; jgp<np; ++jgp)
     {
-      dudy = dvdx = 0.;
+      dudy[igp][jgp] = dvdx[igp][jgp] = 0.;
       for (int kgp=0; kgp<np; ++kgp)
       {
-        dudy += Dvv[kgp][jgp] * vcov[igp][kgp][1];
-        dvdx += Dvv[kgp][igp] * vcov[kgp][jgp][0];
+        dudy[igp][jgp] += Dvv[kgp][jgp] * vcov[igp][kgp][1];
+        dvdx[igp][jgp] += Dvv[kgp][igp] * vcov[kgp][jgp][0];
       }
 
-      AT_2D(vort,igp,jgp,np) = (dvdx - dudy) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
+    }
+  }
+  SIMD
+  for(int igp=0; igp<np; ++igp)
+  {
+    for(int jgp=0; jgp<np; ++jgp)
+    {
+      AT_2D(vort,igp,jgp,np) = (dvdx[igp][jgp] - dudy[igp][jgp]) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
     }
   }
 }

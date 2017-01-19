@@ -35,17 +35,17 @@ void compute_and_apply_rhs (TestData& data)
 
   // Get a pointer version so we can use single
   // subroutines interface for both ptrs and arrays
-  real* Ephi_ptr             = PTR_FROM_2D(Ephi);
-  real* divdp_ptr            = PTR_FROM_3D(divdp);
-  real* eta_dot_dpdn_tmp_ptr = PTR_FROM_3D(eta_dot_dpdn_tmp);
-  real* grad_p_ptr           = PTR_FROM_4D(grad_p);
-  real* p_ptr                = PTR_FROM_3D(p);
-  real* vdp_ptr              = PTR_FROM_4D(vdp);
-  real* vgrad_p_ptr          = PTR_FROM_3D(vgrad_p);
-  real* vort_ptr             = PTR_FROM_3D(vort);
-  real* vtemp_ptr            = PTR_FROM_3D(vtemp);
-  real* omega_p_tmp_ptr      = PTR_FROM_3D(omega_p_tmp);
-  real* T_v_ptr              = PTR_FROM_3D(T_v);
+  RESTRICT real* Ephi_ptr             = PTR_FROM_2D(Ephi);
+  RESTRICT real* divdp_ptr            = PTR_FROM_3D(divdp);
+  RESTRICT real* eta_dot_dpdn_tmp_ptr = PTR_FROM_3D(eta_dot_dpdn_tmp);
+  RESTRICT real* grad_p_ptr           = PTR_FROM_4D(grad_p);
+  RESTRICT real* p_ptr                = PTR_FROM_3D(p);
+  RESTRICT real* vdp_ptr              = PTR_FROM_4D(vdp);
+  RESTRICT real* vgrad_p_ptr          = PTR_FROM_3D(vgrad_p);
+  RESTRICT real* vort_ptr             = PTR_FROM_3D(vort);
+  RESTRICT real* vtemp_ptr            = PTR_FROM_3D(vtemp);
+  RESTRICT real* omega_p_tmp_ptr      = PTR_FROM_3D(omega_p_tmp);
+  RESTRICT real* T_v_ptr              = PTR_FROM_3D(T_v);
 
   // Other accessory variables
   real Qt     = 0;
@@ -55,24 +55,24 @@ void compute_and_apply_rhs (TestData& data)
   real v1     = 0;
   real v2     = 0;
 
-  real* Qdp_ie            = nullptr;
-  real* T_n0              = nullptr;
-  real* T_nm1             = nullptr;
-  real* T_np1             = nullptr;
-  real* derived_vn0       = nullptr;
-  real* dp3d_n0           = nullptr;
-  real* dp3d_nm1          = nullptr;
-  real* dp3d_np1          = nullptr;
-  real* fcor              = nullptr;
-  real* omega_p           = nullptr;
-  real* pecnd             = nullptr;
-  real* phi               = nullptr;
-  real* phis              = nullptr;
-  real* spheremp          = nullptr;
-  real* v_n0              = nullptr;
-  real* v_nm1             = nullptr;
-  real* v_np1             = nullptr;
-  real* eta_dot_dpdn      = nullptr;
+  RESTRICT real* Qdp_ie            = nullptr;
+  RESTRICT real* T_n0              = nullptr;
+  RESTRICT real* T_nm1             = nullptr;
+  RESTRICT real* T_np1             = nullptr;
+  RESTRICT real* derived_vn0       = nullptr;
+  RESTRICT real* dp3d_n0           = nullptr;
+  RESTRICT real* dp3d_nm1          = nullptr;
+  RESTRICT real* dp3d_np1          = nullptr;
+  RESTRICT real* fcor              = nullptr;
+  RESTRICT real* omega_p           = nullptr;
+  RESTRICT real* pecnd             = nullptr;
+  RESTRICT real* phi               = nullptr;
+  RESTRICT real* phis              = nullptr;
+  RESTRICT real* spheremp          = nullptr;
+  RESTRICT real* v_n0              = nullptr;
+  RESTRICT real* v_nm1             = nullptr;
+  RESTRICT real* v_np1             = nullptr;
+  RESTRICT real* eta_dot_dpdn      = nullptr;
 
   // Input parameters
   const int nets = data.control.nets;
@@ -119,12 +119,10 @@ void compute_and_apply_rhs (TestData& data)
       {
         for (int jgp=0; jgp<np; ++jgp)
         {
-          v1 = AT_4D(v_n0,ilev,igp,jgp,0,np,np,2);
-          v2 = AT_4D(v_n0,ilev,igp,jgp,1,np,np,2);
-          vgrad_p[ilev][igp][jgp] = v1 * grad_p[ilev][igp][jgp][0] + v2 * grad_p[ilev][igp][jgp][1];
+          AT_3D(vgrad_p_ptr, ilev, igp, jgp, np, np) = AT_4D(v_n0,ilev,igp,jgp,0,np,np,2) * AT_4D(grad_p_ptr, ilev, igp, jgp, 0, np, np, 2) + AT_4D(v_n0,ilev,igp,jgp,1,np,np,2) * AT_4D(grad_p_ptr, ilev, igp, jgp, 1, np, np, 2);
 
-          vdp[ilev][igp][jgp][0] = v1 * AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
-          vdp[ilev][igp][jgp][1] = v2 * AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
+          AT_4D(vdp_ptr, ilev, igp, jgp, 0, np, np, 2) = AT_4D(v_n0,ilev,igp,jgp,0,np,np,2) * AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
+          AT_4D(vdp_ptr, ilev, igp, jgp, 1, np, np, 2) = AT_4D(v_n0,ilev,igp,jgp,1,np,np,2) * AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
 
           AT_4D(derived_vn0,ilev,igp,jgp,0,np,np,2) += data.constants.eta_ave_w * vdp[ilev][igp][jgp][0];
           AT_4D(derived_vn0,ilev,igp,jgp,1,np,np,2) += data.constants.eta_ave_w * vdp[ilev][igp][jgp][1];
@@ -253,6 +251,7 @@ void compute_and_apply_rhs (TestData& data)
     T_nm1    = SLICE_5D_IJ(data.arrays.elem_state_T,ie,nm1,timelevels,nlev,np,np);
     dp3d_nm1 = SLICE_5D_IJ(data.arrays.elem_state_dp3d,ie,nm1,timelevels,nlev,np,np);
 
+    SIMD
     for (int ilev=0; ilev<nlev; ++ilev)
     {
       for (int igp=0; igp<np; ++igp)
@@ -308,9 +307,9 @@ void preq_omega_ps (const real* const p, const real* const vgrad_p,
 {
   real ckk, ckl, term;
   real suml[np][np];
-  for (int jgp=0; jgp<np; ++jgp)
+  for (int igp=0; igp<np; ++igp)
   {
-    for (int igp=0; igp<np; ++igp)
+    for (int jgp=0; jgp<np; ++jgp)
     {
       ckk = 0.5 / AT_3D(p,0,igp,jgp,np,np);
       term  = AT_3D(divdp,0,igp,jgp,np,np);
@@ -320,7 +319,7 @@ void preq_omega_ps (const real* const p, const real* const vgrad_p,
 
     for (int ilev=1; ilev<nlev-1; ++ilev)
     {
-      for (int igp=0; igp<np; ++igp)
+      for (int jgp=0; jgp<np; ++jgp)
       {
         ckk = 0.5 / AT_3D(p,ilev,igp,jgp,np,np);
         ckl = 2.0 * ckk;
@@ -332,7 +331,7 @@ void preq_omega_ps (const real* const p, const real* const vgrad_p,
       }
     }
 
-    for (int igp=0; igp<np; ++igp)
+    for (int jgp=0; jgp<np; ++jgp)
     {
       ckk = 0.5 / AT_3D(p,(nlev-1),igp,jgp,np,np);
       ckl = 2.0 * ckk;
