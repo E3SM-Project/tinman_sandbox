@@ -6,7 +6,7 @@
 
 #include <iostream>
 #include <cstring>
-#include <vector>
+#include <memory>
 
 bool is_unsigned_int(const char* str)
 {
@@ -93,7 +93,7 @@ int main (int argc, char** argv)
   // Burn in before timing to reduce cache effect
   TinMan::compute_and_apply_rhs(data,*region);
 
-  std::vector<Timer::Timer> timers(num_exec);
+  std::unique_ptr<Timer::Timer[]> timers(new Timer::Timer[num_elems]);
   for (int i=0; i<num_exec; ++i)
   {
     timers[i].startTimer();
