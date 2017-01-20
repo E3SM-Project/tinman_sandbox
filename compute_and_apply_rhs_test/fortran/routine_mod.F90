@@ -63,9 +63,26 @@ implicit none
 
   print *, 'Hello Routine'
 
-#define dXdX1XdpXn0Xie :,:,1,ie,4,n0 
-#define dXdXkm1XdpXn0Xie :,:,k-1,ie,4,n0 
-#define dXdXkXdpXn0Xie :,:,k,ie,4,n0
+! u=1, v=2, T=3, dp3d=4, ps=5
+
+!dp
+#define dXdX1XdpXn0Xie    :,:,1,ie,4,n0     
+!dp
+#define dXdXkm1XdpXn0Xie  :,:,k-1,ie,4,n0   
+!dp
+#define dXdXkXdpXn0Xie    :,:,k,ie,4,n0     
+!u
+#define iXjX1XuXn0Xie     i,j,k,ie,1,n0     
+!v
+#define iXjX1XvXn0Xie     i,j,k,ie,2,n0     
+!dp
+#define iXjXkXdpXn0Xie    i,j,k,ie,4,n0     
+!t
+#define iXjXkXtXn0Xie     i,j,k,ie,3,n0     
+!t
+#define dXdXkXtXn0Xie     :,:,k,ie,3,n0     
+
+ 
 
   do ie=nets,nete
      phi => elem(ie)%derived%phi(:,:,:)
@@ -75,12 +92,12 @@ implicit none
 !------------REFACTOR
      p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + ST( dXdX1XdpXn0Xie  ) /2
      p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + dp(:,:,1)/2
-!------------REFACTOR
+!------------end REFACTOR
      do k=2,nlev
 !------------REFACTOR
-        p(:,:,1)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkm1XdpXn0Xie )/2
+!        p(:,:,1)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkm1XdpXn0Xie )/2
         p(:,:,k)=p(:,:,k-1) + dp(:,:,k-1)/2 + dp(:,:,k)/2
-!------------REFACTOR
+!------------end REFACTOR
      enddo
 
 !#omp parallel do
@@ -89,22 +106,35 @@ implicit none
         rdp(:,:,k) = 1.0D0/dp(:,:,k)
         do j=1,np
            do i=1,np
+!------------REFACTOR
+              v1 = ST( iXjX1XuXn0Xie )
+              v2 = ST( iXjX1XvXn0Xie )
               v1 = elem(ie)%state%v(i,j,1,k,n0)
               v2 = elem(ie)%state%v(i,j,2,k,n0)
+!------------end REFACTOR
               vgrad_p(i,j,k) = (v1*grad_p(i,j,1,k) + v2*grad_p(i,j,2,k))
+!------------REFACTOR
+!              vdp(i,j,1,k) = v1*ST( i,j,k,ie,4,n0  )
+!              vdp(i,j,2,k) = v2*ST( i,j,k,ie,4,n0 )
               vdp(i,j,1,k) = v1*dp(i,j,k)
               vdp(i,j,2,k) = v2*dp(i,j,k)
+!------------end REFACTOR
            end do
         end do
         elem(ie)%derived%vn0(:,:,:,k)=elem(ie)%derived%vn0(:,:,:,k)+eta_ave_w*vdp(:,:,:,k)
         divdp(:,:,k)=divergence_sphere(vdp(:,:,:,k),deriv,elem(ie))
+!------------REFACTOR PROBLEM!
         vort(:,:,k)=vorticity_sphere(elem(ie)%state%v(:,:,:,k,n0),deriv,elem(ie))
+!------------end REFACTOR
      enddo
      if (qn0 == -1 ) then
         do k=1,nlev
            do j=1,np
               do i=1,np
+!------------REFACTOR
+                 T_v(i,j,k) = ST( iXjXkXtXn0Xie )
                  T_v(i,j,k) = elem(ie)%state%T(i,j,k,n0)
+!------------end REFACTOR
                  kappa_star(i,j,k) = kappa
               end do
            end do
@@ -113,14 +143,20 @@ implicit none
         do k=1,nlev
            do j=1,np
               do i=1,np
+!------------REFACTOR
+                 Qt = elem(ie)%state%Qdp(i,j,k,1,qn0)/ ST( iXjXkXdpXn0Xie )
                  Qt = elem(ie)%state%Qdp(i,j,k,1,qn0)/dp(i,j,k)
+                 T_v(i,j,k) = Virtual_Temperature1d( ST( iXjXkXtXn0Xie ),Qt)
                  T_v(i,j,k) = Virtual_Temperature1d(elem(ie)%state%T(i,j,k,n0),Qt)
+!------------end REFACTOR
                  kappa_star(i,j,k) = kappa
               end do
            end do
         end do
      end if
+!------------REFACTOR PROBLEM!
      call preq_hydrostatic(phi,elem(ie)%state%phis,T_v,p,dp)
+!------------end REFACTOR
      call preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
      sdot_sum=0
      ! VERTICALLY LAGRANGIAN:   no vertical motion
@@ -138,17 +174,28 @@ implicit none
      vertloop: do k=1,nlev
         do j=1,np
            do i=1,np
+!------------REFACTOR
+              v1 = ST( iXjX1XuXn0Xie )
+              v2 = ST( iXjX1XvXn0Xie )
               v1     = elem(ie)%state%v(i,j,1,k,n0)
               v2     = elem(ie)%state%v(i,j,2,k,n0)
+!------------end REFACTOR
               E = 0.5D0*( v1*v1 + v2*v2 )
               Ephi(i,j)=E+phi(i,j,k)+elem(ie)%derived%pecnd(i,j,k)
            end do
         end do
+!------------REFACTOR
+        vtemp(:,:,:)   = gradient_sphere( ST( dXdXkXtXn0Xie ), deriv,elem(ie)%Dinv)
         vtemp(:,:,:)   = gradient_sphere(elem(ie)%state%T(:,:,k,n0),deriv,elem(ie)%Dinv)
+!------------end REFACTOR
         do j=1,np
            do i=1,np
+!------------REFACTOR
+              v1 = ST( iXjX1XuXn0Xie )
+              v2 = ST( iXjX1XvXn0Xie )
               v1     = elem(ie)%state%v(i,j,1,k,n0)
               v2     = elem(ie)%state%v(i,j,2,k,n0)
+!------------end REFACTOR
               vgrad_T(i,j) =  v1*vtemp(i,j,1) + v2*vtemp(i,j,2)
            end do
         end do
