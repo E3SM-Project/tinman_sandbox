@@ -10,7 +10,7 @@ subroutine compute_and_apply_rhs(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,nets,ne
   ! ===================================
 
   use kinds, only : real_kind
-  use element_mod, only : element_t, np, nlev, ntrac, nelemd
+  use element_mod, only : element_t, np, nlev, ntrac, nelemd, ST
   use derivative_mod_base, only : derivative_t, divergence_sphere, gradient_sphere, vorticity_sphere
   use hybvcoord_mod, only : hvcoord_t
 
@@ -63,18 +63,27 @@ implicit none
 
   print *, 'Hello Routine'
 
-
-
+#define dXdX1XdpXn0Xie :,:,1,ie,4,n0 
+#define dXdXkm1XdpXn0Xie :,:,k-1,ie,4,n0 
+#define dXdXkXdpXn0Xie :,:,k,ie,4,n0
 
   do ie=nets,nete
      phi => elem(ie)%derived%phi(:,:,:)
      dp  => elem(ie)%state%dp3d(:,:,:,n0)
 
+!replace with macro
+!------------REFACTOR
+     p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + ST( dXdX1XdpXn0Xie  ) /2
      p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + dp(:,:,1)/2
+!------------REFACTOR
      do k=2,nlev
+!------------REFACTOR
+        p(:,:,1)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkm1XdpXn0Xie )/2
         p(:,:,k)=p(:,:,k-1) + dp(:,:,k-1)/2 + dp(:,:,k)/2
+!------------REFACTOR
      enddo
 
+!#omp parallel do
      do k=1,nlev
         grad_p(:,:,:,k) = gradient_sphere(p(:,:,k),deriv,elem(ie)%Dinv)
         rdp(:,:,k) = 1.0D0/dp(:,:,k)

@@ -32,6 +32,32 @@ module element_mod
 !  real (kind=real_kind), allocatable, target, public :: derived_divdp_proj       (:,:,:,:)        ! (np,np,nlev,nelemd)                     DSSed divdp
 
 
+! instead of elem-state, let's get STATE array
+  integer, public, parameter :: numst = 40, indu = 1, indv = 2, indT = 3, &
+                                inddp = 4, indps = 5 ! u,v,T,dp3d,ps_v = 5 vars + 35 tracers
+  real (kind=real_kind), public :: ST(np,np,nlev,nelemd,numst,timelevels)
+
+!current addressing is STATE(np,np,nlev,tl,st,ie)
+
+! Let's collect all addressing here:
+!     dp  => elem(ie)%state%dp3d(:,:,:,n0)
+!     v1 = elem(ie)%state%v(i,j,1,k,n0)
+!     v2 = elem(ie)%state%v(i,j,2,k,n0)
+!     elem(ie)%derived%vn0(:,:,:,k)=elem(ie)%derived%vn0(:,:,:,k)+eta_ave_w*vdp(:,:,:,k)
+!     elem(ie)%state%v(:,:,:,k,n0)
+!     T_v(i,j,k) = elem(ie)%state%T(i,j,k,n0)  
+!     Qt = elem(ie)%state%Qdp(i,j,k,1,qn0)/dp(i,j,k)
+!     T_v(i,j,k) = Virtual_Temperature1d(elem(ie)%state%T(i,j,k,n0),Qt)
+!     call preq_hydrostatic(phi,elem(ie)%state%phis,T_v,p,dp)
+!     elem(ie)%state%v(:,:,1,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,1,k,nm1) + dt2*vtens1(:,:,k) )
+!     elem(ie)%state%v(:,:,2,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,2,k,nm1) + dt2*vtens2(:,:,k) )
+!     elem(ie)%state%T(:,:,k,np1) = elem(ie)%spheremp(:,:)*(elem(ie)%state%T(:,:,k,nm1) + dt2*ttens(:,:,k))
+!     elem(ie)%state%dp3d(:,:,k,np1) = &
+!     elem(ie)%spheremp(:,:) * (elem(ie)%state%dp3d(:,:,k,nm1) - &
+!             dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
+
+!#define d_d_1_dp_n0_ie :,:,1,ie,4,n0 
+
 ! =========== PRIMITIVE-EQUATION DATA-STRUCTURES =====================
 
   type, public :: elem_state_t
@@ -42,6 +68,7 @@ module element_mod
     ! vertically-lagrangian code advects dp3d instead of ps_v
     ! tracers Q, Qdp always use 2 level time scheme
 
+#if 1
     real (kind=real_kind) :: v   (np,np,2,nlev,timelevels)            ! velocity                           1
     real (kind=real_kind) :: T   (np,np,nlev,timelevels)              ! temperature                        2
     real (kind=real_kind) :: dp3d(np,np,nlev,timelevels)              ! delta p on levels                  8
@@ -49,7 +76,7 @@ module element_mod
     real (kind=real_kind) :: phis(np,np)                              ! surface geopotential (prescribed)  5
     real (kind=real_kind) :: Q   (np,np,nlev,qsize_d)                 ! Tracer concentration               6
     real (kind=real_kind) :: Qdp (np,np,nlev,qsize_d,2)               ! Tracer mass                        7
-
+#endif
   end type elem_state_t
 
   integer(kind=int_kind),public,parameter::StateComponents=7! num prognistics variables (for prim_restart_mod.F90)

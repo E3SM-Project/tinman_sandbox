@@ -22,7 +22,9 @@ real (kind=real_kind) :: eta_ave_w
 real (kind=real_kind) :: ii, jj, kk, iee
 
 ! local
-integer :: i,j,k,ie
+integer :: i,j,k,ie,tl, ind
+
+real (kind=real_kind) :: Ttest(np*np*nlev), Tt(np,np,nlev)
 
 !----------------- INIT
 
@@ -106,19 +108,74 @@ integer :: i,j,k,ie
 
 !----------------- END OF INIT
 
+!----------------- for testing, T from element 3
+Ttest = (/ 1994.6060414921399D0,     &
+   3985.1944059666303D0,   5971.8288730432123D0, 7954.3873066989408D0, 1992.6023599782336D0,&
+   3981.1805774651789D0,   5965.8119284451077D0, 7946.3528550804112D0, 1990.6093477237437D0,&
+   3977.1927219435743D0,   5959.8395065266241D0, 7938.3853758170817D0, 1988.6037427888766D0,&
+   3973.1755220801824D0,    5953.8169318880446D0,    7930.3424947341891D0,    1992.6078804174476D0,&
+   3981.1935478349997D0,     5965.8354987738894D0,    7946.3864826888175D0,    1990.6031963942496D0,&
+   3977.1774388985023D0,    5959.8147927500886D0,    7938.3449547062282D0,    1988.6115818353771D0,&
+   3973.1918352429375D0,     5953.8474407528065D0,    7930.3839702448904D0,    1986.6048270374827D0,&
+   3969.1714221867760D0,    5947.8205235312034D0,    7922.3345892940542D0,    1990.6094623943170D0,&
+   3977.1928946132675D0,    5959.8408373068978D0,    7938.3852721680478D0,    1988.6038726151007D0,&
+   3973.1744292809399D0,    5953.8170518575153D0,    7930.3389642544762D0,    1986.6133762856102D0,&
+   3969.1910878050408D0,    5947.8532660252749D0,    7922.3827651758893D0,    1984.6056557594145D0,&
+   3965.1683325125096D0,    5941.8231758430275D0,    7914.3280317362323D0 /)
 
+!------------- end of definign T for test
 
+!------------- copying elem%state into ST array
+!state vars in STATE: u,v,T,dp3d,ps_v = 5 vars + 35 tracers
+do ie = 1, nelemd; do k=1, nlev; do j=1,np; do i=1,np
+  ! u, v
+  ST(i,j,k,ie,indu,1:timelevels) = elem(ie)%state%v(i,j,k,1,1:timelevels)
+  ST(i,j,k,ie,indv,1:timelevels) = elem(ie)%state%v(i,j,k,2,1:timelevels)
+  ! T
+  ST(i,j,k,ie,indT,1:timelevels) = elem(ie)%state%T(i,j,k,1:timelevels)
+  ! dp
+  ST(i,j,k,ie,inddp,1:timelevels) = elem(ie)%state%dp3d(i,j,k,1:timelevels)
+enddo; enddo; enddo; enddo
+! now, ps is a different story, not a leveled var
+do ie = 1, nelemd; do k=1, nlev; do j=1,np; do i=1,np
+  ! ps
+  ST(i,j,k,ie,inddp,1:timelevels) = elem(ie)%state%ps_v(i,j,1:timelevels)
+enddo; enddo; enddo; enddo
 
-
+! end of copying elem%state to ST
 
 
 print *, 'hey', np
 
+!np1 fields will be changed
 call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete,eta_ave_w)
 
-do ie = 1,nelem
-print *, 'From element', ie, 'variable T =', elem(ie)%state%T(:,:,:,:)
-enddo
+
+
+
+! ---------------- DO NOT MODIFY ------------------------
+ie = 3
+!do k = 1,nlev; do j = 1,np; do i = 1,np
+!print *, elem(ie)%state%T(i,j,k,np1)
+!enddo; enddo; enddo
+
+ind = 1
+do k = 1,nlev; do j = 1,np; do i = 1,np
+Tt(i,j,k) = Ttest(ind)
+!print *, Tt(i,j,k), Ttest(ind)
+ind = ind+1
+enddo; enddo; enddo
+
+print *, 'diff', maxval(abs(Tt - elem(ie)%state%T(:,:,:,np1)))
+
+!do k = 1,nlev; do j = 1,np; do i = 1,np
+!print *,i,j,k, Tt(i,j,k), elem(ie)%state%T(i,j,k,np1), '\n'
+!enddo; enddo; enddo
+
+
+!print *, 'difference = ', RESHAPE(elem(ie)%state%T,(/1,np*np*timelevels*nlev/))
+!Ttest(1:np*np*nlev*timelevels) - 
+
 
 end program main
 
