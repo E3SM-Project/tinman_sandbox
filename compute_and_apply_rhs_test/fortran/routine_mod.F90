@@ -11,7 +11,8 @@ subroutine compute_and_apply_rhs(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,nets,ne
 
   use kinds, only : real_kind
   use element_mod, only : element_t, np, nlev, ntrac, nelemd, ST
-  use derivative_mod_base, only : derivative_t, divergence_sphere, gradient_sphere, vorticity_sphere
+  use derivative_mod_base, only : derivative_t, divergence_sphere, gradient_sphere, vorticity_sphere, &
+                                  vorticity_v2
   use hybvcoord_mod, only : hvcoord_t
 
   use physical_constants, only : cp, cpwater_vapor, Rgas, kappa
@@ -146,7 +147,8 @@ implicit none
         elem(ie)%derived%vn0(:,:,:,k)=elem(ie)%derived%vn0(:,:,:,k)+eta_ave_w*vdp(:,:,:,k)
         divdp(:,:,k)=divergence_sphere(vdp(:,:,:,k),deriv,elem(ie))
 !------------REFACTOR PROBLEM!
-        vort(:,:,k)=vorticity_sphere(elem(ie)%state%v(:,:,:,k,n0),deriv,elem(ie))
+!       vort(:,:,k)=vorticity_sphere(elem(ie)%state%v(:,:,:,k,n0),deriv,elem(ie))
+        vort(:,:,k)=vorticity_v2(elem(ie)%state%v(:,:,1,k,n0),elem(ie)%state%v(:,:,2,k,n0),deriv,elem(ie))
 !------------end REFACTOR
      enddo
      if (qn0 == -1 ) then
