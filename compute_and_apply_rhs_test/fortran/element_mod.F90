@@ -33,11 +33,11 @@ module element_mod
 
 
 ! instead of elem-state, let's get STATE array
-  integer, public, parameter :: numst = 40, indu = 1, indv = 2, indT = 3, &
-                                inddp = 4, indps = 5 ! u,v,T,dp3d,ps_v = 5 vars + 35 tracers
+  integer, public, parameter :: numst = 41, indu = 1,  indv = 2, indT = 3, &
+                                inddp = 4,  indps = 5, indphis = 6 ! u,v,T,dp3d,ps_v, phis = 6 vars + 35 tracers
   real (kind=real_kind), public :: ST(np,np,nlev,nelemd,numst,timelevels)
 
-!current addressing is STATE(np,np,nlev,tl,st,ie)
+!current addressing is STATE(np,np,nlev,tl,st,ie), replacing it with (i,j,k,ie,st,tl )
 
 ! Let's collect all addressing here:
 !     dp  => elem(ie)%state%dp3d(:,:,:,n0)

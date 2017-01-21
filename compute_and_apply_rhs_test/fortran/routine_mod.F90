@@ -90,7 +90,7 @@ implicit none
 #define dXdXkXvXnm1Xie    :,:,k,ie,2,nm1
 
 !elem(ie)%state%v(:,:,1,k,np1)
-#define dXdXkXuXnp1Xie    :,:,k,ie,2,np1
+#define dXdXkXuXnp1Xie    :,:,k,ie,1,np1
 
 !elem(ie)%state%v(:,:,2,k,np1)
 #define dXdXkXvXnp1Xie    :,:,k,ie,2,np1 
@@ -106,6 +106,16 @@ implicit none
 
 !elem(ie)%state%dp3d(:,:,k,nm1)
 #define dXdXkXdpXnm1Xie   :,:,k,ie,4,nm1
+
+!elem(ie)%state%phis
+#define dXdX1XphisX1Xie   :,:,1,ie,6,1
+
+!elem(ie)%state%v(:,:,1,k,n0)
+#define dXdXkXuXn0Xie    :,:,k,ie,1,n0
+
+!elem(ie)%state%v(:,:,2,k,n0)
+#define dXdXkXvXn0Xie    :,:,k,ie,2,n0 
+
 
   do ie=nets,nete
      phi => elem(ie)%derived%phi(:,:,:)
@@ -137,7 +147,7 @@ implicit none
 !------------end REFACTOR
               vgrad_p(i,j,k) = (v1*grad_p(i,j,1,k) + v2*grad_p(i,j,2,k))
 !------------REFACTOR
-!              vdp(i,j,1,k) = v1*ST( i,j,k,ie,4,n0  )
+!              vdp(i,j,1,k) = v1*ST( i,j,k,ie,4,n0 )
 !              vdp(i,j,2,k) = v2*ST( i,j,k,ie,4,n0 )
               vdp(i,j,1,k) = v1*dp(i,j,k)
               vdp(i,j,2,k) = v2*dp(i,j,k)
@@ -148,6 +158,7 @@ implicit none
         divdp(:,:,k)=divergence_sphere(vdp(:,:,:,k),deriv,elem(ie))
 !------------REFACTOR PROBLEM!
 !       vort(:,:,k)=vorticity_sphere(elem(ie)%state%v(:,:,:,k,n0),deriv,elem(ie))
+        vort(:,:,k)=vorticity_v2( ST( dXdXkXuXn0Xie ) , ST( dXdXkXvXn0Xie ) ,deriv,elem(ie))
         vort(:,:,k)=vorticity_v2(elem(ie)%state%v(:,:,1,k,n0),elem(ie)%state%v(:,:,2,k,n0),deriv,elem(ie))
 !------------end REFACTOR
      enddo
@@ -178,7 +189,8 @@ implicit none
            end do
         end do
      end if
-!------------REFACTOR PROBLEM!
+!------------REFACTOR
+     call preq_hydrostatic(phi, ST( :,:,1,ie,6,1 ) ,T_v,p, ST( i,j,k,ie,4,n0 ) )
      call preq_hydrostatic(phi,elem(ie)%state%phis,T_v,p,dp)
 !------------end REFACTOR
      call preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
