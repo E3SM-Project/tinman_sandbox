@@ -82,7 +82,29 @@ implicit none
 !t
 #define dXdXkXtXn0Xie     :,:,k,ie,3,n0     
 
- 
+!elem(ie)%state%v(:,:,1,k,nm1)
+#define dXdXkXuXnm1Xie    :,:,k,ie,1,nm1
+
+!elem(ie)%state%v(:,:,2,k,nm1)
+#define dXdXkXvXnm1Xie    :,:,k,ie,2,nm1
+
+!elem(ie)%state%v(:,:,1,k,np1)
+#define dXdXkXuXnp1Xie    :,:,k,ie,2,np1
+
+!elem(ie)%state%v(:,:,2,k,np1)
+#define dXdXkXvXnp1Xie    :,:,k,ie,2,np1 
+
+!elem(ie)%state%T(:,:,k,np1)
+#define dXdXkXtXnp1Xie    :,:,k,ie,3,np1 
+
+!elem(ie)%state%T(:,:,k,nm1)
+#define dXdXkXtXnm1Xie    :,:,k,ie,3,nm1
+
+!elem(ie)%state%dp3d(:,:,k,np1)
+#define dXdXkXdpXnp1Xie   :,:,k,ie,4,np1
+
+!elem(ie)%state%dp3d(:,:,k,nm1)
+#define dXdXkXdpXnm1Xie   :,:,k,ie,4,nm1
 
   do ie=nets,nete
      phi => elem(ie)%derived%phi(:,:,:)
@@ -208,8 +230,12 @@ implicit none
               glnps1 = Rgas*gpterm*grad_p(i,j,1,k)
               glnps2 = Rgas*gpterm*grad_p(i,j,2,k)
 
+!------------REFACTOR
+              v1 = ST( iXjX1XuXn0Xie )
+              v2 = ST( iXjX1XvXn0Xie )
               v1     = elem(ie)%state%v(i,j,1,k,n0)
               v2     = elem(ie)%state%v(i,j,2,k,n0)
+!------------end REFACTOR
 
               vtens1(i,j,k) =   - v_vadv(i,j,1,k)                           &
                    + v2*(elem(ie)%fcor(i,j) + vort(i,j,k))        &
@@ -223,12 +249,21 @@ implicit none
      end do vertloop
 
      do k=1,nlev
+!------------REFACTOR
+        ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXuXnm1Xie ) + dt2*vtens1(:,:,k) )
+        ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXvXnm1Xie ) + dt2*vtens2(:,:,k) )
+        ST( dXdXkXtXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXtXnm1Xie ) + dt2*ttens(:,:,k)  )
+        ST( dXdXkXdpXnp1Xie ) = &
+             elem(ie)%spheremp(:,:) * ( ST( dXdXkXdpXnm1Xie ) - &
+             dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
+
         elem(ie)%state%v(:,:,1,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,1,k,nm1) + dt2*vtens1(:,:,k) )
         elem(ie)%state%v(:,:,2,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,2,k,nm1) + dt2*vtens2(:,:,k) )
         elem(ie)%state%T(:,:,k,np1) = elem(ie)%spheremp(:,:)*(elem(ie)%state%T(:,:,k,nm1) + dt2*ttens(:,:,k))
         elem(ie)%state%dp3d(:,:,k,np1) = &
              elem(ie)%spheremp(:,:) * (elem(ie)%state%dp3d(:,:,k,nm1) - &
              dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
+!------------end REFACTOR
      enddo ! k loop
   end do
 
