@@ -112,6 +112,9 @@ implicit none
 !elem(ie)%state%phis
 #define dXdX1XphisX1Xie   :,:,1,ie,6,1
 
+!dp
+#define dXdXdXdpXn0Xie     :,:,:,ie,4,n0
+
 !elem(ie)%state%v(:,:,1,k,n0)
 #define dXdXkXuXn0Xie    :,:,k,ie,1,n0
 
@@ -213,8 +216,12 @@ implicit none
         end do
      end if
 !------------REFACTOR
-     call preq_hydrostatic(phi, ST( :,:,1,ie,6,1 ) ,T_v,p, ST( i,j,k,ie,4,n0 ) )
+     call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) ,T_v,p, ST( dXdXdXdpXn0Xie ) )
+!print *, phi
      call preq_hydrostatic(phi,elem(ie)%state%phis,T_v,p,dp)
+!print *, phi
+!stop
+!verified
 !------------end REFACTOR
      call preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
      sdot_sum=0
@@ -238,14 +245,19 @@ implicit none
               v2 = ST( iXjXkXvXn0Xie )
               v1     = elem(ie)%state%v(i,j,1,k,n0)
               v2     = elem(ie)%state%v(i,j,2,k,n0)
+!verified above
 !------------end REFACTOR
               E = 0.5D0*( v1*v1 + v2*v2 )
               Ephi(i,j)=E+phi(i,j,k)+elem(ie)%derived%pecnd(i,j,k)
            end do
         end do
 !------------REFACTOR
+!print *, gradient_sphere( ST( dXdXkXtXn0Xie ), deriv,elem(ie)%Dinv) - &
+!gradient_sphere(elem(ie)%state%T(:,:,k,n0),deriv,elem(ie)%Dinv)
         vtemp(:,:,:)   = gradient_sphere( ST( dXdXkXtXn0Xie ), deriv,elem(ie)%Dinv)
         vtemp(:,:,:)   = gradient_sphere(elem(ie)%state%T(:,:,k,n0),deriv,elem(ie)%Dinv)
+!stop
+!verified
 !------------end REFACTOR
         do j=1,np
            do i=1,np
@@ -254,6 +266,7 @@ implicit none
               v2 = ST( iXjXkXvXn0Xie )
               v1     = elem(ie)%state%v(i,j,1,k,n0)
               v2     = elem(ie)%state%v(i,j,2,k,n0)
+!verified above
 !------------end REFACTOR
               vgrad_T(i,j) =  v1*vtemp(i,j,1) + v2*vtemp(i,j,2)
            end do
@@ -272,6 +285,7 @@ implicit none
               v2 = ST( iXjXkXvXn0Xie )
               v1     = elem(ie)%state%v(i,j,1,k,n0)
               v2     = elem(ie)%state%v(i,j,2,k,n0)
+!verified above
 !------------end REFACTOR
 
               vtens1(i,j,k) =   - v_vadv(i,j,1,k)                           &
@@ -287,6 +301,23 @@ implicit none
 
      do k=1,nlev
 !------------REFACTOR
+print *, k
+!print *,elem(ie)%spheremp(:,:)*( ST( dXdXkXuXnm1Xie ) + dt2*vtens1(:,:,k) )-&
+!elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,1,k,nm1) + dt2*vtens1(:,:,k) )
+!print *, elem(ie)%spheremp(:,:)*( ST( dXdXkXvXnm1Xie ) + dt2*vtens2(:,:,k) ) -&
+!elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,2,k,nm1) + dt2*vtens2(:,:,k) )
+!print *, elem(ie)%spheremp(:,:)*( ST( dXdXkXtXnm1Xie ) + dt2*ttens(:,:,k)  ) -&
+!elem(ie)%spheremp(:,:)*(elem(ie)%state%T(:,:,k,nm1) + dt2*ttens(:,:,k))
+!print *, elem(ie)%spheremp(:,:) * ( ST( dXdXkXdpXnm1Xie ) - &
+!             dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k))) -&
+!elem(ie)%spheremp(:,:) * (elem(ie)%state%dp3d(:,:,k,nm1) - &
+!             dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
+!now LHS
+!print *, ST( dXdXkXuXnp1Xie ) - elem(ie)%state%v(:,:,1,k,np1)
+!print *, ST( dXdXkXuXnp1Xie ) - elem(ie)%state%v(:,:,2,k,np1)
+!print *, ST( dXdXkXtXnp1Xie ) - elem(ie)%state%T(:,:,k,np1)
+!print *, ST( dXdXkXdpXnp1Xie ) - elem(ie)%state%dp3d(:,:,k,np1)
+
         ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXuXnm1Xie ) + dt2*vtens1(:,:,k) )
         ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXvXnm1Xie ) + dt2*vtens2(:,:,k) )
         ST( dXdXkXtXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXtXnm1Xie ) + dt2*ttens(:,:,k)  )
@@ -300,6 +331,8 @@ implicit none
         elem(ie)%state%dp3d(:,:,k,np1) = &
              elem(ie)%spheremp(:,:) * (elem(ie)%state%dp3d(:,:,k,nm1) - &
              dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
+
+!verified though it is better to set fields differently for timelevels
 !------------end REFACTOR
      enddo ! k loop
   end do
