@@ -10,6 +10,7 @@ use hybvcoord_mod
 implicit none
 
 type (element_t), allocatable  :: elem(:)
+real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
 type (derivative_t) :: deriv
 
 ! init params
@@ -129,26 +130,27 @@ Ttest = (/ 1994.6060414921399D0,     &
 !state vars in STATE: u,v,T,dp3d,ps_v = 5 vars + 35 tracers
 do ie = 1, nelemd; do k=1, nlev; do j=1,np; do i=1,np
   ! u, v
-  ST(i,j,k,ie,indu,1:timelevels) = elem(ie)%state%v(i,j,k,1,1:timelevels)
-  ST(i,j,k,ie,indv,1:timelevels) = elem(ie)%state%v(i,j,k,2,1:timelevels)
+  ST(i,j,k,ie,indu,1:timelevels) = elem(ie)%state%v(i,j,1,k,1:timelevels)
+  ST(i,j,k,ie,indv,1:timelevels) = elem(ie)%state%v(i,j,2,k,1:timelevels)
   ! T
   ST(i,j,k,ie,indT,1:timelevels) = elem(ie)%state%T(i,j,k,1:timelevels)
   ! dp
   ST(i,j,k,ie,inddp,1:timelevels) = elem(ie)%state%dp3d(i,j,k,1:timelevels)
+  ! vapor
+  ST(i,j,k,ie,indvapor,1:timelevels) = elem(ie)%state%Qdp(i,j,k,1,1:timelevels)
 enddo; enddo; enddo; enddo
-! now, ps is a different story, not a leveled var
+! now, ps and phis are a different story, not a leveled var
 do ie = 1, nelemd; do k=1, nlev; do j=1,np; do i=1,np
   ! ps
-  ST(i,j,k,ie,inddp,1:timelevels) = elem(ie)%state%ps_v(i,j,1:timelevels)
+  ST(i,j,k,ie,indps,1:timelevels) = elem(ie)%state%ps_v(i,j,1:timelevels)
+  ! phis
+  ST(i,j,k,ie,indphis,1:timelevels) = elem(ie)%state%phis(i,j)
 enddo; enddo; enddo; enddo
-
-! end of copying elem%state to ST
-
 
 print *, 'hey', np
 
 !np1 fields will be changed
-call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete,eta_ave_w)
+call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w, ST)
 
 
 

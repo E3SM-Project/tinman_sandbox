@@ -4,13 +4,14 @@ implicit none
 contains
 
 
-subroutine compute_and_apply_rhs(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,nets,nete,eta_ave_w)
+subroutine compute_and_apply_rhs(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,nets,nete,eta_ave_w,ST)
 !subroutine compute_and_apply_rhs(np1,nm1,n0,qn0,dt2,elem,hvcoord,hybrid,&
 !       deriv,nets,nete,compute_diagnostics,eta_ave_w)
   ! ===================================
 
   use kinds, only : real_kind
-  use element_mod, only : element_t, np, nlev, ntrac, nelemd, ST
+  use element_mod, only : element_t, np, nlev, ntrac, nelemd, numst, timelevels,&
+                          indu, indv, indT, inddp,  indps, indphis
   use derivative_mod_base, only : derivative_t, divergence_sphere, gradient_sphere, vorticity_sphere, &
                                   vorticity_v2
   use hybvcoord_mod, only : hvcoord_t
@@ -20,6 +21,7 @@ subroutine compute_and_apply_rhs(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,nets,ne
 implicit none
 
   type (element_t), intent(inout), target :: elem(:)
+  real (kind=real_kind), intent(inout) :: ST(np,np,nlev,nelemd,numst,timelevels)
   type (derivative_t)  , intent(in) :: deriv
   type (hvcoord_t)     , intent(in) :: hvcoord
   integer, intent(in) :: nets, nete, np1,nm1,n0,qn0
@@ -64,7 +66,7 @@ implicit none
 
   print *, 'Hello Routine'
 
-! u=1, v=2, T=3, dp3d=4, ps=5
+! u=1, v=2, T=3, dp3d=4, ps=5, phis=6, vapor=7
 
 !dp
 #define dXdX1XdpXn0Xie    :,:,1,ie,4,n0     
@@ -73,9 +75,9 @@ implicit none
 !dp
 #define dXdXkXdpXn0Xie    :,:,k,ie,4,n0     
 !u
-#define iXjX1XuXn0Xie     i,j,k,ie,1,n0     
+#define iXjXkXuXn0Xie     i,j,k,ie,1,n0     
 !v
-#define iXjX1XvXn0Xie     i,j,k,ie,2,n0     
+#define iXjXkXvXn0Xie     i,j,k,ie,2,n0     
 !dp
 #define iXjXkXdpXn0Xie    i,j,k,ie,4,n0     
 !t
@@ -116,6 +118,9 @@ implicit none
 !elem(ie)%state%v(:,:,2,k,n0)
 #define dXdXkXvXn0Xie    :,:,k,ie,2,n0 
 
+!elem(ie)%state%Qdp(i,j,k,1,qn0)
+#define iXjXkXqXqn0Xie   i,j,k,ie,7,qn0 
+
 
   do ie=nets,nete
      phi => elem(ie)%derived%phi(:,:,:)
@@ -123,13 +128,20 @@ implicit none
 
 !replace with macro
 !------------REFACTOR
+!comparing output of operations for ST and old vars
+!print *, hvcoord%hyai(1)*hvcoord%ps0 + ST( dXdX1XdpXn0Xie  ) /2 - (hvcoord%hyai(1)*hvcoord%ps0 + dp(:,:,1)/2)
      p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + ST( dXdX1XdpXn0Xie  ) /2
      p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + dp(:,:,1)/2
+!stop
+!verified
 !------------end REFACTOR
      do k=2,nlev
 !------------REFACTOR
-!        p(:,:,1)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkm1XdpXn0Xie )/2
+!print *, (p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkXdpXn0Xie )/2)-(p(:,:,k-1) + dp(:,:,k-1)/2 + dp(:,:,k)/2)
+!        p(:,:,1)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkXdpXn0Xie )/2
         p(:,:,k)=p(:,:,k-1) + dp(:,:,k-1)/2 + dp(:,:,k)/2
+!stop
+!verified
 !------------end REFACTOR
      enddo
 
@@ -140,24 +152,31 @@ implicit none
         do j=1,np
            do i=1,np
 !------------REFACTOR
-              v1 = ST( iXjX1XuXn0Xie )
-              v2 = ST( iXjX1XvXn0Xie )
+!print *, ST( iXjXkXuXn0Xie )- elem(ie)%state%v(i,j,1,k,n0)
+!print *, ST( iXjXkXvXn0Xie )- elem(ie)%state%v(i,j,2,k,n0)
+              v1 = ST( iXjXkXuXn0Xie )
+              v2 = ST( iXjXkXvXn0Xie )
               v1 = elem(ie)%state%v(i,j,1,k,n0)
               v2 = elem(ie)%state%v(i,j,2,k,n0)
+!verified
 !------------end REFACTOR
               vgrad_p(i,j,k) = (v1*grad_p(i,j,1,k) + v2*grad_p(i,j,2,k))
 !------------REFACTOR
+!print *, v1*ST( i,j,k,ie,4,n0 ) - v1*dp(i,j,k)
+!print *, v2*ST( i,j,k,ie,4,n0 ) - v2*dp(i,j,k)
 !              vdp(i,j,1,k) = v1*ST( i,j,k,ie,4,n0 )
 !              vdp(i,j,2,k) = v2*ST( i,j,k,ie,4,n0 )
               vdp(i,j,1,k) = v1*dp(i,j,k)
               vdp(i,j,2,k) = v2*dp(i,j,k)
+!verified
 !------------end REFACTOR
            end do
         end do
         elem(ie)%derived%vn0(:,:,:,k)=elem(ie)%derived%vn0(:,:,:,k)+eta_ave_w*vdp(:,:,:,k)
         divdp(:,:,k)=divergence_sphere(vdp(:,:,:,k),deriv,elem(ie))
-!------------REFACTOR PROBLEM!
+!------------REFACTOR
 !       vort(:,:,k)=vorticity_sphere(elem(ie)%state%v(:,:,:,k,n0),deriv,elem(ie))
+!vefiried by above
         vort(:,:,k)=vorticity_v2( ST( dXdXkXuXn0Xie ) , ST( dXdXkXvXn0Xie ) ,deriv,elem(ie))
         vort(:,:,k)=vorticity_v2(elem(ie)%state%v(:,:,1,k,n0),elem(ie)%state%v(:,:,2,k,n0),deriv,elem(ie))
 !------------end REFACTOR
@@ -175,14 +194,18 @@ implicit none
            end do
         end do
      else
+!this loop, moisture
         do k=1,nlev
            do j=1,np
               do i=1,np
 !------------REFACTOR
-                 Qt = elem(ie)%state%Qdp(i,j,k,1,qn0)/ ST( iXjXkXdpXn0Xie )
+!print *, ST( iXjXkXqXqn0Xie )/ ST( iXjXkXdpXn0Xie ) - elem(ie)%state%Qdp(i,j,k,1,qn0)/dp(i,j,k)
+!print *, Virtual_Temperature1d( ST( iXjXkXtXn0Xie ),Qt) - Virtual_Temperature1d(elem(ie)%state%T(i,j,k,n0),Qt)
+                 Qt = ST( iXjXkXqXqn0Xie )/ ST( iXjXkXdpXn0Xie )
                  Qt = elem(ie)%state%Qdp(i,j,k,1,qn0)/dp(i,j,k)
                  T_v(i,j,k) = Virtual_Temperature1d( ST( iXjXkXtXn0Xie ),Qt)
                  T_v(i,j,k) = Virtual_Temperature1d(elem(ie)%state%T(i,j,k,n0),Qt)
+!verified
 !------------end REFACTOR
                  kappa_star(i,j,k) = kappa
               end do
@@ -211,8 +234,8 @@ implicit none
         do j=1,np
            do i=1,np
 !------------REFACTOR
-              v1 = ST( iXjX1XuXn0Xie )
-              v2 = ST( iXjX1XvXn0Xie )
+              v1 = ST( iXjXkXuXn0Xie )
+              v2 = ST( iXjXkXvXn0Xie )
               v1     = elem(ie)%state%v(i,j,1,k,n0)
               v2     = elem(ie)%state%v(i,j,2,k,n0)
 !------------end REFACTOR
@@ -227,8 +250,8 @@ implicit none
         do j=1,np
            do i=1,np
 !------------REFACTOR
-              v1 = ST( iXjX1XuXn0Xie )
-              v2 = ST( iXjX1XvXn0Xie )
+              v1 = ST( iXjXkXuXn0Xie )
+              v2 = ST( iXjXkXvXn0Xie )
               v1     = elem(ie)%state%v(i,j,1,k,n0)
               v2     = elem(ie)%state%v(i,j,2,k,n0)
 !------------end REFACTOR
@@ -245,8 +268,8 @@ implicit none
               glnps2 = Rgas*gpterm*grad_p(i,j,2,k)
 
 !------------REFACTOR
-              v1 = ST( iXjX1XuXn0Xie )
-              v2 = ST( iXjX1XvXn0Xie )
+              v1 = ST( iXjXkXuXn0Xie )
+              v2 = ST( iXjXkXvXn0Xie )
               v1     = elem(ie)%state%v(i,j,1,k,n0)
               v2     = elem(ie)%state%v(i,j,2,k,n0)
 !------------end REFACTOR

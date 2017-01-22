@@ -34,8 +34,8 @@ module element_mod
 
 ! instead of elem-state, let's get STATE array
   integer, public, parameter :: numst = 41, indu = 1,  indv = 2, indT = 3, &
-                                inddp = 4,  indps = 5, indphis = 6 ! u,v,T,dp3d,ps_v, phis = 6 vars + 35 tracers
-  real (kind=real_kind), public :: ST(np,np,nlev,nelemd,numst,timelevels)
+                                inddp = 4,  indps = 5, indphis = 6, indvapor = 7 ! u,v,T,dp3d,ps_v,phis = 6 vars + 35 tracers
+
 
 !current addressing is STATE(np,np,nlev,tl,st,ie), replacing it with (i,j,k,ie,st,tl )
 
@@ -75,7 +75,7 @@ module element_mod
     real (kind=real_kind) :: ps_v(np,np,timelevels)                   ! surface pressure                   4
     real (kind=real_kind) :: phis(np,np)                              ! surface geopotential (prescribed)  5
     real (kind=real_kind) :: Q   (np,np,nlev,qsize_d)                 ! Tracer concentration               6
-    real (kind=real_kind) :: Qdp (np,np,nlev,qsize_d,2)               ! Tracer mass                        7
+    real (kind=real_kind) :: Qdp (np,np,nlev,qsize_d,timelevels)               ! Tracer mass                        7
 #endif
   end type elem_state_t
 
