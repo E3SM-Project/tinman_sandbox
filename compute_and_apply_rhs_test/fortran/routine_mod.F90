@@ -301,8 +301,8 @@ implicit none
 
      do k=1,nlev
 !------------REFACTOR
-print *, k
-if (ie == 3 ) print *,'original', ttens(:,:,k) 
+!print *, k
+!if (ie == 3 ) print *,'original', ttens(:,:,k) 
 !print *,elem(ie)%spheremp(:,:)*( ST( dXdXkXuXnm1Xie ) + dt2*vtens1(:,:,k) )-&
 !elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,1,k,nm1) + dt2*vtens1(:,:,k) )
 !print *, elem(ie)%spheremp(:,:)*( ST( dXdXkXvXnm1Xie ) + dt2*vtens2(:,:,k) ) -&
