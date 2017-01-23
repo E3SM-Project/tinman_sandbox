@@ -154,10 +154,7 @@ print *, 'hey', np
 
 !np1 fields will be changed
 
-!before:
-!print *, 'T ORIGINAL BEFORE ', elem(3)%state%T(:,:,:,np1)
-call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w, ST)
-!print *, 'T ORIGINAL AFTER ', elem(3)%state%T(:,:,:,np1)
+call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w)
 
 ! ---------------- DO NOT MODIFY ------------------------
 ie = 3

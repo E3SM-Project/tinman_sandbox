@@ -127,75 +127,34 @@ implicit none
 
   do ie=nets,nete
      phi => elem(ie)%derived%phi(:,:,:)
-!     dp  => elem(ie)%state%dp3d(:,:,:,n0)
 
-!replace with macro
-!------------REFACTOR
-!comparing output of operations for ST and old vars
-!print *, hvcoord%hyai(1)*hvcoord%ps0 + ST( dXdX1XdpXn0Xie  ) /2 - (hvcoord%hyai(1)*hvcoord%ps0 + dp(:,:,1)/2)
      p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + ST( dXdX1XdpXn0Xie  ) /2
-!     p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + dp(:,:,1)/2
-!print *, ST
-!stop
-!verified
-!------------end REFACTOR
      do k=2,nlev
-!------------REFACTOR
-!print *, (p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkXdpXn0Xie )/2)-(p(:,:,k-1) + dp(:,:,k-1)/2 + dp(:,:,k)/2)
         p(:,:,k)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkXdpXn0Xie )/2
-!        p(:,:,k)=p(:,:,k-1) + dp(:,:,k-1)/2 + dp(:,:,k)/2
-!stop
-!verified
-!------------end REFACTOR
      enddo
 
 !#omp parallel do
      do k=1,nlev
         grad_p(:,:,:,k) = gradient_sphere(p(:,:,k),deriv,elem(ie)%Dinv)
-!REFACTOR
-!        rdp(:,:,k) = 1.0D0/dp(:,:,k)
         rdp(:,:,k) = 1.0D0/ST( dXdXkXdpXn0Xie )
-!end REFACTOR
         do j=1,np
            do i=1,np
-!------------REFACTOR
-!print *, ST( iXjXkXuXn0Xie )- elem(ie)%state%v(i,j,1,k,n0)
-!print *, ST( iXjXkXvXn0Xie )- elem(ie)%state%v(i,j,2,k,n0)
               v1 = ST( iXjXkXuXn0Xie )
               v2 = ST( iXjXkXvXn0Xie )
-!              v1 = elem(ie)%state%v(i,j,1,k,n0)
-!              v2 = elem(ie)%state%v(i,j,2,k,n0)
-!verified
-!------------end REFACTOR
               vgrad_p(i,j,k) = (v1*grad_p(i,j,1,k) + v2*grad_p(i,j,2,k))
-!------------REFACTOR
-!print *, v1*ST( i,j,k,ie,4,n0 ) - v1*dp(i,j,k)
-!print *, v2*ST( i,j,k,ie,4,n0 ) - v2*dp(i,j,k)
               vdp(i,j,1,k) = v1*ST( i,j,k,ie,4,n0 )
               vdp(i,j,2,k) = v2*ST( i,j,k,ie,4,n0 )
-!              vdp(i,j,1,k) = v1*dp(i,j,k)
-!              vdp(i,j,2,k) = v2*dp(i,j,k)
-!verified
-!------------end REFACTOR
            end do
         end do
         elem(ie)%derived%vn0(:,:,:,k)=elem(ie)%derived%vn0(:,:,:,k)+eta_ave_w*vdp(:,:,:,k)
         divdp(:,:,k)=divergence_sphere(vdp(:,:,:,k),deriv,elem(ie))
-!------------REFACTOR
-!       vort(:,:,k)=vorticity_sphere(elem(ie)%state%v(:,:,:,k,n0),deriv,elem(ie))
-!vefiried by above
         vort(:,:,k)=vorticity_v2( ST( dXdXkXuXn0Xie ) , ST( dXdXkXvXn0Xie ) ,deriv,elem(ie))
-!        vort(:,:,k)=vorticity_v2(elem(ie)%state%v(:,:,1,k,n0),elem(ie)%state%v(:,:,2,k,n0),deriv,elem(ie))
-!------------end REFACTOR
      enddo
      if (qn0 == -1 ) then
         do k=1,nlev
            do j=1,np
               do i=1,np
-!------------REFACTOR
                  T_v(i,j,k) = ST( iXjXkXtXn0Xie )
-!                 T_v(i,j,k) = elem(ie)%state%T(i,j,k,n0)
-!------------end REFACTOR
                  kappa_star(i,j,k) = kappa
               end do
            end do
@@ -205,28 +164,14 @@ implicit none
         do k=1,nlev
            do j=1,np
               do i=1,np
-!------------REFACTOR
-!print *, ST( iXjXkXqXqn0Xie )/ ST( iXjXkXdpXn0Xie ) - elem(ie)%state%Qdp(i,j,k,1,qn0)/dp(i,j,k)
-!print *, Virtual_Temperature1d( ST( iXjXkXtXn0Xie ),Qt) - Virtual_Temperature1d(elem(ie)%state%T(i,j,k,n0),Qt)
                  Qt = ST( iXjXkXqXqn0Xie )/ ST( iXjXkXdpXn0Xie )
-!                 Qt = elem(ie)%state%Qdp(i,j,k,1,qn0)/dp(i,j,k)
                  T_v(i,j,k) = Virtual_Temperature1d( ST( iXjXkXtXn0Xie ),Qt)
-!                 T_v(i,j,k) = Virtual_Temperature1d(elem(ie)%state%T(i,j,k,n0),Qt)
-!verified
-!------------end REFACTOR
                  kappa_star(i,j,k) = kappa
               end do
            end do
         end do
      end if
-!------------REFACTOR
      call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) ,T_v,p, ST( dXdXdXdpXn0Xie ) )
-!print *, phi
-!     call preq_hydrostatic(phi,elem(ie)%state%phis,T_v,p,dp)
-!print *, phi
-!stop
-!verified
-!------------end REFACTOR
      call preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
      sdot_sum=0
      ! VERTICALLY LAGRANGIAN:   no vertical motion
@@ -244,34 +189,17 @@ implicit none
      vertloop: do k=1,nlev
         do j=1,np
            do i=1,np
-!------------REFACTOR
               v1 = ST( iXjXkXuXn0Xie )
               v2 = ST( iXjXkXvXn0Xie )
-!              v1     = elem(ie)%state%v(i,j,1,k,n0)
-!              v2     = elem(ie)%state%v(i,j,2,k,n0)
-!verified above
-!------------end REFACTOR
               E = 0.5D0*( v1*v1 + v2*v2 )
               Ephi(i,j)=E+phi(i,j,k)+elem(ie)%derived%pecnd(i,j,k)
            end do
         end do
-!------------REFACTOR
-!print *, gradient_sphere( ST( dXdXkXtXn0Xie ), deriv,elem(ie)%Dinv) - &
-!gradient_sphere(elem(ie)%state%T(:,:,k,n0),deriv,elem(ie)%Dinv)
         vtemp(:,:,:)   = gradient_sphere( ST( dXdXkXtXn0Xie ), deriv,elem(ie)%Dinv)
-!        vtemp(:,:,:)   = gradient_sphere(elem(ie)%state%T(:,:,k,n0),deriv,elem(ie)%Dinv)
-!stop
-!verified
-!------------end REFACTOR
         do j=1,np
            do i=1,np
-!------------REFACTOR
               v1 = ST( iXjXkXuXn0Xie )
               v2 = ST( iXjXkXvXn0Xie )
-!              v1     = elem(ie)%state%v(i,j,1,k,n0)
-!              v2     = elem(ie)%state%v(i,j,2,k,n0)
-!verified above
-!------------end REFACTOR
               vgrad_T(i,j) =  v1*vtemp(i,j,1) + v2*vtemp(i,j,2)
            end do
         end do
@@ -284,14 +212,8 @@ implicit none
               glnps1 = Rgas*gpterm*grad_p(i,j,1,k)
               glnps2 = Rgas*gpterm*grad_p(i,j,2,k)
 
-!------------REFACTOR
               v1 = ST( iXjXkXuXn0Xie )
               v2 = ST( iXjXkXvXn0Xie )
-!              v1     = elem(ie)%state%v(i,j,1,k,n0)
-!              v2     = elem(ie)%state%v(i,j,2,k,n0)
-!verified above
-!------------end REFACTOR
-
               vtens1(i,j,k) =   - v_vadv(i,j,1,k)                           &
                    + v2*(elem(ie)%fcor(i,j) + vort(i,j,k))        &
                    - vtemp(i,j,1) - glnps1
@@ -304,41 +226,12 @@ implicit none
      end do vertloop
 
      do k=1,nlev
-!------------REFACTOR
-!print *, k
-!if(ie == 3) print *,'st ', ttens(:,:,k) 
-!print *,elem(ie)%spheremp(:,:)*( ST( dXdXkXuXnm1Xie ) + dt2*vtens1(:,:,k) )-&
-!elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,1,k,nm1) + dt2*vtens1(:,:,k) )
-!print *, elem(ie)%spheremp(:,:)*( ST( dXdXkXvXnm1Xie ) + dt2*vtens2(:,:,k) ) -&
-!elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,2,k,nm1) + dt2*vtens2(:,:,k) )
-!print *, elem(ie)%spheremp(:,:)*( ST( dXdXkXtXnm1Xie ) + dt2*ttens(:,:,k)  ) -&
-!elem(ie)%spheremp(:,:)*(elem(ie)%state%T(:,:,k,nm1) + dt2*ttens(:,:,k))
-!print *, elem(ie)%spheremp(:,:) * ( ST( dXdXkXdpXnm1Xie ) - &
-!             dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k))) -&
-!elem(ie)%spheremp(:,:) * (elem(ie)%state%dp3d(:,:,k,nm1) - &
-!             dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
-!now LHS
-!print *, ST( dXdXkXuXnp1Xie ) - elem(ie)%state%v(:,:,1,k,np1)
-!print *, ST( dXdXkXuXnp1Xie ) - elem(ie)%state%v(:,:,2,k,np1)
-!print *, ST( dXdXkXtXnp1Xie ) - elem(ie)%state%T(:,:,k,np1)
-!print *, ST( dXdXkXdpXnp1Xie ) - elem(ie)%state%dp3d(:,:,k,np1)
-
         ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXuXnm1Xie ) + dt2*vtens1(:,:,k) )
         ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXvXnm1Xie ) + dt2*vtens2(:,:,k) )
         ST( dXdXkXtXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXtXnm1Xie ) + dt2*ttens(:,:,k)  )
         ST( dXdXkXdpXnp1Xie ) = &
              elem(ie)%spheremp(:,:) * ( ST( dXdXkXdpXnm1Xie ) - &
              dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
-
-!        elem(ie)%state%v(:,:,1,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,1,k,nm1) + dt2*vtens1(:,:,k) )
-!        elem(ie)%state%v(:,:,2,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,2,k,nm1) + dt2*vtens2(:,:,k) )
-!        elem(ie)%state%T(:,:,k,np1) = elem(ie)%spheremp(:,:)*(elem(ie)%state%T(:,:,k,nm1) + dt2*ttens(:,:,k))
-!        elem(ie)%state%dp3d(:,:,k,np1) = &
-!             elem(ie)%spheremp(:,:) * (elem(ie)%state%dp3d(:,:,k,nm1) - &
-!             dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
-
-!verified though it is better to set fields differently for timelevels
-!------------end REFACTOR
      enddo ! k loop
   end do
 end subroutine compute_and_apply_rhs_st
