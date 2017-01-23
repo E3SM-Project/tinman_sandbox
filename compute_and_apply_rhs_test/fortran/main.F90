@@ -3,7 +3,8 @@ program main
 
 use kinds
 use element_mod
-use routine_mod
+use routine_mod, only : compute_and_apply_rhs
+use routine_mod_st, only : compute_and_apply_rhs_st
 use derivative_mod_base
 use hybvcoord_mod
 
@@ -36,8 +37,8 @@ real (kind=real_kind) :: Ttest(np*np*nlev), Tt(np,np,nlev)
   dt2 = 1.0
   eta_ave_w = 1.0
   nets = 1
-  nete = 3
-  nelem = nete-nets+1
+  nete = nelemd
+
 
   Dvv_init(1:16) = (/ -3.0,  -0.80901699437494745,   0.30901699437494745, &     
  -0.50000000000000000 ,4.0450849718747373, 0.0, -1.1180339887498949, &     
@@ -150,10 +151,11 @@ enddo; enddo; enddo; enddo
 print *, 'hey', np
 
 !np1 fields will be changed
+
+!before:
+!print *, 'T ORIGINAL BEFORE ', elem(3)%state%T(:,:,:,np1)
 call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w, ST)
-
-
-
+!print *, 'T ORIGINAL AFTER ', elem(3)%state%T(:,:,:,np1)
 
 ! ---------------- DO NOT MODIFY ------------------------
 ie = 3
@@ -168,15 +170,18 @@ Tt(i,j,k) = Ttest(ind)
 ind = ind+1
 enddo; enddo; enddo
 
-print *, 'diff', maxval(abs(Tt - elem(ie)%state%T(:,:,:,np1)))
-
-!do k = 1,nlev; do j = 1,np; do i = 1,np
-!print *,i,j,k, Tt(i,j,k), elem(ie)%state%T(i,j,k,np1), '\n'
-!enddo; enddo; enddo
+print *, 'ORIGINAL diff', maxval(abs(Tt - elem(ie)%state%T(:,:,:,np1)))
+!print *, elem(ie)%state%T(:,:,:,np1)
 
 
-!print *, 'difference = ', RESHAPE(elem(ie)%state%T,(/1,np*np*timelevels*nlev/))
-!Ttest(1:np*np*nlev*timelevels) - 
+!print *, 'T ST BEFORE ', ST(:,:,:,ie,3,np1)
+call compute_and_apply_rhs_st(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w, ST)
+!print *, 'T ST AFTER ', ST(:,:,:,ie,3,np1)
+print *, 'ST diff', maxval(abs(Tt - ST(:,:,:,ie,3,np1)))
+!print *, ST(:,:,:,ie,3,np1)
+
+
+
 
 
 end program main

@@ -14,7 +14,7 @@ module element_mod
   integer, public, parameter :: nlevp=nlev+1
   integer, public, parameter :: qsize_d=1
   integer, public, parameter :: ntrac = 1
-  integer, public, parameter :: nelemd = 1
+  integer, public, parameter :: nelemd = 3
   integer, public, parameter :: npsq=np*np
 
 
@@ -33,7 +33,8 @@ module element_mod
 
 
 ! instead of elem-state, let's get STATE array
-  integer, public, parameter :: numst = 41, indu = 1,  indv = 2, indT = 3, &
+! CHANGE numst=41 !
+  integer, public, parameter :: numst = 7, indu = 1,  indv = 2, indT = 3, &
                                 inddp = 4,  indps = 5, indphis = 6, indvapor = 7 ! u,v,T,dp3d,ps_v,phis = 6 vars + 35 tracers
 
 
