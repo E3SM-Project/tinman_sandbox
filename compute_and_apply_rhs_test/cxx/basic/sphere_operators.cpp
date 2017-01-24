@@ -5,84 +5,110 @@
 namespace Homme
 {
 
-void gradient_sphere (const real* const s, const TestData& data,
-                      int ielem, real* const ds)
+void gradient_sphere (const real* RESTRICT const s, const TestData& RESTRICT data,
+                      int ielem, real* RESTRICT const ds)
 {
   typedef real Dvv_type[np][np];
 
-  const Dvv_type& Dvv = data.deriv.Dvv;
-  real rrearth = data.constants.rrearth;
+  const Dvv_type& RESTRICT Dvv = data.deriv.Dvv;
   real* Dinv = SLICE_5D (data.arrays.elem_Dinv,ielem,np,np,2,2);
 
   real dsdx, dsdy;
   real v1[np][np];
   real v2[np][np];
+  SIMD
   for (int j=0; j<np; ++j)
   {
     for (int l=0; l<np; ++l)
     {
-      dsdx = dsdy = 0;
+      dsdy = 0.0;
       for (int i=0; i<np; ++i)
       {
-        dsdx += Dvv[i][l]*AT_2D(s,i,j,np);
         dsdy += Dvv[i][l]*AT_2D(s,j,i,np);
       }
-
-      v1[l][j] = dsdx * rrearth;
-      v2[j][l] - dsdy * rrearth;
+      v2[j][l] = dsdy * Constants::rrearth;
     }
   }
 
+  SIMD
+  for (int l=0; l<np; ++l)
+  {
+    for (int j=0; j<np; ++j)
+    {
+      dsdx = 0.0;
+      for (int i=0; i<np; ++i)
+      {
+        dsdx += Dvv[i][l]*AT_2D(s,i,j,np);
+      }
+      v1[l][j] = dsdx * Constants::rrearth;
+    }
+  }
+
+  SIMD
   for (int j=0; j<np; ++j)
   {
     for (int i=0; i<np; ++i)
     {
-      AT_3D (ds, i, j, 0, np, 2) = AT_4D(Dinv,i,j,0,0,np,2,2)*v1[i][j]
-                                 + AT_4D(Dinv,i,j,1,0,np,2,2)*v2[i][j];
-
-      AT_3D (ds, i, j, 1, np, 2) = AT_4D(Dinv,i,j,0,1,np,2,2)*v1[i][j]
-                                 + AT_4D(Dinv,i,j,1,1,np,2,2)*v2[i][j];
-    }
-  }
-}
-
-void divergence_sphere (const real* const v, const TestData& data,
-                        int ielem, real* const div)
-{
-  typedef real Dvv_type[np][np];
-
-  const Dvv_type& Dvv = data.deriv.Dvv;
-  real rrearth = data.constants.rrearth;
-
-  real* Dinv    = SLICE_5D (data.arrays.elem_Dinv,ielem,np,np,2,2);
-  real* metdet  = SLICE_3D (data.arrays.elem_metdet,ielem,np,np);
-  real* rmetdet = SLICE_3D (data.arrays.elem_rmetdet,ielem,np,np);
-
-  real gv[np][np][2];
-  for (int igp=0; igp<np; ++igp)
-  {
-    for (int jgp=0; jgp<np; ++jgp)
-    {
-      gv[igp][jgp][0] = AT_2D(metdet,igp,jgp,np)* ( AT_4D(Dinv,igp,jgp,0,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
-                                                   +AT_4D(Dinv,igp,jgp,0,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2) );
-      gv[igp][jgp][1] = AT_2D(metdet,igp,jgp,np)* ( AT_4D(Dinv,igp,jgp,1,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
-                                                   +AT_4D(Dinv,igp,jgp,1,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2) );
-    }
-  }
-
-  real dudy[np][np], dvdx[np][np];
-  SIMD
-  for (int igp=0; igp<np; ++igp)
-  {
-    for (int jgp=0; jgp<np; ++jgp)
-    {
-      dudy[igp][jgp] = dvdx[igp][jgp] = 0.;
-      for (int kgp=0; kgp<np; ++kgp)
+      for(int k = 0; k < 2; ++k)
       {
-        dudy[igp][jgp] += Dvv[kgp][jgp] * gv[kgp][jgp][1];
-        dvdx[igp][jgp] += Dvv[kgp][igp] * gv[igp][kgp][0];
+        AT_3D (ds, i, j, k, np, 2) = (AT_4D(Dinv,i,j,0,k,np,2,2)*v1[i][j]
+                                      + AT_4D(Dinv,i,j,1,k,np,2,2)*v2[i][j]);
       }
+    }
+  }
+}
 
+void divergence_sphere (const real* RESTRICT const v, const TestData& RESTRICT data,
+                        int ielem, real* RESTRICT const div)
+{
+  typedef real Dvv_type[np][np];
+
+  /* Requires 8 cache lines */
+  real* RESTRICT Dinv = SLICE_5D (data.arrays.elem_Dinv,ielem,np,np,2,2);
+
+  /* Requires 4 cache lines */
+  real* RESTRICT metdet = SLICE_3D (data.arrays.elem_metdet,ielem,np,np);
+
+  /* Requires 4 cache lines */
+  real gv[np][np][2];
+  SIMD
+  for (int igp=0; igp<np; ++igp)
+  {
+    for (int jgp=0; jgp<np; ++jgp)
+    {
+      for(int kgp = 0; kgp < 2; ++kgp)
+      {
+        gv[igp][jgp][kgp] = AT_2D(metdet,igp,jgp,np)*(AT_4D(Dinv,igp,jgp,kgp,0,np,2,2)
+                                                      *AT_3D(v,igp,jgp,0,np,2)
+                                                      +AT_4D(Dinv,igp,jgp,kgp,1,np,2,2)
+                                                      *AT_3D(v,igp,jgp,1,np,2));
+      }
+    }
+  }
+
+  /* Requires 2 cache lines */
+  const Dvv_type& RESTRICT Dvv = data.deriv.Dvv;
+
+  /* Requires 2 cache lines */
+  real* RESTRICT rmetdet = SLICE_3D (data.arrays.elem_rmetdet,ielem,np,np);
+  real dd_sum[np][np];
+  SIMD
+  for (int igp=0; igp<np; ++igp)
+  {
+    for (int jgp=0; jgp<np; ++jgp)
+    {
+      dd_sum[igp][jgp] = 0;
+    }
+  }
+  SIMD
+  for (int kgp=0; kgp<np; ++kgp)
+  {
+    for (int igp=0; igp<np; ++igp)
+    {
+      for (int jgp=0; jgp<np; ++jgp)
+      {
+        dd_sum[ijp][jgp] += Dvv[kgp][jgp] * gv[kgp][jgp][1] + Dvv[kgp][igp] * gv[igp][kgp][0];
+      }
     }
   }
   SIMD
@@ -90,23 +116,34 @@ void divergence_sphere (const real* const v, const TestData& data,
   {
     for (int jgp=0; jgp<np; ++jgp)
     {
-      AT_2D(div,igp,jgp,np) = (dvdx[igp][jgp] + dudy[igp][jgp]) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
+      AT_2D(div,igp,jgp,np) = dd_sum[ijp][jgp] * AT_2D(rmetdet,igp,jgp,np) * Constants::rrearth;
     }
   }
 }
 
-void vorticity_sphere (const real* const v, const TestData& data,
-                       int ielem, real* const vort)
+void vorticity_sphere (const real* RESTRICT const v, const TestData& RESTRICT data,
+                       int ielem, real* RESTRICT const vort)
 {
+  /* In full, vorticity_sphere requires:
+   *   12 cache lines for input data
+   *   6 cache lines for local buffers (can be put into SIMD registers)
+   *   7/8s of a cache line for local integers and pointers
+   * for a total of 18+19/12 cache lines on average; or typically 20
+   * (assuming uniform PDF of local variable position on the stack)
+   * Note that 1 cache line = 1 AVX 512 register; of which there are 32
+   */
+
   typedef real Dvv_type[np][np];
 
-  const Dvv_type& Dvv = data.deriv.Dvv;
-  real rrearth = data.constants.rrearth;
+  /* Requires 2 cache lines */
+  const Dvv_type& RESTRICT Dvv = data.deriv.Dvv;
 
-  real* D       = SLICE_5D (data.arrays.elem_D,ielem,np,np,2,2);
-  real* rmetdet = SLICE_3D (data.arrays.elem_rmetdet,ielem,np,np);
+  /* Requires 8 cache lines */
+  real* RESTRICT D = SLICE_5D (data.arrays.elem_D,ielem,np,np,2,2);
 
+  /* Requires 4 cache lines */
   real vcov[np][np][2];
+  SIMD
   for (int igp=0; igp<np; ++igp)
   {
     for (int jgp=0; jgp<np; ++jgp)
@@ -118,27 +155,36 @@ void vorticity_sphere (const real* const v, const TestData& data,
     }
   }
 
-  real dudy[np][np], dvdx[np][np];
+  /* Requires 2 cache lines */
+  real dd_diff[np][np];
   SIMD
   for (int igp=0; igp<np; ++igp)
   {
     for (int jgp=0; jgp<np; ++jgp)
     {
-      dudy[igp][jgp] = dvdx[igp][jgp] = 0.;
-      for (int kgp=0; kgp<np; ++kgp)
-      {
-        dudy[igp][jgp] += Dvv[kgp][jgp] * vcov[igp][kgp][1];
-        dvdx[igp][jgp] += Dvv[kgp][igp] * vcov[kgp][jgp][0];
-      }
-
+      dd_diff[igp][jgp] = 0;
     }
   }
+  SIMD
+  for (int kgp=0; kgp<np; ++kgp)
+  {
+    for (int igp=0; igp<np; ++igp)
+    {
+      for (int jgp=0; jgp<np; ++jgp)
+      {
+        dd_diff[igp][jgp] += Dvv[kgp][jgp] * vcov[igp][kgp][1] - Dvv[kgp][igp] * vcov[kgp][jgp][0];
+      }
+    }
+  }
+
+  /* Requires 2 cache lines */
+  real* RESTRICT rmetdet = SLICE_3D (data.arrays.elem_rmetdet,ielem,np,np);
   SIMD
   for(int igp=0; igp<np; ++igp)
   {
     for(int jgp=0; jgp<np; ++jgp)
     {
-      AT_2D(vort,igp,jgp,np) = (dvdx[igp][jgp] - dudy[igp][jgp]) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
+      AT_2D(vort,igp,jgp,np) = dd_diff[igp][jgp] * AT_2D(rmetdet,igp,jgp,np) * Constants::rrearth;
     }
   }
 }

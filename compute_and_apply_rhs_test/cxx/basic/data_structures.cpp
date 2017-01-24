@@ -129,14 +129,6 @@ void Arrays::cleanup_data ()
   delete[] elem_derived_vn0;
 }
 
-void Constants::init_data ()
-{
-  kappa        = 1.0;
-  Rwater_vapor = 1.0;
-  Rgas         = 10.0;
-  eta_ave_w    = 1.0;
-}
-
 void Control::init_data ()
 {
   nets = 0;
@@ -177,7 +169,6 @@ void Derivative::init_data ()
 void TestData::init_data ()
 {
   arrays.init_data();
-  constants.init_data();
   control.init_data();
   hvcoord.init_data();
   deriv.init_data();

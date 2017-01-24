@@ -45,13 +45,11 @@ struct Arrays
 
 struct Constants
 {
-  real  rrearth;
-  real  eta_ave_w;
-  real  Rwater_vapor;
-  real  Rgas;
-  real  kappa;
-
-  void init_data ();
+  static constexpr const real rrearth = 1.0;
+  static constexpr const real eta_ave_w = 1.0;
+  static constexpr const real Rwater_vapor = 1.0;
+  static constexpr const real Rgas = 10.0;
+  static constexpr const real kappa = 1.0;
 };
 
 struct Control
@@ -77,7 +75,6 @@ struct Derivative
 struct TestData
 {
   Arrays      arrays    = {};
-  Constants   constants = {};
   Control     control   = {};
   Derivative  deriv     = {};
   HVCoord     hvcoord   = {};

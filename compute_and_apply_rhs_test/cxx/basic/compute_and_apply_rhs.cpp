@@ -14,24 +14,25 @@ namespace Homme
 void compute_and_apply_rhs (TestData& data)
 {
   // Create local arrays
-  real Ephi[np][np]                    = {};
-  real T_v[nlev][np][np]               = {};
-  real divdp[nlev][np][np]             = {};
-  real grad_p[nlev][np][np][2]         = {};
-  real eta_dot_dpdn_tmp[nlevp][np][np] = {};
-  real kappa_star[nlev][np][np]        = {};
-  real omega_p_tmp[nlev][np][np]       = {};
-  real p[nlev][np][np]                 = {};
-  real ttens[nlev][np][np]             = {};
-  real T_vadv[nlev][np][np]            = {};
-  real v_vadv[nlev][np][np][2]         = {};
-  real vdp[nlev][np][np][2]            = {};
-  real vgrad_T[np][np]                 = {};
-  real vgrad_p[nlev][np][np]           = {};
-  real vort[nlev][np][np]              = {};
-  real vtemp[np][np][2]                = {};
-  real vtens1[nlev][np][np]            = {};
-  real vtens2[nlev][np][np]            = {};
+  // Those without restrict shouldn't be accessed without their pointers
+  real Ephi[np][np]                      = {};
+  real T_v[nlev][np][np]                 = {};
+  real divdp[nlev][np][np]               = {};
+  real grad_p[nlev][np][np][2]           = {};
+  real eta_dot_dpdn_tmp[nlevp][np][np]   = {};
+  real omega_p_tmp[nlev][np][np]         = {};
+  real p[nlev][np][np]                   = {};
+  real vdp[nlev][np][np][2]              = {};
+  real vgrad_p[nlev][np][np]             = {};
+  real vort[nlev][np][np]                = {};
+  real vtemp[np][np][2]                  = {};
+  RESTRICT real kappa_star[nlev][np][np] = {};
+  RESTRICT real ttens[nlev][np][np]      = {};
+  RESTRICT real T_vadv[nlev][np][np]     = {};
+  RESTRICT real v_vadv[nlev][np][np][2]  = {};
+  RESTRICT real vgrad_T[np][np]          = {};
+  RESTRICT real vtens1[nlev][np][np]     = {};
+  RESTRICT real vtens2[nlev][np][np]     = {};
 
   // Get a pointer version so we can use single
   // subroutines interface for both ptrs and arrays
@@ -86,23 +87,26 @@ void compute_and_apply_rhs (TestData& data)
   // Loop over elements
   for (int ie=nets; ie<nete; ++ie)
   {
+
+
     dp3d_n0 = SLICE_5D_IJ(data.arrays.elem_state_dp3d,ie,n0,timelevels,nlev,np,np);
 
     for (int igp=0; igp<np; ++igp)
     {
       for (int jgp=0; jgp<np; ++jgp)
       {
-        p[0][igp][jgp] = data.hvcoord.hyai[0]*data.hvcoord.ps0 + 0.5*AT_3D(dp3d_n0,0,igp,jgp,np,np);
+        AT_3D(p_ptr, np, np, 0, igp, jgp) = data.hvcoord.hyai[0]*data.hvcoord.ps0 + 0.5*AT_3D(dp3d_n0,0,igp,jgp,np,np);
       }
     }
 
+    SIMD
     for (int ilev=1; ilev<nlev; ++ilev)
     {
       for (int igp=0; igp<np; ++igp)
       {
         for (int jgp=0; jgp<np; ++jgp)
         {
-          p[ilev][igp][jgp] = p[ilev-1][igp][jgp]
+          AT_3D(p_ptr, ilev, igp, jgp, np, np) = AT_3D(p_ptr, ilev-1, igp, jgp, np, np)
                             + 0.5*AT_3D(dp3d_n0,(ilev-1),igp,jgp,np,np)
                             + 0.5*AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
         }
@@ -115,6 +119,7 @@ void compute_and_apply_rhs (TestData& data)
     {
       gradient_sphere (SLICE_3D(p_ptr,ilev,np,np), data, ie, SLICE_4D(grad_p_ptr,ilev,np,np,2));
 
+      SIMD
       for (int igp=0; igp<np; ++igp)
       {
         for (int jgp=0; jgp<np; ++jgp)
@@ -124,8 +129,8 @@ void compute_and_apply_rhs (TestData& data)
           AT_4D(vdp_ptr, ilev, igp, jgp, 0, np, np, 2) = AT_4D(v_n0,ilev,igp,jgp,0,np,np,2) * AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
           AT_4D(vdp_ptr, ilev, igp, jgp, 1, np, np, 2) = AT_4D(v_n0,ilev,igp,jgp,1,np,np,2) * AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
 
-          AT_4D(derived_vn0,ilev,igp,jgp,0,np,np,2) += data.constants.eta_ave_w * vdp[ilev][igp][jgp][0];
-          AT_4D(derived_vn0,ilev,igp,jgp,1,np,np,2) += data.constants.eta_ave_w * vdp[ilev][igp][jgp][1];
+          AT_4D(derived_vn0,ilev,igp,jgp,0,np,np,2) += Constants::eta_ave_w * AT_4D(vdp_ptr, ilev, igp, jgp, 0, np, np, 2);
+          AT_4D(derived_vn0,ilev,igp,jgp,1,np,np,2) += Constants::eta_ave_w * AT_4D(vdp_ptr, ilev, igp, jgp, 1, np, np, 2);
         }
       }
 
@@ -136,14 +141,15 @@ void compute_and_apply_rhs (TestData& data)
     T_n0 = SLICE_5D_IJ(data.arrays.elem_state_T,ie,n0,timelevels,nlev,np,np);
     if (qn0==-1)
     {
+      SIMD
       for (int ilev=0; ilev<nlev; ++ilev)
       {
         for (int igp=0; igp<np; ++igp)
         {
           for (int jgp=0; jgp<np; ++jgp)
           {
-            T_v[ilev][igp][jgp] = AT_3D(T_n0,ilev,igp,jgp,np,np);
-            kappa_star[ilev][igp][jgp] = data.constants.kappa;
+            AT_3D(T_v_ptr, ilev, igp, jgp, np, np) = AT_3D(T_n0,ilev,igp,jgp,np,np);
+            kappa_star[ilev][igp][jgp] = Constants::kappa;
           }
         }
       }
@@ -151,6 +157,7 @@ void compute_and_apply_rhs (TestData& data)
     else
     {
       Qdp_ie = SLICE_6D (data.arrays.elem_state_Qdp,ie,nlev,qsize_d,2,np,np);
+      SIMD
       for (int ilev=0; ilev<nlev; ++ilev)
       {
         for (int igp=0; igp<np; ++igp)
@@ -158,8 +165,8 @@ void compute_and_apply_rhs (TestData& data)
           for (int jgp=0; jgp<np; ++jgp)
           {
             Qt = AT_5D(Qdp_ie,ilev,1,qn0,igp,jgp,qsize_d,2,np,np) / AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
-            T_v[ilev][igp][jgp] = AT_3D(T_n0,ilev,igp,jgp,np,np)*(1.0+ (data.constants.Rwater_vapor/data.constants.Rgas - 1.0)*Qt);
-            kappa_star[ilev][igp][jgp] = data.constants.kappa;
+            AT_3D(T_v_ptr, ilev, igp, jgp, np, np) = AT_3D(T_n0,ilev,igp,jgp,np,np)*(real(1.0)+ (Constants::Rwater_vapor/Constants::Rgas - real(1.0))*Qt);
+            kappa_star[ilev][igp][jgp] = Constants::kappa;
           }
         }
       }
@@ -168,27 +175,42 @@ void compute_and_apply_rhs (TestData& data)
     phis = SLICE_3D(data.arrays.elem_state_phis,ie,np,np);
     phi  = SLICE_4D(data.arrays.elem_derived_phi,ie,nlev,np,np);
 
-    preq_hydrostatic (phis,T_v_ptr,p_ptr,dp3d_n0,data.constants.Rgas,phi);
+    preq_hydrostatic (phis,T_v_ptr,p_ptr,dp3d_n0,Constants::Rgas,phi);
     preq_omega_ps (p_ptr,vgrad_p_ptr,divdp_ptr,omega_p_tmp_ptr);
 
     omega_p      = SLICE_4D(data.arrays.elem_derived_omega_p,ie,nlev,np,np);
     eta_dot_dpdn = SLICE_4D(data.arrays.elem_derived_eta_dot_dpdn,ie,nlevp,np,np);
+
+    SIMD
     for (int ilev=0; ilev<nlev; ++ilev)
     {
       for (int igp=0; igp<np; ++igp)
       {
         for (int jgp=0; jgp<np; ++jgp)
         {
-          AT_3D(eta_dot_dpdn,ilev,igp,jgp,np,np) += data.constants.eta_ave_w * eta_dot_dpdn_tmp[ilev][igp][jgp];
-          AT_3D(omega_p,ilev,igp,jgp,np,np) += data.constants.eta_ave_w * omega_p_tmp[ilev][igp][jgp];
+          AT_3D(eta_dot_dpdn,ilev,igp,jgp,np,np) += Constants::eta_ave_w * AT_3D(eta_dot_dpdn_tmp_ptr, ilev, igp, jgp, np, np);
         }
       }
     }
+
+    SIMD
+    for (int ilev=0; ilev<nlev; ++ilev)
+    {
+      for (int igp=0; igp<np; ++igp)
+      {
+        for (int jgp=0; jgp<np; ++jgp)
+        {
+          AT_3D(omega_p,ilev,igp,jgp,np,np) += Constants::eta_ave_w * AT_3D(omega_p_tmp_ptr, ilev, igp, jgp, np, np);
+        }
+      }
+    }
+
+    SIMD
     for (int igp=0; igp<np; ++igp)
     {
       for (int jgp=0; jgp<np; ++jgp)
       {
-        AT_3D(eta_dot_dpdn,nlev,igp,jgp,np,np) += data.constants.eta_ave_w * eta_dot_dpdn_tmp[nlev][igp][jgp];
+        AT_3D(eta_dot_dpdn,nlev,igp,jgp,np,np) += Constants::eta_ave_w * AT_3D(eta_dot_dpdn_tmp_ptr, nlev, igp, jgp, np, np);
       }
     }
 
@@ -196,6 +218,7 @@ void compute_and_apply_rhs (TestData& data)
     fcor  = SLICE_3D(data.arrays.elem_fcor,ie,np,np);
     for (int ilev=0; ilev<nlev; ++ilev)
     {
+      SIMD
       for (int igp=0; igp<np; ++igp)
       {
         for (int jgp=0; jgp<np; ++jgp)
@@ -203,12 +226,13 @@ void compute_and_apply_rhs (TestData& data)
           v1 = AT_4D(v_n0,ilev,igp,jgp,0,np,np,2);
           v2 = AT_4D(v_n0,ilev,igp,jgp,1,np,np,2);
 
-          Ephi[igp][jgp] = 0.5 * (v1*v1 + v2*v2) + AT_3D(phi,ilev,igp,jgp,np,np) + AT_3D (pecnd,ilev,igp,jgp,np,np);
+          AT_2D(Ephi_ptr, igp, jgp, np) = 0.5 * (v1*v1 + v2*v2) + AT_3D(phi,ilev,igp,jgp,np,np) + AT_3D(pecnd,ilev,igp,jgp,np,np);
         }
       }
 
       gradient_sphere (SLICE_3D(T_n0,ilev,np,np),data,ie,vtemp_ptr);
 
+      SIMD
       for (int igp=0; igp<np; ++igp)
       {
         for (int jgp=0; jgp<np; ++jgp)
@@ -216,28 +240,29 @@ void compute_and_apply_rhs (TestData& data)
           v1 = AT_4D(v_n0,ilev,igp,jgp,0,np,np,2);
           v2 = AT_4D(v_n0,ilev,igp,jgp,1,np,np,2);
 
-          vgrad_T[igp][jgp] = v1*vtemp[igp][jgp][0] + v2*vtemp[igp][jgp][1];
+          vgrad_T[igp][jgp] = v1*AT_3D(vtemp_ptr, igp, jgp, 0, np, 2) + v2*AT_3D(vtemp_ptr, igp, jgp, 1, np, 2);
         }
       }
 
       gradient_sphere (Ephi_ptr, data, ie, vtemp_ptr);
 
+      SIMD
       for (int igp=0; igp<np; ++igp)
       {
         for (int jgp=0; jgp<np; ++jgp)
         {
-          gpterm = T_v[ilev][igp][jgp] / p[ilev][igp][jgp];
+          gpterm = AT_3D(T_v_ptr, ilev, igp, jgp, np, np) / AT_3D(p_ptr, ilev, igp, jgp, np, np);
 
-          glnps1 = data.constants.Rgas*gpterm*grad_p[ilev][igp][jgp][0];
-          glnps2 = data.constants.Rgas*gpterm*grad_p[ilev][igp][jgp][1];
+          glnps1 = Constants::Rgas*gpterm*AT_4D(grad_p_ptr, ilev, igp, jgp, 0, np, np, 2);
+          glnps2 = Constants::Rgas*gpterm*AT_4D(grad_p_ptr, ilev, igp, jgp, 1, np, np, 2);
 
           v1 = AT_4D(v_n0,ilev,igp,jgp,0,np,np,2);
           v2 = AT_4D(v_n0,ilev,igp,jgp,1,np,np,2);
 
-          vtens1[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][0] + v2 * (AT_2D(fcor,igp,jgp,np) + vort[ilev][igp][jgp]) - vtemp[igp][jgp][0] - glnps1;
-          vtens2[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][1] - v1 * (AT_2D(fcor,igp,jgp,np) + vort[ilev][igp][jgp]) - vtemp[igp][jgp][1] - glnps2;
+          vtens1[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][0] + v2 * (AT_2D(fcor,igp,jgp,np) + AT_3D(vort_ptr, ilev, igp, jgp, np, np)) - AT_3D(vtemp_ptr, igp, jgp, 0, np, 2) - glnps1;
+          vtens2[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][1] - v1 * (AT_2D(fcor,igp,jgp,np) + AT_3D(vort_ptr, ilev, igp, jgp, np, np)) - AT_3D(vtemp_ptr, igp, jgp, 1, np, 2) - glnps2;
 
-          ttens[ilev][igp][jgp]  = T_vadv[ilev][igp][jgp] - vgrad_T[igp][jgp] + kappa_star[ilev][igp][jgp]*T_v[ilev][igp][jgp]*omega_p_tmp[ilev][igp][jgp];
+          ttens[ilev][igp][jgp]  = T_vadv[ilev][igp][jgp] - vgrad_T[igp][jgp] + kappa_star[ilev][igp][jgp]*AT_3D(T_v_ptr, ilev, igp, jgp, np, np)*AT_3D(omega_p_tmp_ptr, ilev, igp, jgp, np, np);
         }
       }
     }
@@ -258,23 +283,36 @@ void compute_and_apply_rhs (TestData& data)
       {
         for (int jgp=0; jgp<np; ++jgp)
         {
-          AT_4D(v_np1,ilev,igp,jgp,0,np,np,2) = AT_2D(spheremp,igp,jgp,np) * (AT_4D(v_nm1,ilev,igp,jgp,0,np,np,2) + dt2*vtens1[ilev][igp][jgp]);
-          AT_4D(v_np1,ilev,igp,jgp,1,np,np,2) = AT_2D(spheremp,igp,jgp,np) * (AT_4D(v_nm1,ilev,igp,jgp,1,np,np,2) + dt2*vtens1[ilev][igp][jgp]);
+          for(int k=0; k<2; ++k)
+          {
+            AT_4D(v_np1,ilev,igp,jgp,k,np,np,2) = AT_2D(spheremp,igp,jgp,np) * (AT_4D(v_nm1,ilev,igp,jgp,k,np,np,2) + dt2*vtens1[ilev][igp][jgp]);
+          }
+        }
+      }
+    }
+    SIMD
+    for (int ilev=0; ilev<nlev; ++ilev)
+    {
+      for (int igp=0; igp<np; ++igp)
+      {
+        for (int jgp=0; jgp<np; ++jgp)
+        {
           AT_3D(T_np1,ilev,igp,jgp,np,np)     = AT_2D(spheremp,igp,jgp,np) * (AT_3D(T_nm1,ilev,igp,jgp,np,np) + dt2*ttens[ilev][igp][jgp]);
-          AT_3D(dp3d_np1,ilev,igp,jgp,np,np)  = AT_2D(spheremp,igp,jgp,np) * (AT_3D(dp3d_nm1,ilev,igp,jgp,np,np) + dt2*divdp[ilev][igp][jgp]);
+          AT_3D(dp3d_np1,ilev,igp,jgp,np,np)  = AT_2D(spheremp,igp,jgp,np) * (AT_3D(dp3d_nm1,ilev,igp,jgp,np,np) + dt2*AT_3D(divdp_ptr, ilev, igp, jgp, np, np));
         }
       }
     }
   }
 }
 
-void preq_hydrostatic (const real* const phis, const real* const T_v,
-                       const real* const p, const real* dp,
-                       real Rgas, real* const phi)
+void preq_hydrostatic (RESTRICT const real* const phis, RESTRICT const real* const T_v,
+                       RESTRICT const real* const p, RESTRICT const real* dp,
+                       real Rgas, RESTRICT real* const phi)
 {
   real hkk, hkl;
   real phii[nlev][np][np];
 
+  SIMD
   for (int jgp=0; jgp<np; ++jgp)
   {
     for (int igp=0; igp<np; ++igp)
@@ -302,11 +340,12 @@ void preq_hydrostatic (const real* const phis, const real* const T_v,
   }
 }
 
-void preq_omega_ps (const real* const p, const real* const vgrad_p,
-                    const real* const divdp, real* const omega_p)
+void preq_omega_ps (RESTRICT const real* const p, RESTRICT const real* const vgrad_p,
+                    RESTRICT const real* const divdp, RESTRICT real* const omega_p)
 {
   real ckk, ckl, term;
   real suml[np][np];
+  SIMD
   for (int igp=0; igp<np; ++igp)
   {
     for (int jgp=0; jgp<np; ++jgp)
