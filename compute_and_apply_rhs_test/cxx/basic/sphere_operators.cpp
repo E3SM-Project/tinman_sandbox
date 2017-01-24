@@ -107,7 +107,7 @@ void divergence_sphere (const real* RESTRICT const v, const TestData& RESTRICT d
     {
       for (int jgp=0; jgp<np; ++jgp)
       {
-        dd_sum[ijp][jgp] += Dvv[kgp][jgp] * gv[kgp][jgp][1] + Dvv[kgp][igp] * gv[igp][kgp][0];
+        dd_sum[igp][jgp] += Dvv[kgp][jgp] * gv[kgp][jgp][1] + Dvv[kgp][igp] * gv[igp][kgp][0];
       }
     }
   }
@@ -116,7 +116,7 @@ void divergence_sphere (const real* RESTRICT const v, const TestData& RESTRICT d
   {
     for (int jgp=0; jgp<np; ++jgp)
     {
-      AT_2D(div,igp,jgp,np) = dd_sum[ijp][jgp] * AT_2D(rmetdet,igp,jgp,np) * Constants::rrearth;
+      AT_2D(div,igp,jgp,np) = dd_sum[igp][jgp] * AT_2D(rmetdet,igp,jgp,np) * Constants::rrearth;
     }
   }
 }
