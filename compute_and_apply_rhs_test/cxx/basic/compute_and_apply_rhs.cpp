@@ -8,6 +8,8 @@
 #include <iostream>
 #include <fstream>
 
+#include "immintrin.h"
+
 namespace Homme
 {
 
@@ -49,7 +51,6 @@ void compute_and_apply_rhs (TestData& data)
   RESTRICT real* T_v_ptr              = PTR_FROM_3D(T_v);
 
   // Other accessory variables
-  real Qt     = 0;
   real glnps1 = 0;
   real glnps2 = 0;
   real gpterm = 0;
@@ -84,31 +85,42 @@ void compute_and_apply_rhs (TestData& data)
   const int qn0  = data.control.qn0;
   const real dt2 = data.control.dt2;
 
+  constexpr const int doubles_per_avx512 = 512 / (8 * sizeof(double));
+  double ones[doubles_per_avx512];
+  double halves[doubles_per_avx512];
+  for(int i = 0; i < doubles_per_avx512; ++i) {
+    ones[i] = 1.0;
+    halves[i] = 0.5;
+  }
+
   // Loop over elements
   for (int ie=nets; ie<nete; ++ie)
   {
 
-
     dp3d_n0 = SLICE_5D_IJ(data.arrays.elem_state_dp3d,ie,n0,timelevels,nlev,np,np);
 
+    SIMD
     for (int igp=0; igp<np; ++igp)
     {
       for (int jgp=0; jgp<np; ++jgp)
       {
-        AT_3D(p_ptr, np, np, 0, igp, jgp) = data.hvcoord.hyai[0]*data.hvcoord.ps0 + 0.5*AT_3D(dp3d_n0,0,igp,jgp,np,np);
+        AT_3D(p_ptr, 0, igp, jgp, np, np) = data.hvcoord.hyai[0]*data.hvcoord.ps0 + 0.5*AT_3D(dp3d_n0,0,igp,jgp,np,np);
       }
     }
 
-    SIMD
-    for (int ilev=1; ilev<nlev; ++ilev)
     {
-      for (int igp=0; igp<np; ++igp)
+      __m512d one_half = _mm512_load_pd(halves);
+      for (int ilev=1; ilev<nlev; ++ilev)
       {
-        for (int jgp=0; jgp<np; ++jgp)
+        for(int avx_i = 0; avx_i < 2; ++avx_i)
         {
-          AT_3D(p_ptr, ilev, igp, jgp, np, np) = AT_3D(p_ptr, ilev-1, igp, jgp, np, np)
-                            + 0.5*AT_3D(dp3d_n0,(ilev-1),igp,jgp,np,np)
-                            + 0.5*AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
+          __m512d a = _mm512_load_pd(&AT_2D(dp3d_n0, ilev - 1, avx_i * doubles_per_avx512, 2 * doubles_per_avx512));
+          __m512d c = _mm512_load_pd(&AT_2D(p_ptr, ilev - 1, avx_i * doubles_per_avx512, 2 * doubles_per_avx512));
+          c = _mm512_fmadd_pd(a, one_half, c);
+
+          a = _mm512_load_pd(&AT_2D(dp3d_n0, ilev, avx_i * doubles_per_avx512, 2 * doubles_per_avx512));
+          c = _mm512_fmadd_pd(a, one_half, c);
+          _mm512_store_pd(&AT_2D(p_ptr, ilev, avx_i * doubles_per_avx512, 2 * doubles_per_avx512), c);
         }
       }
     }
@@ -157,15 +169,35 @@ void compute_and_apply_rhs (TestData& data)
     else
     {
       Qdp_ie = SLICE_6D (data.arrays.elem_state_Qdp,ie,nlev,qsize_d,2,np,np);
-      SIMD
+
+      double coeff_mem[doubles_per_avx512];
+      for(int i = 0; i < doubles_per_avx512; ++i)
+      {
+        coeff_mem[i] = Constants::Rwater_vapor/Constants::Rgas - real(1.0);
+      }
+      __m512d qt_coeff = _mm512_load_pd(coeff_mem);
+      __m512d avx_ones = _mm512_load_pd(ones);
+
       for (int ilev=0; ilev<nlev; ++ilev)
       {
-        for (int igp=0; igp<np; ++igp)
+        for (int avx_i=0; avx_i<2; ++avx_i)
         {
-          for (int jgp=0; jgp<np; ++jgp)
+          __m512d mult = _mm512_load_pd(&AT_4D(Qdp_ie, ilev, 1, qn0, avx_i * doubles_per_avx512, qsize_d, 2, 2 * doubles_per_avx512));
+          __m512d den = _mm512_load_pd(&AT_2D(dp3d_n0, ilev, avx_i * doubles_per_avx512, 2 * doubles_per_avx512));
+          __m512d buf = _mm512_div_pd(mult, den);
+          buf = _mm512_fmadd_pd(buf, qt_coeff, avx_ones);
+          mult = _mm512_load_pd(&AT_2D(T_n0, ilev, avx_i * doubles_per_avx512, 2 * doubles_per_avx512));
+          buf = _mm512_mul_pd(buf, mult);
+          _mm512_store_pd(&AT_2D(T_v_ptr, ilev, avx_i * doubles_per_avx512, 2 * doubles_per_avx512), buf);
+        }
+      }
+
+      for(int ilev = 0; ilev<nlev; ++ilev)
+      {
+        for(int igp = 0; igp < np; ++igp)
+        {
+          for(int jgp = 0; jgp < np; ++jgp)
           {
-            Qt = AT_5D(Qdp_ie,ilev,1,qn0,igp,jgp,qsize_d,2,np,np) / AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
-            AT_3D(T_v_ptr, ilev, igp, jgp, np, np) = AT_3D(T_n0,ilev,igp,jgp,np,np)*(real(1.0)+ (Constants::Rwater_vapor/Constants::Rgas - real(1.0))*Qt);
             kappa_star[ilev][igp][jgp] = Constants::kappa;
           }
         }
