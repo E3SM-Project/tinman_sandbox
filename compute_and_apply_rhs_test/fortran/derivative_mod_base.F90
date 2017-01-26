@@ -14,6 +14,7 @@ private
 
   public  :: gradient_sphere
   public  :: vorticity_sphere
+  public  :: vorticity_v2
   public  :: divergence_sphere
 
 contains
@@ -119,6 +120,62 @@ contains
     end do
 
   end function vorticity_sphere
+
+
+! separate velocity input
+!DIR$ ATTRIBUTES FORCEINLINE :: vorticity_v2
+  function vorticity_v2(u,v,deriv,elem) result(vort)
+!
+!   input:  v = velocity in lat-lon coordinates
+!   ouput:  spherical vorticity of v
+!
+    type (derivative_t), intent(in) :: deriv
+    type (element_t), intent(in) :: elem
+    real(kind=real_kind), intent(in) :: u(np,np),v(np,np)
+
+    real(kind=real_kind) :: vort(np,np)
+
+    integer i
+    integer j
+    integer l
+    
+    real(kind=real_kind) ::  dvdx00,dudy00
+    real(kind=real_kind) ::  vco(np,np,2)
+    real(kind=real_kind) ::  vtemp(np,np)
+
+    ! convert to covariant form
+    do j=1,np
+       do i=1,np
+          vco(i,j,1)=(elem%D(i,j,1,1)*v(i,j) + elem%D(i,j,2,1)*u(i,j))
+          vco(i,j,2)=(elem%D(i,j,1,2)*v(i,j) + elem%D(i,j,2,2)*u(i,j))
+       enddo
+    enddo
+
+    do j=1,np
+       do l=1,np
+
+          dudy00=0.0d0
+          dvdx00=0.0d0
+
+!DIR$ UNROLL(NP)
+          do i=1,np
+             dvdx00 = dvdx00 + deriv%Dvv(i,l  )*vco(i,j  ,2)
+             dudy00 = dudy00 + deriv%Dvv(i,l  )*vco(j  ,i,1)
+          enddo
+ 
+          vort(l  ,j  ) = dvdx00
+          vtemp(j  ,l  ) = dudy00
+       enddo
+    enddo
+
+    do j=1,np
+       do i=1,np
+          vort(i,j)=(vort(i,j)-vtemp(i,j))*(elem%rmetdet(i,j)*rrearth)
+       end do
+    end do
+
+  end function vorticity_v2
+
 
 
 !DIR$ ATTRIBUTES FORCEINLINE :: divergence_sphere
