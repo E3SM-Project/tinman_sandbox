@@ -43,7 +43,7 @@ void Derivative::init_data ()
   {
     for (int j=0; j<NP; ++j)
     {
-      Dvv[i][j] = values[(j-1)*NP + i];
+      Dvv[i][j] = values[j*NP + i];
     }
   }
 }
