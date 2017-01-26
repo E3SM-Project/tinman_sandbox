@@ -156,7 +156,8 @@ void divergence_sphere (Kokkos::TeamPolicy<>::member_type &team,
   });
 }
 
-void vorticity_sphere (const ViewUnmanaged<Real[2][NP][NP]> v, const TestData& data,
+void vorticity_sphere (const ViewUnmanaged<Real[NP][NP]> u,
+                       const ViewUnmanaged<Real[NP][NP]> v, const TestData& data,
                        const ViewUnmanaged<Real[NP][NP]> metDet,
                        const ViewUnmanaged<Real[2][2][NP][NP]> D,
                        ViewUnmanaged<Real[NP][NP]> vort)
@@ -171,8 +172,8 @@ void vorticity_sphere (const ViewUnmanaged<Real[2][NP][NP]> v, const TestData& d
   {
     for (int jgp=0; jgp<NP; ++jgp)
     {
-      vcov[0][igp][jgp] = D(0,0,igp,jgp)*v(0,igp,jgp) + D(1,0,igp,jgp)*v(1,igp,jgp);
-      vcov[1][igp][jgp] = D(0,1,igp,jgp)*v(0,igp,jgp) + D(1,1,igp,jgp)*v(1,igp,jgp);
+      vcov[0][igp][jgp] = D(0,0,igp,jgp)*u(igp,jgp) + D(1,0,igp,jgp)*v(igp,jgp);
+      vcov[1][igp][jgp] = D(0,1,igp,jgp)*u(igp,jgp) + D(1,1,igp,jgp)*v(igp,jgp);
     }
   }
 
@@ -194,7 +195,8 @@ void vorticity_sphere (const ViewUnmanaged<Real[2][NP][NP]> v, const TestData& d
 }
 
 void vorticity_sphere (Kokkos::TeamPolicy<>::member_type &team,
-                       const ViewUnmanaged<Real[2][NP][NP]> v, const TestData& data,
+                       const ViewUnmanaged<Real[NP][NP]> u,
+                       const ViewUnmanaged<Real[NP][NP]> v,const TestData& data,
                        const ViewUnmanaged<Real[NP][NP]> metDet,
                        const ViewUnmanaged<Real[2][2][NP][NP]> D,
                        ViewUnmanaged<Real[NP][NP]> vort)
@@ -210,8 +212,8 @@ void vorticity_sphere (Kokkos::TeamPolicy<>::member_type &team,
                        [&](const int loop_idx) {
     const int igp = loop_idx / NP;
     const int jgp = loop_idx % NP;
-    vcov[0][igp][jgp] = D(0,0,igp,jgp)*v(0,igp,jgp) + D(1,0,igp,jgp)*v(1,igp,jgp);
-    vcov[1][igp][jgp] = D(0,1,igp,jgp)*v(0,igp,jgp) + D(1,1,igp,jgp)*v(1,igp,jgp);
+    vcov[0][igp][jgp] = D(0,0,igp,jgp)*u(igp,jgp) + D(1,0,igp,jgp)*v(igp,jgp);
+    vcov[1][igp][jgp] = D(0,1,igp,jgp)*u(igp,jgp) + D(1,1,igp,jgp)*v(igp,jgp);
   });
 
   Real dudy, dvdx;
