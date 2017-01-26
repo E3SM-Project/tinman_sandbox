@@ -9,8 +9,16 @@ ENDIF()
 
 CONFIGURE_FILE( ${CMAKE_CURRENT_SOURCE_DIR}/Makefile.custom.in Makefile.custom)
 
+INCLUDE(ProcessorCount)
+ProcessorCount(N)
+IF (NOT N EQUAL 0)
+  # given that cores != 0 you could modify
+  # math(EXPR N "${N}+1")  # modify (increment/decrement) N at your will, in this case, just incrementing N by one
+  SET(JOBS_IN_PARALLEL -j${N})
+ENDIF()
+
 # semi-hack, to forward 'all' to our makefile
-ADD_CUSTOM_TARGET(kokkos COMMAND $(MAKE) -f Makefile.custom
+ADD_CUSTOM_TARGET(kokkos COMMAND ${CMAKE_MAKE_PROGRAM} ${JOBS_IN_PARALLEL} -f Makefile.custom
                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 SET_TARGET_PROPERTIES(kokkos PROPERTIES EXCLUDE_FROM_ALL FALSE)
 
