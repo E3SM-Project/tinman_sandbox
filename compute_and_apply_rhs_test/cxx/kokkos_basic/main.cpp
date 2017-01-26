@@ -53,22 +53,32 @@ int main (int argc, char** argv)
       else if (strncmp(argv[iarg],"--tinman-dump-res=",18) == 0)
       {
         char* val = strchr(argv[iarg],'=')+1;
-        dump_res = std::stoi(val);
+        if (strcmp(val,"yes")==0 || strcmp(val,"YES")==0)
+          dump_res = true;
+        else if (strcmp(val,"no")==0 || strcmp(val,"NO")==0)
+          dump_res = false;
+        else
+        {
+          std::cout << " ERROR! Unrecognized command line option '" << argv[iarg] << "'.\n"
+                    << "        Run with '--tinman-help' to see the available options.\n";
+
+          std::exit(1);
+        }
 
         ++iarg;
         continue;
       }
       else if (strncmp(argv[iarg],"--tinman-help",13) == 0)
       {
-        std::cout << "+------------------------------------------------------------------+\n"
-                  << "|                   TinMan command line arguments                  |\n"
-                  << "+------------------------------------------------------------------+\n"
-                  << "|  --tinman-num-elems  : the number of elements (def=10)           |\n"
-                  << "|  --tinman-dump-res   : whether to dump results to file (def=NO)  |\n"
-                  << "|  --tinman-num-exec   : number of times to execute (def=1)        |\n"
-                  << "|  --tinman-help       : prints this message                       |\n"
-                  << "|  --kokkos-help       : prints kokkos help                        |\n"
-                  << "+------------------------------------------------------------------+\n";
+        std::cout << "+------------------------------------------------------------------------+\n"
+                  << "|                      TinMan command line arguments                     |\n"
+                  << "+------------------------------------------------------------------------+\n"
+                  << "|  --tinman-num-elems=N  : the number of elements (default=10)           |\n"
+                  << "|  --tinman-dump-res=val : whether to dump results to file (default=no)  |\n"
+                  << "|  --tinman-num-exec=N   : number of times to execute (default=1)        |\n"
+                  << "|  --tinman-help         : prints this message                           |\n"
+                  << "|  --kokkos-help         : prints kokkos help                            |\n"
+                  << "+------------------------------------------------------------------------+\n";
 
         std::exit(0);
       }
@@ -83,14 +93,14 @@ int main (int argc, char** argv)
   }
 
   Kokkos::initialize (argc, argv);
+  Kokkos::OpenMP::print_configuration(std::cout,true);
 
-Kokkos::OpenMP::print_configuration(std::cout,true);
   std::cout << " --- Initializing data...\n";
   TinMan::TestData data(num_elems);
   TinMan::Region* region = new TinMan::Region(num_elems); // A pointer, so the views are destryed before Kokkos::finalize
   print_results_2norm (data, *region);
 
-  std::cout << " --- Performing computations...\n";
+  std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
 
   struct timeval start, end;
   gettimeofday(&start, NULL);
