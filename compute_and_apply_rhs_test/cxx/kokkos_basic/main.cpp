@@ -1,11 +1,12 @@
 #include "compute_and_apply_rhs.hpp"
 #include "Region.hpp"
 #include "TestData.hpp"
+#include "timer.hpp"
 #include "Kokkos_Core.hpp"
 
 #include <iostream>
 #include <cstring>
-#include <sys/time.h>
+#include <memory>
 
 bool is_unsigned_int(const char* str)
 {
@@ -98,22 +99,32 @@ int main (int argc, char** argv)
   std::cout << " --- Initializing data...\n";
   TinMan::TestData data(num_elems);
   TinMan::Region* region = new TinMan::Region(num_elems); // A pointer, so the views are destryed before Kokkos::finalize
+
+  // Print norm of initial states, to check we are using same data in all tests
   print_results_2norm (data, *region);
+
+  // Burn in before timing to reduce cache effect
+  TinMan::compute_and_apply_rhs(data,*region);
 
   std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
 
-  struct timeval start, end;
-  gettimeofday(&start, NULL);
+  std::unique_ptr<Timer::Timer[]> timers(new Timer::Timer[num_exec]);
+  Timer::Timer global_timer;
   for (int i=0; i<num_exec; ++i)
   {
+    global_timer.startTimer();
+    timers[i].startTimer();
     TinMan::compute_and_apply_rhs(data,*region);
+    timers[i].stopTimer();
+    global_timer.stopTimer();
   }
-  gettimeofday(&end, NULL);
 
-  double delta = ((end.tv_sec  - start.tv_sec) * 1000000u +
-                   end.tv_usec - start.tv_usec) / 1.e6;
+  std::cout << "   ---> individual executions times:\n";
+  for(int i = 0; i < num_exec; ++i) {
+    std::cout << timers[i] << std::endl;
+  }
+  std::cout << "   ---> compute_and_apply_rhs execution total time: " << global_timer << "\n";
 
-  std::cout << "   ---> compute_and_apply_rhs execution time: " << delta << " seconds.\n";
   print_results_2norm (data,*region);
 
   if (dump_res)

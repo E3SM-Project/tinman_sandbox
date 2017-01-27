@@ -5,6 +5,7 @@ SET (TEST_SRCS
   compute_and_apply_rhs.cpp
   data_structures.cpp
   sphere_operators.cpp
+  timer.cpp
 )
 
 CONFIGURE_FILE( ${CMAKE_SOURCE_DIR}/compute_and_apply_rhs_test/config.h.in config.h)
