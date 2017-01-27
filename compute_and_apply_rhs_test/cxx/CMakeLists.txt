@@ -1,2 +1,3 @@
 ADD_SUBDIRECTORY(basic)
+ADD_SUBDIRECTORY(pointers_only)
 ADD_SUBDIRECTORY(kokkos_basic)
