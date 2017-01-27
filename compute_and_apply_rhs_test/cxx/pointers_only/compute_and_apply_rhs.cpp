@@ -255,6 +255,25 @@ void compute_and_apply_rhs (TestData& data)
       }
     }
   }
+
+  delete[] Ephi             ;
+  delete[] T_v              ;
+  delete[] divdp            ;
+  delete[] grad_p           ;
+  delete[] eta_dot_dpdn_tmp ;
+  delete[] kappa_star       ;
+  delete[] omega_p_tmp      ;
+  delete[] p                ;
+  delete[] ttens            ;
+  delete[] T_vadv           ;
+  delete[] v_vadv           ;
+  delete[] vdp              ;
+  delete[] vgrad_T          ;
+  delete[] vgrad_p          ;
+  delete[] vort             ;
+  delete[] vtemp            ;
+  delete[] vtens1           ;
+  delete[] vtens2           ;
 }
 
 void preq_hydrostatic (const real* const phis, const real* const T_v,
