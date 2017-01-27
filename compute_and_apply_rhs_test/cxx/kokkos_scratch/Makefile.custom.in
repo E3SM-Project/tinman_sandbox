@@ -1,0 +1,62 @@
+# KOKKOS_PATH (root directory of the kokkos repo) must be passed in
+KOKKOS_PATH = ${TINMAN_KOKKOS_PATH}
+KOKKOS_SRC_PATH = $(KOKKOS_PATH)
+HWLOC_PATH=${TINMAN_HWLOC_PATH}
+ifneq ($(HWLOC_PATH),)
+KOKKOS_USE_TPLS=hwloc
+endif
+KOKKOS_DEVICES = "OpenMP"
+EXE_NAME = kokkos_scratch
+
+SRC_DIR = ${CMAKE_CURRENT_SOURCE_DIR}
+OBJ_DIR = ${CMAKE_CURRENT_BINARY_DIR}
+
+SRC = $(wildcard $(SRC_DIR)/*.cpp)
+#vpath %.cpp $(sort $(dir $(SRC)))
+
+default: build
+	@echo "Start Build"
+
+ifneq (,$(findstring Cuda,$(KOKKOS_DEVICES)))
+CXX = $(KOKKOS_PATH)/bin/nvcc_wrapper
+EXE = $(EXE_NAME).cuda
+KOKKOS_ARCH = "HSW,Kepler35"
+else
+CXX = ${CMAKE_CXX_COMPILER}
+EXE = $(EXE_NAME).host
+KOKKOS_ARCH = "HSW"
+endif
+
+CXXFLAGS = ${CMAKE_CXX_FLAGS}
+LINK = $(CXX)
+LINKFLAGS = ${CMAKE_EXE_LINKER_FLAGS}
+INC_DIRS = -I$(SRC_DIR) -I$(OBJ_DIR)
+
+DEPFLAGS = -M
+
+OBJ = $(addprefix obj_files/, $(sort $(patsubst $(SRC_DIR)/%.cpp,%.o,$(SRC))))
+LIB =
+
+include $(KOKKOS_PATH)/Makefile.kokkos
+
+create_obj_dir:
+	@mkdir -p obj_files
+
+mv_obj_to_obj_dir: $(EXE)
+	@mv *.o obj_files/
+
+build: create_obj_dir  mv_obj_to_obj_dir
+
+$(EXE): $(OBJ) $(KOKKOS_LINK_DEPENDS)
+	$(LINK) $(KOKKOS_LDFLAGS) $(LINKFLAGS) $(EXTRA_PATH) $(OBJ) $(KOKKOS_LIBS) $(LIB) -o $(EXE)
+
+rm_obj_dir:
+	@rm -rf obj_files
+
+clean: kokkos-clean rm_obj_dir
+	@rm -f *.o *.cuda *.host *.txt
+
+# Compilation rules
+
+obj_files/%.o:$(SRC_DIR)/%.cpp $(KOKKOS_CPP_DEPENDS)
+	$(CXX) $(KOKKOS_CPPFLAGS) $(KOKKOS_CXXFLAGS) $(INC_DIRS) $(LINKFLAGS) $(CXXFLAGS) $(EXTRA_INC) -c $< -o $@
