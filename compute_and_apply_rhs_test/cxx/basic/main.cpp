@@ -108,21 +108,23 @@ int main (int argc, char** argv)
   compute_and_apply_rhs(data);
 
   std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
-  std::vector<Timer::Timer> timers(num_exec);
+  //std::vector<Timer::Timer> timers(num_exec);
   Timer::Timer global_timer;
   for (int i=0; i<num_exec; ++i)
   {
     global_timer.startTimer();
-    timers[i].startTimer();
+//    timers[i].startTimer();
     compute_and_apply_rhs(data);
-    timers[i].stopTimer();
+//    timers[i].stopTimer();
     global_timer.stopTimer();
   }
 
+/*
   std::cout << "   ---> individual executions times:\n";
   for(int i = 0; i < num_exec; ++i) {
     std::cout << timers[i] << std::endl;
   }
+*/
   std::cout << "   ---> compute_and_apply_rhs execution total time: " << global_timer << "\n";
 
   print_results_2norm (data);

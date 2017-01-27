@@ -94,7 +94,10 @@ int main (int argc, char** argv)
   }
 
   Kokkos::initialize (argc, argv);
+
+#ifdef KOKKOS_HAVE_DEFAULT_DEVICE_TYPE_OPENMP
   Kokkos::OpenMP::print_configuration(std::cout,true);
+#endif
 
   std::cout << " --- Initializing data...\n";
   TinMan::TestData data(num_elems);
@@ -108,21 +111,23 @@ int main (int argc, char** argv)
 
   std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
 
-  std::unique_ptr<Timer::Timer[]> timers(new Timer::Timer[num_exec]);
+  //std::unique_ptr<Timer::Timer[]> timers(new Timer::Timer[num_exec]);
   Timer::Timer global_timer;
   for (int i=0; i<num_exec; ++i)
   {
     global_timer.startTimer();
-    timers[i].startTimer();
+    //timers[i].startTimer();
     TinMan::compute_and_apply_rhs(data,*region);
-    timers[i].stopTimer();
+    //timers[i].stopTimer();
     global_timer.stopTimer();
   }
 
+/*
   std::cout << "   ---> individual executions times:\n";
   for(int i = 0; i < num_exec; ++i) {
     std::cout << timers[i] << std::endl;
   }
+*/
   std::cout << "   ---> compute_and_apply_rhs execution total time: " << global_timer << "\n";
 
   print_results_2norm (data,*region);
