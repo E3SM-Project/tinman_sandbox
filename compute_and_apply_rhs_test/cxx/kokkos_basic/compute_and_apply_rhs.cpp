@@ -84,19 +84,19 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
     Real vtens2[NUM_LEV][NP][NP]           = {};
 
     // Subviews in the current element
-    auto scalars_2d_ie = subview(scalars_2d, ie, ALL(), ALL(), ALL());
-    auto tensors_2d_ie = subview(tensors_2d, ie, ALL(), ALL(), ALL(), ALL(), ALL());
-    auto scalars_3d_ie = subview(scalars_3d, ie, ALL(), ALL(), ALL(), ALL());
-    auto scalars_4d_ie = subview(scalars_4d, ie, ALL(), ALL(), ALL(), ALL(), ALL());
+    ViewUnmanaged<Real[NUM_2D_SCALARS][NP][NP]> scalars_2d_ie = subview(scalars_2d, ie, ALL(), ALL(), ALL());
+    ViewUnmanaged<Real[NUM_2D_TENSORS][2][2][NP][NP]> tensors_2d_ie = subview(tensors_2d, ie, ALL(), ALL(), ALL(), ALL(), ALL());
+    ViewUnmanaged<Real[NUM_3D_SCALARS][NUM_LEV][NP][NP]> scalars_3d_ie = subview(scalars_3d, ie, ALL(), ALL(), ALL(), ALL());
+    ViewUnmanaged<Real[NUM_TIME_LEVELS][NUM_4D_SCALARS][NUM_LEV][NP][NP]> scalars_4d_ie = subview(scalars_4d, ie, ALL(), ALL(), ALL(), ALL(), ALL());
 
     // Some subviews used more than once
-    auto metDet_ie    = subview (scalars_2d_ie, IDX_METDET, ALL(), ALL());
-    auto spheremp_ie  = subview (scalars_2d_ie, IDX_SPHEREMP, ALL(), ALL());
-    auto DInv_ie      = subview (tensors_2d_ie, IDX_DINV, ALL(), ALL(), ALL(), ALL());
-    auto dp3d_ie_n0   = subview (scalars_4d_ie, n0, IDX_DP3D, ALL(), ALL(), ALL());
-    auto U_ie_n0      = subview (scalars_4d_ie, n0, IDX_U, ALL(), ALL(), ALL());
-    auto V_ie_n0      = subview (scalars_4d_ie, n0, IDX_V, ALL(), ALL(), ALL());
-    auto T_ie_n0      = subview (scalars_4d_ie, n0, IDX_T, ALL(), ALL(), ALL());
+    ViewUnmanaged<Real[NP][NP]> metDet_ie    = subview (scalars_2d_ie, IDX_METDET, ALL(), ALL());
+    ViewUnmanaged<Real[NP][NP]> spheremp_ie  = subview (scalars_2d_ie, IDX_SPHEREMP, ALL(), ALL());
+    ViewUnmanaged<Real[2][2][NP][NP]> DInv_ie      = subview (tensors_2d_ie, IDX_DINV, ALL(), ALL(), ALL(), ALL());
+    ViewUnmanaged<Real[NUM_LEV][NP][NP]> dp3d_ie_n0   = subview (scalars_4d_ie, n0, IDX_DP3D, ALL(), ALL(), ALL());
+    ViewUnmanaged<Real[NUM_LEV][NP][NP]> U_ie_n0      = subview (scalars_4d_ie, n0, IDX_U, ALL(), ALL(), ALL());
+    ViewUnmanaged<Real[NUM_LEV][NP][NP]> V_ie_n0      = subview (scalars_4d_ie, n0, IDX_V, ALL(), ALL(), ALL());
+    ViewUnmanaged<Real[NUM_LEV][NP][NP]> T_ie_n0      = subview (scalars_4d_ie, n0, IDX_T, ALL(), ALL(), ALL());
 
     // Other accessory variables
     Real v1     = 0;
