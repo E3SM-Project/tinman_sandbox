@@ -33,33 +33,33 @@ Region::Region( int num_elems )
       for (int jgp=0; jgp<NP; ++jgp)
       {
         // Initializing m_2d_tensors and m_2d_scalars
-        m_2d_tensors(ie,D,0,0,igp,jgp) = init_map(x,n++);
-        m_2d_tensors(ie,D,0,1,igp,jgp) = init_map(x,n++);
-        m_2d_tensors(ie,D,1,0,igp,jgp) = init_map(x,n++);
-        m_2d_tensors(ie,D,1,1,igp,jgp) = init_map(x,n++);
+        m_2d_tensors(ie,IDX_D,0,0,igp,jgp) = init_map(x,n++);
+        m_2d_tensors(ie,IDX_D,0,1,igp,jgp) = init_map(x,n++);
+        m_2d_tensors(ie,IDX_D,1,0,igp,jgp) = init_map(x,n++);
+        m_2d_tensors(ie,IDX_D,1,1,igp,jgp) = init_map(x,n++);
 
-        Real detD = m_2d_tensors(ie,D,0,0,igp,jgp)*m_2d_tensors(ie,D,1,0,igp,jgp)
-                  - m_2d_tensors(ie,D,0,1,igp,jgp)*m_2d_tensors(ie,D,1,1,igp,jgp);
+        Real detD = m_2d_tensors(ie,IDX_D,0,0,igp,jgp)*m_2d_tensors(ie,IDX_D,1,0,igp,jgp)
+                  - m_2d_tensors(ie,IDX_D,0,1,igp,jgp)*m_2d_tensors(ie,IDX_D,1,1,igp,jgp);
 
-        m_2d_tensors(ie,DINV,0,0,igp,jgp) =  m_2d_tensors(ie,D,1,1,igp,jgp) / detD;
-        m_2d_tensors(ie,DINV,0,1,igp,jgp) = -m_2d_tensors(ie,D,0,1,igp,jgp) / detD;
-        m_2d_tensors(ie,DINV,1,0,igp,jgp) = -m_2d_tensors(ie,D,1,0,igp,jgp) / detD;
-        m_2d_tensors(ie,DINV,1,1,igp,jgp) =  m_2d_tensors(ie,D,0,0,igp,jgp) / detD;
+        m_2d_tensors(ie,IDX_DINV,0,0,igp,jgp) =  m_2d_tensors(ie,IDX_D,1,1,igp,jgp) / detD;
+        m_2d_tensors(ie,IDX_DINV,0,1,igp,jgp) = -m_2d_tensors(ie,IDX_D,0,1,igp,jgp) / detD;
+        m_2d_tensors(ie,IDX_DINV,1,0,igp,jgp) = -m_2d_tensors(ie,IDX_D,1,0,igp,jgp) / detD;
+        m_2d_tensors(ie,IDX_DINV,1,1,igp,jgp) =  m_2d_tensors(ie,IDX_D,0,0,igp,jgp) / detD;
 
-        m_2d_scalars(ie,FCOR,    igp,jgp) = init_map(x,n++);
-        m_2d_scalars(ie,SPHEREMP,igp,jgp) = init_map(x,n++);
-        m_2d_scalars(ie,METDET,  igp,jgp) = init_map(x,n++);
-        m_2d_scalars(ie,PHIS,    igp,jgp) = init_map(x,n++);
+        m_2d_scalars(ie,IDX_FCOR,    igp,jgp) = init_map(x,n++);
+        m_2d_scalars(ie,IDX_SPHEREMP,igp,jgp) = init_map(x,n++);
+        m_2d_scalars(ie,IDX_METDET,  igp,jgp) = init_map(x,n++);
+        m_2d_scalars(ie,IDX_PHIS,    igp,jgp) = init_map(x,n++);
 
         // Initializing arrays that contain [NUM_LEV]
         for (int il=0; il<NUM_LEV; ++il)
         {
           // m_3d_scalars
-          m_3d_scalars(ie,OMEGA_P,il,igp,jgp) = init_map(x,n++);
-          m_3d_scalars(ie,PECND  ,il,igp,jgp) = init_map(x,n++);
-          m_3d_scalars(ie,PHI    ,il,igp,jgp) = init_map(x,n++);
-          m_3d_scalars(ie,UN0    ,il,igp,jgp) = init_map(x,n++);
-          m_3d_scalars(ie,VN0    ,il,igp,jgp) = init_map(x,n++);
+          m_3d_scalars(ie,IDX_OMEGA_P,il,igp,jgp) = init_map(x,n++);
+          m_3d_scalars(ie,IDX_PECND  ,il,igp,jgp) = init_map(x,n++);
+          m_3d_scalars(ie,IDX_PHI    ,il,igp,jgp) = init_map(x,n++);
+          m_3d_scalars(ie,IDX_UN0    ,il,igp,jgp) = init_map(x,n++);
+          m_3d_scalars(ie,IDX_VN0    ,il,igp,jgp) = init_map(x,n++);
 
           // Initializing m_Qdp
           for (int iq=0; iq<QSIZE_D; ++iq)
@@ -72,10 +72,10 @@ Region::Region( int num_elems )
           for (int it=0; it<NUM_TIME_LEVELS; ++it)
           {
             // Initializing m_element_states
-            m_4d_scalars(ie,it,U,   il,igp,jgp) = init_map(x,n++);
-            m_4d_scalars(ie,it,V,   il,igp,jgp) = init_map(x,n++);
-            m_4d_scalars(ie,it,T,   il,igp,jgp) = init_map(x,n++);
-            m_4d_scalars(ie,it,DP3D,il,igp,jgp) = init_map(x,n++);
+            m_4d_scalars(ie,it,IDX_U,   il,igp,jgp) = init_map(x,n++);
+            m_4d_scalars(ie,it,IDX_V,   il,igp,jgp) = init_map(x,n++);
+            m_4d_scalars(ie,it,IDX_T,   il,igp,jgp) = init_map(x,n++);
+            m_4d_scalars(ie,it,IDX_DP3D,il,igp,jgp) = init_map(x,n++);
           }
         }
 

@@ -16,21 +16,21 @@ constexpr int NUM_2D_SCALARS = 4;
 constexpr int NUM_2D_TENSORS = 2;
 
 // Some constexpr for the index of different variables in the views
-constexpr int U        = 0;
-constexpr int V        = 1;
-constexpr int T        = 2;
-constexpr int DP3D     = 3;
-constexpr int OMEGA_P  = 0;
-constexpr int PECND    = 1;
-constexpr int PHI      = 2;
-constexpr int UN0      = 3;
-constexpr int VN0      = 4;
-constexpr int FCOR     = 0;
-constexpr int SPHEREMP = 1;
-constexpr int METDET   = 2;
-constexpr int PHIS     = 3;
-constexpr int D        = 0;
-constexpr int DINV     = 1;
+constexpr int IDX_U        = 0;
+constexpr int IDX_V        = 1;
+constexpr int IDX_T        = 2;
+constexpr int IDX_DP3D     = 3;
+constexpr int IDX_OMEGA_P  = 0;
+constexpr int IDX_PECND    = 1;
+constexpr int IDX_PHI      = 2;
+constexpr int IDX_UN0      = 3;
+constexpr int IDX_VN0      = 4;
+constexpr int IDX_FCOR     = 0;
+constexpr int IDX_SPHEREMP = 1;
+constexpr int IDX_METDET   = 2;
+constexpr int IDX_PHIS     = 3;
+constexpr int IDX_D        = 0;
+constexpr int IDX_DINV     = 1;
 
 class Region
 {

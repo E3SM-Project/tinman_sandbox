@@ -44,7 +44,7 @@ void gradient_sphere (const ViewUnmanaged<Real[NP][NP]> s, const TestData& data,
   }
 }
 
-void gradient_sphere (Kokkos::TeamPolicy<>::member_type &team,
+void gradient_sphere (const Kokkos::TeamPolicy<>::member_type &team,
                       const ViewUnmanaged<Real[NP][NP]> s, const TestData& data,
                       const ViewUnmanaged<Real[2][2][NP][NP]> DInv,
                       ViewUnmanaged<Real[2][NP][NP]> grad_s)
@@ -121,7 +121,7 @@ void divergence_sphere (const ViewUnmanaged<Real[2][NP][NP]> v, const TestData& 
   }
 }
 
-void divergence_sphere (Kokkos::TeamPolicy<>::member_type &team,
+void divergence_sphere (const Kokkos::TeamPolicy<>::member_type &team,
                         const ViewUnmanaged<Real[2][NP][NP]> v, const TestData& data,
                         const ViewUnmanaged<Real[NP][NP]> metDet,
                         const ViewUnmanaged<Real[2][2][NP][NP]> DInv,
@@ -197,7 +197,7 @@ void vorticity_sphere (const ViewUnmanaged<Real[NP][NP]> u,
   }
 }
 
-void vorticity_sphere (Kokkos::TeamPolicy<>::member_type &team,
+void vorticity_sphere (const Kokkos::TeamPolicy<>::member_type &team,
                        const ViewUnmanaged<Real[NP][NP]> u,
                        const ViewUnmanaged<Real[NP][NP]> v,const TestData& data,
                        const ViewUnmanaged<Real[NP][NP]> metDet,

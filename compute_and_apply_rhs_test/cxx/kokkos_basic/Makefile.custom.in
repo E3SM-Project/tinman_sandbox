@@ -29,7 +29,7 @@ endif
 
 CXXFLAGS = ${CMAKE_CXX_FLAGS}
 LINK = $(CXX)
-LINKFLAGS =
+LINKFLAGS = ${CMAKE_EXE_LINKER_FLAGS}
 INC_DIRS = -I$(SRC_DIR) -I$(OBJ_DIR)
 
 DEPFLAGS = -M
@@ -59,4 +59,4 @@ clean: kokkos-clean rm_obj_dir
 # Compilation rules
 
 obj_files/%.o:$(SRC_DIR)/%.cpp $(KOKKOS_CPP_DEPENDS)
-	$(CXX) $(KOKKOS_CPPFLAGS) $(KOKKOS_CXXFLAGS) $(INC_DIRS) $(CXXFLAGS) $(EXTRA_INC) -c $< -o $@
+	$(CXX) $(KOKKOS_CPPFLAGS) $(KOKKOS_CXXFLAGS) $(INC_DIRS) $(LINKFLAGS) $(CXXFLAGS) $(EXTRA_INC) -c $< -o $@
