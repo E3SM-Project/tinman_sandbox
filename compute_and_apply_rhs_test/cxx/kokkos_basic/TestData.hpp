@@ -57,6 +57,8 @@ public:
   const Derivative& deriv()     const { return m_deriv;     }
   const HVCoord&    hvcoord()   const { return m_hvcoord;   }
 
+  void update_time_levels();
+
 private:
   Constants   m_constants = {};
   Control     m_control   = {};

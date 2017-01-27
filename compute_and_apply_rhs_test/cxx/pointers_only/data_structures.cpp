@@ -183,6 +183,14 @@ void TestData::init_data ()
   deriv.init_data();
 }
 
+void TestData::update_time_levels ()
+{
+  int tmp = control.np1;
+  control.np1 = control.nm1;
+  control.nm1 = control.n0;
+  control.n0  = tmp;
+}
+
 void TestData::cleanup_data ()
 {
   arrays.cleanup_data();

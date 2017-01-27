@@ -56,4 +56,12 @@ TestData::TestData (const int num_elems)
   m_deriv.init_data();
 }
 
+void TestData::update_time_levels()
+{
+  int tmp = m_control.np1;
+  m_control.np1 = m_control.nm1;
+  m_control.nm1 = m_control.n0;
+  m_control.n0  = tmp;
+}
+
 } // Namespace TinMan

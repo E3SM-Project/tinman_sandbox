@@ -83,6 +83,7 @@ struct TestData
   HVCoord     hvcoord   = {};
 
   void init_data ();
+  void update_time_levels();
   void cleanup_data ();
 };
 

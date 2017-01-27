@@ -113,14 +113,18 @@ int main (int argc, char** argv)
 
   //std::unique_ptr<Timer::Timer[]> timers(new Timer::Timer[num_exec]);
   Timer::Timer global_timer;
+  global_timer.startTimer();
   for (int i=0; i<num_exec; ++i)
   {
-    global_timer.startTimer();
     //timers[i].startTimer();
     TinMan::compute_and_apply_rhs(data,*region);
+    data.update_time_levels();
     //timers[i].stopTimer();
-    global_timer.stopTimer();
   }
+#ifdef KOKKOS_HAVE_DEFAULT_DEVICE_TYPE_OPENMP
+  Kokkos::OpenMP::fence();
+#endif
+  global_timer.stopTimer();
 
 /*
   std::cout << "   ---> individual executions times:\n";
