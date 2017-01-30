@@ -25,8 +25,6 @@ ELSE ()
   ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL Intel)
     SET(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -assume byterecl")
     SET(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fp-model precise -ftz")
-    #SET(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fp-model fast -qopt-report=5 -ftz")
-    #SET(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -mP2OPT_hpo_matrix_opt_framework=0 -fp-model fast -qopt-report=5 -ftz")
 
     SET(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -diag-disable 8291")
     # remark #8291: Recommended relationship between field width 'W' and the number of fractional digits 'D' in this edit descriptor is 'W>=D+7'.
@@ -39,7 +37,6 @@ ELSE ()
     ADD_DEFINITIONS(-DCPRIBM)
   ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL NAG)
     SET(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -kind=byte -wmismatch=mpi_send,mpi_recv,mpi_bcast,mpi_allreduce,mpi_reduce,mpi_isend,mpi_irecv,mpi_irsend,mpi_rsend,mpi_gatherv,mpi_gather,mpi_scatterv,mpi_allgather,mpi_alltoallv,mpi_file_read_all,mpi_file_write_all,mpi_file_read_at")
-#    SET(OPT_FFLAGS "${OPT_FFLAGS} -ieee=full -O2")
     SET(DEBUG_FFLAGS "${DEBUG_FFLAGS} -g -time -f2003 -ieee=stop")
     ADD_DEFINITIONS(-DHAVE_F2003_PTR_BND_REMAP)
     # Needed by both PIO and csm_share
@@ -53,7 +50,6 @@ ENDIF ()
 
 # C++ Flags
 
-
 INCLUDE(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" CXX11_SUPPORTED)
 IF (${CXX11_SUPPORTED})
@@ -63,6 +59,11 @@ ELSE ()
 ENDIF ()
 
 CHECK_CXX_COMPILER_FLAG("-cxxlib" CXXLIB_SUPPORTED)
+
+# Make certain no optimizations are specified ahead of time
+STRING(REGEX REPLACE "-O[0-3]" "" CMAKE_Fortran_FLAGS_RELEASE ${CMAKE_Fortran_FLAGS_RELEASE})
+STRING(REGEX REPLACE "-O[0-3]" "" CMAKE_C_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
+STRING(REGEX REPLACE "-O[0-3]" "" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
 
 ##############################################################################
 # Optimization flags
@@ -92,7 +93,6 @@ ELSE ()
     ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL PathScale)
     ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL Intel)
       SET(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O3")
-      #SET(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -mavx -DTEMP_INTEL_COMPILER_WORKAROUND_001")
     ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL XL)
       SET(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O2 -qmaxmem=-1")
     ELSEIF (CMAKE_Fortran_COMPILER_ID STREQUAL Cray)
@@ -109,7 +109,6 @@ ELSE ()
     ELSEIF (CMAKE_C_COMPILER_ID STREQUAL PathScale)
     ELSEIF (CMAKE_C_COMPILER_ID STREQUAL Intel)
       SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2")
-      #SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx -DTEMP_INTEL_COMPILER_WORKAROUND_001")
     ELSEIF (CMAKE_C_COMPILER_ID STREQUAL XL)
       SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2 -qmaxmem=-1")
     ELSEIF (CMAKE_C_COMPILER_ID STREQUAL Cray)
@@ -121,7 +120,7 @@ ELSE ()
     SET (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} ${OPT_CXXFLAGS}")
   ELSE ()
     IF (CMAKE_CXX_COMPILER_ID STREQUAL GNU)
-      SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native")
+      SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
     ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL PGI)
     ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL PathScale)
     ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL Intel)
