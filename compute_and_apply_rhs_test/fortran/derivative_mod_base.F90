@@ -1,7 +1,8 @@
 module derivative_mod_base
 
-  use kinds,          only : real_kind, longdouble_kind
-  use element_mod, only : np, nelemd, nlev, element_t
+  use kinds
+  use element_state_mod
+  use element_mod
   use physical_constants, only : rrearth
 
 implicit none

@@ -1,5 +1,106 @@
 module routine_mod_ST
 
+
+
+!u
+#define iXjXkXuX1Xie     i,j,k,ie,1,1    
+!v
+#define iXjXkXvX1Xie     i,j,k,ie,2,1 
+!t
+#define iXjXkXtX1Xie     i,j,k,ie,3,1     
+!dp
+#define iXjXkXdpX1Xie    i,j,k,ie,4,1 
+!u
+#define iXjXkXuX2Xie     i,j,k,ie,1,2     
+!v
+#define iXjXkXvX2Xie     i,j,k,ie,2,2  
+!t
+#define iXjXkXtX2Xie     i,j,k,ie,3,2     
+!dp
+#define iXjXkXdpX2Xie    i,j,k,ie,4,2 
+!u
+#define iXjXkXuX3Xie     i,j,k,ie,1,3     
+!v
+#define iXjXkXvX3Xie     i,j,k,ie,2,3  
+!t
+#define iXjXkXtX3Xie     i,j,k,ie,3,3     
+!dp
+#define iXjXkXdpX3Xie    i,j,k,ie,4,3 
+
+!u
+#define iXjXkXuXdXie     i,j,k,ie,1,1:timelevels    
+!v
+#define iXjXkXvXdXie     i,j,k,ie,2,1:timelevels
+!t
+#define iXjXkXtXdXie     i,j,k,ie,3,1:timelevels     
+!dp
+#define iXjXkXdpXdXie    i,j,k,ie,4,1:timelevels 
+!q1
+#define iXjXkXqXdXie     i,j,k,ie,7,1:timelevels
+
+
+
+
+!dp
+#define dXdX1XdpXn0Xie    :,:,1,ie,4,n0     
+!dp
+#define dXdXkm1XdpXn0Xie  :,:,k-1,ie,4,n0   
+!dp
+#define dXdXkXdpXn0Xie    :,:,k,ie,4,n0     
+!u
+#define iXjXkXuXn0Xie     i,j,k,ie,1,n0     
+!v
+#define iXjXkXvXn0Xie     i,j,k,ie,2,n0  
+!t
+#define iXjXkXtXn0Xie     i,j,k,ie,3,n0     
+!dp
+#define iXjXkXdpXn0Xie    i,j,k,ie,4,n0 
+       
+!t
+#define dXdXkXtXn0Xie     :,:,k,ie,3,n0     
+
+!elem(ie)%state%v(:,:,1,k,nm1)
+#define dXdXkXuXnm1Xie    :,:,k,ie,1,nm1
+
+!elem(ie)%state%v(:,:,2,k,nm1)
+#define dXdXkXvXnm1Xie    :,:,k,ie,2,nm1
+
+!elem(ie)%state%v(:,:,1,k,np1)
+#define dXdXkXuXnp1Xie    :,:,k,ie,1,np1
+
+!elem(ie)%state%v(:,:,2,k,np1)
+#define dXdXkXvXnp1Xie    :,:,k,ie,2,np1 
+
+!elem(ie)%state%T(:,:,k,np1)
+#define dXdXkXtXnp1Xie    :,:,k,ie,3,np1 
+
+!elem(ie)%state%T(:,:,k,nm1)
+#define dXdXkXtXnm1Xie    :,:,k,ie,3,nm1
+
+!elem(ie)%state%dp3d(:,:,k,np1)
+#define dXdXkXdpXnp1Xie   :,:,k,ie,4,np1
+
+!elem(ie)%state%dp3d(:,:,k,nm1)
+#define dXdXkXdpXnm1Xie   :,:,k,ie,4,nm1
+
+!elem(ie)%state%phis
+#define dXdX1XphisX1Xie   :,:,1,ie,6,1
+
+!dp
+#define dXdXdXdpXn0Xie     :,:,:,ie,4,n0
+
+!elem(ie)%state%v(:,:,1,k,n0)
+#define dXdXkXuXn0Xie    :,:,k,ie,1,n0
+
+!elem(ie)%state%v(:,:,2,k,n0)
+#define dXdXkXvXn0Xie    :,:,k,ie,2,n0 
+
+!elem(ie)%state%Qdp(i,j,k,1,qn0)
+#define iXjXkXqXqn0Xie   i,j,k,ie,7,qn0 
+
+
+
+
 implicit none
 contains
 
@@ -9,9 +110,9 @@ subroutine compute_and_apply_rhs_st(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,nets
 !       deriv,nets,nete,compute_diagnostics,eta_ave_w)
   ! ===================================
 
-  use kinds, only : real_kind
-  use element_mod, only : element_t, np, nlev, ntrac, nelemd, numst, timelevels,&
-                          indu, indv, indT, inddp,  indps, indphis
+  use kinds, only : real_kind, np, nlev, ntrac, nelemd, timelevels, numst
+  use element_state_mod
+  use element_mod
   use derivative_mod_base, only : derivative_t, divergence_sphere, gradient_sphere, vorticity_sphere, &
                                   vorticity_v2
   use hybvcoord_mod, only : hvcoord_t
@@ -69,60 +170,47 @@ implicit none
 ! u=1, v=2, T=3, dp3d=4, ps=5, phis=6, vapor=7
 
 !dp
-#define dXdX1XdpXn0Xie    :,:,1,ie,4,n0     
+!#define dXdX1XdpXn0Xie    :,:,1,ie,4,n0     
 !dp
-#define dXdXkm1XdpXn0Xie  :,:,k-1,ie,4,n0   
+!#define dXdXkm1XdpXn0Xie  :,:,k-1,ie,4,n0   
 !dp
-#define dXdXkXdpXn0Xie    :,:,k,ie,4,n0     
+!#define dXdXkXdpXn0Xie    :,:,k,ie,4,n0     
 !u
-#define iXjXkXuXn0Xie     i,j,k,ie,1,n0     
+!#define iXjXkXuXn0Xie     i,j,k,ie,1,n0     
 !v
-#define iXjXkXvXn0Xie     i,j,k,ie,2,n0     
+!#define iXjXkXvXn0Xie     i,j,k,ie,2,n0     
 !dp
-#define iXjXkXdpXn0Xie    i,j,k,ie,4,n0     
+!#define iXjXkXdpXn0Xie    i,j,k,ie,4,n0     
 !t
-#define iXjXkXtXn0Xie     i,j,k,ie,3,n0     
+!#define iXjXkXtXn0Xie     i,j,k,ie,3,n0     
 !t
-#define dXdXkXtXn0Xie     :,:,k,ie,3,n0     
-
+!#define dXdXkXtXn0Xie     :,:,k,ie,3,n0     
 !elem(ie)%state%v(:,:,1,k,nm1)
-#define dXdXkXuXnm1Xie    :,:,k,ie,1,nm1
-
+!#define dXdXkXuXnm1Xie    :,:,k,ie,1,nm1
 !elem(ie)%state%v(:,:,2,k,nm1)
-#define dXdXkXvXnm1Xie    :,:,k,ie,2,nm1
-
+!#define dXdXkXvXnm1Xie    :,:,k,ie,2,nm1
 !elem(ie)%state%v(:,:,1,k,np1)
-#define dXdXkXuXnp1Xie    :,:,k,ie,1,np1
-
+!#define dXdXkXuXnp1Xie    :,:,k,ie,1,np1
 !elem(ie)%state%v(:,:,2,k,np1)
-#define dXdXkXvXnp1Xie    :,:,k,ie,2,np1 
-
+!#define dXdXkXvXnp1Xie    :,:,k,ie,2,np1 
 !elem(ie)%state%T(:,:,k,np1)
-#define dXdXkXtXnp1Xie    :,:,k,ie,3,np1 
-
+!#define dXdXkXtXnp1Xie    :,:,k,ie,3,np1 
 !elem(ie)%state%T(:,:,k,nm1)
-#define dXdXkXtXnm1Xie    :,:,k,ie,3,nm1
-
+!#define dXdXkXtXnm1Xie    :,:,k,ie,3,nm1
 !elem(ie)%state%dp3d(:,:,k,np1)
-#define dXdXkXdpXnp1Xie   :,:,k,ie,4,np1
-
+!#define dXdXkXdpXnp1Xie   :,:,k,ie,4,np1
 !elem(ie)%state%dp3d(:,:,k,nm1)
-#define dXdXkXdpXnm1Xie   :,:,k,ie,4,nm1
-
+!#define dXdXkXdpXnm1Xie   :,:,k,ie,4,nm1
 !elem(ie)%state%phis
-#define dXdX1XphisX1Xie   :,:,1,ie,6,1
-
+!#define dXdX1XphisX1Xie   :,:,1,ie,6,1
 !dp
-#define dXdXdXdpXn0Xie     :,:,:,ie,4,n0
-
+!#define dXdXdXdpXn0Xie     :,:,:,ie,4,n0
 !elem(ie)%state%v(:,:,1,k,n0)
-#define dXdXkXuXn0Xie    :,:,k,ie,1,n0
-
+!#define dXdXkXuXn0Xie    :,:,k,ie,1,n0
 !elem(ie)%state%v(:,:,2,k,n0)
-#define dXdXkXvXn0Xie    :,:,k,ie,2,n0 
-
+!#define dXdXkXvXn0Xie    :,:,k,ie,2,n0 
 !elem(ie)%state%Qdp(i,j,k,1,qn0)
-#define iXjXkXqXqn0Xie   i,j,k,ie,7,qn0 
+!#define iXjXkXqXqn0Xie   i,j,k,ie,7,qn0 
 
 
   do ie=nets,nete
@@ -247,8 +335,7 @@ end subroutine compute_and_apply_rhs_st
   end function Virtual_Temperature1d
 
   subroutine preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
-    use kinds, only : real_kind
-    use element_mod, only : np, nlev
+    use kinds, only : real_kind, np, nlev
     use hybvcoord_mod, only : hvcoord_t
 
     implicit none
@@ -294,8 +381,7 @@ end subroutine compute_and_apply_rhs_st
 
 
   subroutine preq_hydrostatic(phi,phis,T_v,p,dp)
-    use kinds, only : real_kind
-    use element_mod, only : np, nlev
+    use kinds, only : real_kind, np, nlev
     use physical_constants, only : rgas
     implicit none
     real(kind=real_kind), intent(out) :: phi(np,np,nlev)     

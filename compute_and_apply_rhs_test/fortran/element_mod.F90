@@ -2,20 +2,11 @@
 module element_mod
 
   use coordinate_systems_mod, only: spherical_polar_t, cartesian2D_t, cartesian3D_t
-  use kinds, only :   int_kind, long_kind, real_kind 
+  use kinds
+  use element_state_mod
 
   implicit none
   private
-  integer, public, parameter :: timelevels = 3
-
-
-  integer, public, parameter :: np=4
-  integer, public, parameter :: nlev=3
-  integer, public, parameter :: nlevp=nlev+1
-  integer, public, parameter :: qsize_d=1
-  integer, public, parameter :: ntrac = 1
-  integer, public, parameter :: nelemd = 3
-  integer, public, parameter :: npsq=np*np
 
 
   type, public :: index_t
@@ -25,17 +16,10 @@ module element_mod
      integer(kind=int_kind) :: UniquePtOffset
   end type index_t
 
-
-!  real (kind=real_kind), allocatable, target, public :: state_Qdp                (:,:,:,:,:,:)    ! (np,np,nlev,qsize_d,2,nelemd)   
-!  real (kind=real_kind), allocatable, target, public :: derived_vn0              (:,:,:,:,:)      ! (np,np,2,nlev,nelemd)                   velocity for SE tracer advection
-!  real (kind=real_kind), allocatable, target, public :: derived_divdp            (:,:,:,:)        ! (np,np,nlev,nelemd)                     divergence of dp
-!  real (kind=real_kind), allocatable, target, public :: derived_divdp_proj       (:,:,:,:)        ! (np,np,nlev,nelemd)                     DSSed divdp
-
-
 ! instead of elem-state, let's get STATE array
 ! CHANGE numst=41 !
-  integer, public, parameter :: numst = 7, indu = 1,  indv = 2, indT = 3, &
-                                inddp = 4,  indps = 5, indphis = 6, indvapor = 7 ! u,v,T,dp3d,ps_v,phis = 6 vars + 35 tracers
+!  integer, public, parameter :: numst = 41, indu = 1,  indv = 2, indT = 3, &
+!                                inddp = 4,  indps = 5, indphis = 6, indvapor = 7 ! u,v,T,dp3d,ps_v,phis = 6 vars + 35 tracers
 
 
 !current addressing is STATE(np,np,nlev,tl,st,ie), replacing it with (i,j,k,ie,st,tl )
@@ -57,28 +41,21 @@ module element_mod
 !     elem(ie)%spheremp(:,:) * (elem(ie)%state%dp3d(:,:,k,nm1) - &
 !             dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
 
-!#define d_d_1_dp_n0_ie :,:,1,ie,4,n0 
-
 ! =========== PRIMITIVE-EQUATION DATA-STRUCTURES =====================
 
-  type, public :: elem_state_t
-
+!  type, public :: elem_state_t
     ! prognostic variables for preqx solver
-
     ! prognostics must match those in prim_restart_mod.F90
     ! vertically-lagrangian code advects dp3d instead of ps_v
     ! tracers Q, Qdp always use 2 level time scheme
-
-#if 1
-    real (kind=real_kind) :: v   (np,np,2,nlev,timelevels)            ! velocity                           1
-    real (kind=real_kind) :: T   (np,np,nlev,timelevels)              ! temperature                        2
-    real (kind=real_kind) :: dp3d(np,np,nlev,timelevels)              ! delta p on levels                  8
-    real (kind=real_kind) :: ps_v(np,np,timelevels)                   ! surface pressure                   4
-    real (kind=real_kind) :: phis(np,np)                              ! surface geopotential (prescribed)  5
-    real (kind=real_kind) :: Q   (np,np,nlev,qsize_d)                 ! Tracer concentration               6
-    real (kind=real_kind) :: Qdp (np,np,nlev,qsize_d,timelevels)               ! Tracer mass                        7
-#endif
-  end type elem_state_t
+!    real (kind=real_kind) :: v   (np,np,2,nlev,timelevels)            ! velocity                           1
+!    real (kind=real_kind) :: T   (np,np,nlev,timelevels)              ! temperature                        2
+!    real (kind=real_kind) :: dp3d(np,np,nlev,timelevels)              ! delta p on levels                  8
+!    real (kind=real_kind) :: ps_v(np,np,timelevels)                   ! surface pressure                   4
+!    real (kind=real_kind) :: phis(np,np)                              ! surface geopotential (prescribed)  5
+!    real (kind=real_kind) :: Q   (np,np,nlev,qsize_d)                 ! Tracer concentration               6
+!    real (kind=real_kind) :: Qdp (np,np,nlev,qsize_d,timelevels)               ! Tracer mass                        7
+!  end type elem_state_t
 
   integer(kind=int_kind),public,parameter::StateComponents=7! num prognistics variables (for prim_restart_mod.F90)
 
@@ -258,7 +235,9 @@ module element_mod
 !     type (GridVertex_t)      :: vertex                               ! element grid vertex information
 !     type (EdgeDescriptor_t)  :: desc
 
+#if 0
      type (elem_state_t)      :: state
+#endif
      type (derived_state_t)   :: derived
      type (elem_accum_t)       :: accum
 

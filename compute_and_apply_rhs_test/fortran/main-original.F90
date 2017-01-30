@@ -1,139 +1,42 @@
 
 program main
 
-
-#if 1
-!u
-#define iXjXkXuX1Xie     i,j,k,ie,1,1    
-!v
-#define iXjXkXvX1Xie     i,j,k,ie,2,1 
-!t
-#define iXjXkXtX1Xie     i,j,k,ie,3,1     
-!dp
-#define iXjXkXdpX1Xie    i,j,k,ie,4,1 
-!u
-#define iXjXkXuX2Xie     i,j,k,ie,1,2     
-!v
-#define iXjXkXvX2Xie     i,j,k,ie,2,2  
-!t
-#define iXjXkXtX2Xie     i,j,k,ie,3,2     
-!dp
-#define iXjXkXdpX2Xie    i,j,k,ie,4,2 
-!u
-#define iXjXkXuX3Xie     i,j,k,ie,1,3     
-!v
-#define iXjXkXvX3Xie     i,j,k,ie,2,3  
-!t
-#define iXjXkXtX3Xie     i,j,k,ie,3,3     
-!dp
-#define iXjXkXdpX3Xie    i,j,k,ie,4,3 
-
-!u
-#define iXjXkXuXdXie     i,j,k,ie,1,1:timelevels    
-!v
-#define iXjXkXvXdXie     i,j,k,ie,2,1:timelevels
-!t
-#define iXjXkXtXdXie     i,j,k,ie,3,1:timelevels     
-!dp
-#define iXjXkXdpXdXie    i,j,k,ie,4,1:timelevels 
-!q1
-#define iXjXkXqXdXie     i,j,k,ie,7,1:timelevels
-
-
-
-
-!dp
-#define dXdX1XdpXn0Xie    :,:,1,ie,4,n0     
-!dp
-#define dXdXkm1XdpXn0Xie  :,:,k-1,ie,4,n0   
-!dp
-#define dXdXkXdpXn0Xie    :,:,k,ie,4,n0     
-!u
-#define iXjXkXuXn0Xie     i,j,k,ie,1,n0     
-!v
-#define iXjXkXvXn0Xie     i,j,k,ie,2,n0  
-!t
-#define iXjXkXtXn0Xie     i,j,k,ie,3,n0     
-!dp
-#define iXjXkXdpXn0Xie    i,j,k,ie,4,n0 
-       
-!t
-#define dXdXkXtXn0Xie     :,:,k,ie,3,n0     
-
-!elem(ie)%state%v(:,:,1,k,nm1)
-#define dXdXkXuXnm1Xie    :,:,k,ie,1,nm1
-
-!elem(ie)%state%v(:,:,2,k,nm1)
-#define dXdXkXvXnm1Xie    :,:,k,ie,2,nm1
-
-!elem(ie)%state%v(:,:,1,k,np1)
-#define dXdXkXuXnp1Xie    :,:,k,ie,1,np1
-
-!elem(ie)%state%v(:,:,2,k,np1)
-#define dXdXkXvXnp1Xie    :,:,k,ie,2,np1 
-
-!elem(ie)%state%T(:,:,k,np1)
-#define dXdXkXtXnp1Xie    :,:,k,ie,3,np1 
-
-!elem(ie)%state%T(:,:,k,nm1)
-#define dXdXkXtXnm1Xie    :,:,k,ie,3,nm1
-
-!elem(ie)%state%dp3d(:,:,k,np1)
-#define dXdXkXdpXnp1Xie   :,:,k,ie,4,np1
-
-!elem(ie)%state%dp3d(:,:,k,nm1)
-#define dXdXkXdpXnm1Xie   :,:,k,ie,4,nm1
-
-!elem(ie)%state%phis
-#define dXdX1XphisX1Xie   :,:,1,ie,6,1
-
-!dp
-#define dXdXdXdpXn0Xie     :,:,:,ie,4,n0
-
-!elem(ie)%state%v(:,:,1,k,n0)
-#define dXdXkXuXn0Xie    :,:,k,ie,1,n0
-
-!elem(ie)%state%v(:,:,2,k,n0)
-#define dXdXkXvXn0Xie    :,:,k,ie,2,n0 
-
-!elem(ie)%state%Qdp(i,j,k,1,qn0)
-#define iXjXkXqXqn0Xie   i,j,k,ie,7,qn0 
-#endif
-
-
-
 use kinds
 use element_state_mod
 use element_mod
-use routine_mod_st, only : compute_and_apply_rhs_st
+use routine_mod, only : compute_and_apply_rhs
+!use routine_mod_st, only : compute_and_apply_rhs_st
 use derivative_mod_base
 use hybvcoord_mod
 
 implicit none
 
-type (element_t), allocatable  :: elem(:)
-real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
-type (derivative_t) :: deriv
+  type (element_t), allocatable  :: elem(:)
+!  real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
+  type (derivative_t) :: deriv
 
 ! init params
 
-real (kind=real_kind) :: Dvv_init(np*np)
-type (hvcoord_t)   :: hvcoord
-integer :: nets, nete
-real*8 :: dt2
-real (kind=real_kind) :: eta_ave_w 
-real (kind=real_kind) :: ii, jj, kk, iee
+  real (kind=real_kind) :: Dvv_init(np*np)
+  type (hvcoord_t)   :: hvcoord
+  integer :: nets, nete, nelem
+  real*8 :: dt2
+  real (kind=real_kind) :: eta_ave_w 
+  real (kind=real_kind) :: ii, jj, kk, iee
 
 ! local
-integer :: i,j,k,ie,tl, ind
+  integer :: i,j,k,ie,tl, ind
 
-real (kind=real_kind) :: Ttest(np*np*nlev), Tt(np,np,nlev)
+  real (kind=real_kind) :: Ttest(np*np*nlev), Tt(np,np,nlev)
 
   dt2 = 1.0
   eta_ave_w = 1.0
   nets = 1
   nete = nelemd
+
 !----------------- INIT
+
+
 
   Dvv_init(1:16) = (/ -3.0,  -0.80901699437494745,   0.30901699437494745, &     
  -0.50000000000000000 ,4.0450849718747373, 0.0, -1.1180339887498949, &     
@@ -146,8 +49,7 @@ real (kind=real_kind) :: Ttest(np*np*nlev), Tt(np,np,nlev)
    enddo
   enddo 
 
-  allocate(elem(nelemd))
-  ST = 0.0d0
+  allocate(elem(nelem))
 
   do ie = nets,nete
   do k = 1,nlev
@@ -169,22 +71,13 @@ real (kind=real_kind) :: Ttest(np*np*nlev), Tt(np,np,nlev)
       elem(ie)%derived%pecnd(i,j,k) = 1.0
       elem(ie)%derived%omega_p(i,j,k) = jj*jj
 
-!      elem(ie)%state%dp3d(i,j,k,1:timelevels) = 10*kk+iee+ii+jj + (/1,2,3/)
-!      elem(ie)%state%v(i,j,1,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*2.0
-!      elem(ie)%state%v(i,j,2,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*3.0
-!      elem(ie)%state%T(i,j,k,1:timelevels) = 1000-kk-ii-jj+iee/10 + (/1,2,3/)
+      elem(ie)%state%dp3d(i,j,k,1:timelevels) = 10*kk+iee+ii+jj + (/1,2,3/)
+      elem(ie)%state%v(i,j,1,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*2.0
+      elem(ie)%state%v(i,j,2,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*3.0
+      elem(ie)%state%T(i,j,k,1:timelevels) = 1000-kk-ii-jj+iee/10 + (/1,2,3/)
+
 !only vapor
-!      elem(ie)%state%Qdp(i,j,k,1,qn0) = 1.0+SIN(ii*jj*kk)
-
-!        ST( iXjXkXdpX1Xie ) = 10*kk+iee+ii+jj + 1
-!        ST( iXjXkXdpX2Xie ) = 10*kk+iee+ii+jj + 2
-!        ST( iXjXkXdpX3Xie ) = 10*kk+iee+ii+jj + 3
-
-      ST( iXjXkXdpXdXie ) = 10*kk+iee+ii+jj + (/1,2,3/)
-      ST( iXjXkXuXdXie ) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*2.0
-      ST( iXjXkXvXdXie ) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*3.0
-      ST( iXjXkXtXdXie ) = 1000-kk-ii-jj+iee/10 + (/1,2,3/)
-      ST( iXjXkXqXdXie )= 1.0+SIN(ii*jj*kk)
+      elem(ie)%state%Qdp(i,j,k,1,qn0) = 1.0+SIN(ii*jj*kk)
 
       elem(ie)%Dinv(i,j,1,1) = 1.0
       elem(ie)%Dinv(i,j,1,2) = 0.0
@@ -261,7 +154,7 @@ print *, 'hey', np
 
 !np1 fields will be changed
 
-!call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w)
+call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w)
 
 ! ---------------- DO NOT MODIFY ------------------------
 ie = 3
@@ -275,11 +168,10 @@ Tt(i,j,k) = Ttest(ind)
 ind = ind+1
 enddo; enddo; enddo
 
-!print *, 'ORIGINAL diff', maxval(abs(Tt - elem(ie)%state%T(:,:,:,np1)))
+print *, 'ORIGINAL diff', maxval(abs(Tt - elem(ie)%state%T(:,:,:,np1)))
 
-call compute_and_apply_rhs_st(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w, ST)
-print *, 'ST diff', maxval(abs(Tt - ST(:,:,:,ie,3,np1)))
-print *, 'ST', ST(:,:,:,ie,3,np1)
+!call compute_and_apply_rhs_st(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w, ST)
+!print *, 'ST diff', maxval(abs(Tt - ST(:,:,:,ie,3,np1)))
 
 
 

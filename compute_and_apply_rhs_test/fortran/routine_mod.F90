@@ -9,9 +9,10 @@ subroutine compute_and_apply_rhs(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,nets,ne
 !       deriv,nets,nete,compute_diagnostics,eta_ave_w)
   ! ===================================
 
-  use kinds, only : real_kind
-  use element_mod, only : element_t, np, nlev, ntrac, nelemd, numst, timelevels,&
-                          indu, indv, indT, inddp,  indps, indphis
+  use kinds, only : real_kind, np, nlev, ntrac, nelemd, timelevels
+  use element_mod, only : element_t
+  use element_state_mod, only : elem_state_t
+                          !indu, indv, indT, inddp,  indps, indphis
   use derivative_mod_base, only : derivative_t, divergence_sphere, gradient_sphere, vorticity_sphere, &
                                   vorticity_v2
   use hybvcoord_mod, only : hvcoord_t
@@ -189,8 +190,7 @@ end subroutine compute_and_apply_rhs
   end function Virtual_Temperature1d
 
   subroutine preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
-    use kinds, only : real_kind
-    use element_mod, only : np, nlev
+    use kinds, only : real_kind, np, nlev
     use hybvcoord_mod, only : hvcoord_t
 
     implicit none
@@ -236,8 +236,7 @@ end subroutine compute_and_apply_rhs
 
 
   subroutine preq_hydrostatic(phi,phis,T_v,p,dp)
-    use kinds, only : real_kind
-    use element_mod, only : np, nlev
+    use kinds, only : real_kind, np, nlev
     use physical_constants, only : rgas
     implicit none
     real(kind=real_kind), intent(out) :: phi(np,np,nlev)     
