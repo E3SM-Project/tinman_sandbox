@@ -77,7 +77,7 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
   real (kind=real_kind) ::  u_m_umet, v_m_vmet, t_m_tmet 
 
 
-  print *, 'Hello Routine'
+!  print *, 'Hello Routine'
   do ie=nets,nete
      phi => elem(ie)%derived%phi(:,:,:)
 

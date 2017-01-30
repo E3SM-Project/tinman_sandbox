@@ -20,12 +20,13 @@ implicit none
   real (kind=real_kind) :: Dvv_init(np*np)
   type (hvcoord_t)   :: hvcoord
   integer :: nets, nete, nelem
-  real*8 :: dt2
+  real*8 :: dt2, start, finish
   real (kind=real_kind) :: eta_ave_w 
   real (kind=real_kind) :: ii, jj, kk, iee
 
 ! local
   integer :: i,j,k,ie,tl, ind
+  integer, parameter :: loopmax = 30000
 
   real (kind=real_kind) :: Ttest(np*np*nlev), Tt(np,np,nlev)
 
@@ -132,8 +133,12 @@ print *, 'Main original, np=', np
 
 !np1 fields will be changed
 
+call cpu_time(start)
+do ind = 1, loopmax
 call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w)
-
+enddo
+call cpu_time(finish)
+print '("Time = ",f6.4," seconds.")',finish-start
 ! ---------------- DO NOT MODIFY ------------------------
 ie = 3
 !do k = 1,nlev; do j = 1,np; do i = 1,np

@@ -31,12 +31,13 @@ type (derivative_t) :: deriv
 real (kind=real_kind) :: Dvv_init(np*np)
 type (hvcoord_t)   :: hvcoord
 integer :: nets, nete
-real*8 :: dt2
+real*8 :: dt2, start, finish
 real (kind=real_kind) :: eta_ave_w 
 real (kind=real_kind) :: ii, jj, kk, iee
 
 ! local
-integer :: i,j,k,ie,tl, ind
+integer :: i,j,k,ie,tl,ind
+integer, parameter :: loopmax = 30000
 
 real (kind=real_kind) :: Ttest(np*np*nlev), Tt(np,np,nlev)
 
@@ -159,7 +160,13 @@ Tt(i,j,k) = Ttest(ind)
 ind = ind+1
 enddo; enddo; enddo
 
+
+call cpu_time(start)
+do ind = 1, loopmax
 call compute_and_apply_rhs_st(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w, ST)
+enddo
+call cpu_time(finish)
+print '("Time = ",f6.4," seconds.")',finish-start
 
 #if STVER1
 print *, 'STVER1 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
