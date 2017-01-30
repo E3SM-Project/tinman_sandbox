@@ -235,7 +235,7 @@ module element_mod
 !     type (GridVertex_t)      :: vertex                               ! element grid vertex information
 !     type (EdgeDescriptor_t)  :: desc
 
-#if 0
+#if ORIG
      type (elem_state_t)      :: state
 #endif
      type (derived_state_t)   :: derived

@@ -1,105 +1,7 @@
+#include "config1.h"
+#include "config2.h"
+
 module routine_mod_ST
-
-
-
-!u
-#define iXjXkXuX1Xie     i,j,k,ie,1,1    
-!v
-#define iXjXkXvX1Xie     i,j,k,ie,2,1 
-!t
-#define iXjXkXtX1Xie     i,j,k,ie,3,1     
-!dp
-#define iXjXkXdpX1Xie    i,j,k,ie,4,1 
-!u
-#define iXjXkXuX2Xie     i,j,k,ie,1,2     
-!v
-#define iXjXkXvX2Xie     i,j,k,ie,2,2  
-!t
-#define iXjXkXtX2Xie     i,j,k,ie,3,2     
-!dp
-#define iXjXkXdpX2Xie    i,j,k,ie,4,2 
-!u
-#define iXjXkXuX3Xie     i,j,k,ie,1,3     
-!v
-#define iXjXkXvX3Xie     i,j,k,ie,2,3  
-!t
-#define iXjXkXtX3Xie     i,j,k,ie,3,3     
-!dp
-#define iXjXkXdpX3Xie    i,j,k,ie,4,3 
-
-!u
-#define iXjXkXuXdXie     i,j,k,ie,1,1:timelevels    
-!v
-#define iXjXkXvXdXie     i,j,k,ie,2,1:timelevels
-!t
-#define iXjXkXtXdXie     i,j,k,ie,3,1:timelevels     
-!dp
-#define iXjXkXdpXdXie    i,j,k,ie,4,1:timelevels 
-!q1
-#define iXjXkXqXdXie     i,j,k,ie,7,1:timelevels
-
-
-
-
-!dp
-#define dXdX1XdpXn0Xie    :,:,1,ie,4,n0     
-!dp
-#define dXdXkm1XdpXn0Xie  :,:,k-1,ie,4,n0   
-!dp
-#define dXdXkXdpXn0Xie    :,:,k,ie,4,n0     
-!u
-#define iXjXkXuXn0Xie     i,j,k,ie,1,n0     
-!v
-#define iXjXkXvXn0Xie     i,j,k,ie,2,n0  
-!t
-#define iXjXkXtXn0Xie     i,j,k,ie,3,n0     
-!dp
-#define iXjXkXdpXn0Xie    i,j,k,ie,4,n0 
-       
-!t
-#define dXdXkXtXn0Xie     :,:,k,ie,3,n0     
-
-!elem(ie)%state%v(:,:,1,k,nm1)
-#define dXdXkXuXnm1Xie    :,:,k,ie,1,nm1
-
-!elem(ie)%state%v(:,:,2,k,nm1)
-#define dXdXkXvXnm1Xie    :,:,k,ie,2,nm1
-
-!elem(ie)%state%v(:,:,1,k,np1)
-#define dXdXkXuXnp1Xie    :,:,k,ie,1,np1
-
-!elem(ie)%state%v(:,:,2,k,np1)
-#define dXdXkXvXnp1Xie    :,:,k,ie,2,np1 
-
-!elem(ie)%state%T(:,:,k,np1)
-#define dXdXkXtXnp1Xie    :,:,k,ie,3,np1 
-
-!elem(ie)%state%T(:,:,k,nm1)
-#define dXdXkXtXnm1Xie    :,:,k,ie,3,nm1
-
-!elem(ie)%state%dp3d(:,:,k,np1)
-#define dXdXkXdpXnp1Xie   :,:,k,ie,4,np1
-
-!elem(ie)%state%dp3d(:,:,k,nm1)
-#define dXdXkXdpXnm1Xie   :,:,k,ie,4,nm1
-
-!elem(ie)%state%phis
-#define dXdX1XphisX1Xie   :,:,1,ie,6,1
-
-!dp
-#define dXdXdXdpXn0Xie     :,:,:,ie,4,n0
-
-!elem(ie)%state%v(:,:,1,k,n0)
-#define dXdXkXuXn0Xie    :,:,k,ie,1,n0
-
-!elem(ie)%state%v(:,:,2,k,n0)
-#define dXdXkXvXn0Xie    :,:,k,ie,2,n0 
-
-!elem(ie)%state%Qdp(i,j,k,1,qn0)
-#define iXjXkXqXqn0Xie   i,j,k,ie,7,qn0 
-
-
-
 
 implicit none
 contains
@@ -122,7 +24,17 @@ subroutine compute_and_apply_rhs_st(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,nets
 implicit none
 
   type (element_t), intent(inout), target :: elem(:)
-  real (kind=real_kind), intent(inout) :: ST(np,np,nlev,nelemd,numst,timelevels)
+!  real (kind=real_kind), intent(inout) :: ST(np,np,nlev,nelemd,numst,timelevels)
+#if STVER1
+! I J K IE ST TL
+real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
+#endif
+
+#if STVER2
+! I J K ST IE TL
+real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
+#endif
+
   type (derivative_t)  , intent(in) :: deriv
   type (hvcoord_t)     , intent(in) :: hvcoord
   integer, intent(in) :: nets, nete, np1,nm1,n0,qn0
@@ -166,53 +78,6 @@ implicit none
 
 
   print *, 'Hello Routine'
-
-! u=1, v=2, T=3, dp3d=4, ps=5, phis=6, vapor=7
-
-!dp
-!#define dXdX1XdpXn0Xie    :,:,1,ie,4,n0     
-!dp
-!#define dXdXkm1XdpXn0Xie  :,:,k-1,ie,4,n0   
-!dp
-!#define dXdXkXdpXn0Xie    :,:,k,ie,4,n0     
-!u
-!#define iXjXkXuXn0Xie     i,j,k,ie,1,n0     
-!v
-!#define iXjXkXvXn0Xie     i,j,k,ie,2,n0     
-!dp
-!#define iXjXkXdpXn0Xie    i,j,k,ie,4,n0     
-!t
-!#define iXjXkXtXn0Xie     i,j,k,ie,3,n0     
-!t
-!#define dXdXkXtXn0Xie     :,:,k,ie,3,n0     
-!elem(ie)%state%v(:,:,1,k,nm1)
-!#define dXdXkXuXnm1Xie    :,:,k,ie,1,nm1
-!elem(ie)%state%v(:,:,2,k,nm1)
-!#define dXdXkXvXnm1Xie    :,:,k,ie,2,nm1
-!elem(ie)%state%v(:,:,1,k,np1)
-!#define dXdXkXuXnp1Xie    :,:,k,ie,1,np1
-!elem(ie)%state%v(:,:,2,k,np1)
-!#define dXdXkXvXnp1Xie    :,:,k,ie,2,np1 
-!elem(ie)%state%T(:,:,k,np1)
-!#define dXdXkXtXnp1Xie    :,:,k,ie,3,np1 
-!elem(ie)%state%T(:,:,k,nm1)
-!#define dXdXkXtXnm1Xie    :,:,k,ie,3,nm1
-!elem(ie)%state%dp3d(:,:,k,np1)
-!#define dXdXkXdpXnp1Xie   :,:,k,ie,4,np1
-!elem(ie)%state%dp3d(:,:,k,nm1)
-!#define dXdXkXdpXnm1Xie   :,:,k,ie,4,nm1
-!elem(ie)%state%phis
-!#define dXdX1XphisX1Xie   :,:,1,ie,6,1
-!dp
-!#define dXdXdXdpXn0Xie     :,:,:,ie,4,n0
-!elem(ie)%state%v(:,:,1,k,n0)
-!#define dXdXkXuXn0Xie    :,:,k,ie,1,n0
-!elem(ie)%state%v(:,:,2,k,n0)
-!#define dXdXkXvXn0Xie    :,:,k,ie,2,n0 
-!elem(ie)%state%Qdp(i,j,k,1,qn0)
-!#define iXjXkXqXqn0Xie   i,j,k,ie,7,qn0 
-
-
   do ie=nets,nete
      phi => elem(ie)%derived%phi(:,:,:)
 
@@ -230,8 +95,8 @@ implicit none
               v1 = ST( iXjXkXuXn0Xie )
               v2 = ST( iXjXkXvXn0Xie )
               vgrad_p(i,j,k) = (v1*grad_p(i,j,1,k) + v2*grad_p(i,j,2,k))
-              vdp(i,j,1,k) = v1*ST( i,j,k,ie,4,n0 )
-              vdp(i,j,2,k) = v2*ST( i,j,k,ie,4,n0 )
+              vdp(i,j,1,k) = v1*ST( iXjXkXdpXn0Xie )
+              vdp(i,j,2,k) = v2*ST( iXjXkXdpXn0Xie )
            end do
         end do
         elem(ie)%derived%vn0(:,:,:,k)=elem(ie)%derived%vn0(:,:,:,k)+eta_ave_w*vdp(:,:,:,k)

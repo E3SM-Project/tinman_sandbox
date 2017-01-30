@@ -1,106 +1,7 @@
+#include "config1.h"
+#include "config2.h"
 
 program main
-
-
-#if 1
-!u
-#define iXjXkXuX1Xie     i,j,k,ie,1,1    
-!v
-#define iXjXkXvX1Xie     i,j,k,ie,2,1 
-!t
-#define iXjXkXtX1Xie     i,j,k,ie,3,1     
-!dp
-#define iXjXkXdpX1Xie    i,j,k,ie,4,1 
-!u
-#define iXjXkXuX2Xie     i,j,k,ie,1,2     
-!v
-#define iXjXkXvX2Xie     i,j,k,ie,2,2  
-!t
-#define iXjXkXtX2Xie     i,j,k,ie,3,2     
-!dp
-#define iXjXkXdpX2Xie    i,j,k,ie,4,2 
-!u
-#define iXjXkXuX3Xie     i,j,k,ie,1,3     
-!v
-#define iXjXkXvX3Xie     i,j,k,ie,2,3  
-!t
-#define iXjXkXtX3Xie     i,j,k,ie,3,3     
-!dp
-#define iXjXkXdpX3Xie    i,j,k,ie,4,3 
-
-!u
-#define iXjXkXuXdXie     i,j,k,ie,1,1:timelevels    
-!v
-#define iXjXkXvXdXie     i,j,k,ie,2,1:timelevels
-!t
-#define iXjXkXtXdXie     i,j,k,ie,3,1:timelevels     
-!dp
-#define iXjXkXdpXdXie    i,j,k,ie,4,1:timelevels 
-!q1
-#define iXjXkXqXdXie     i,j,k,ie,7,1:timelevels
-
-
-
-
-!dp
-#define dXdX1XdpXn0Xie    :,:,1,ie,4,n0     
-!dp
-#define dXdXkm1XdpXn0Xie  :,:,k-1,ie,4,n0   
-!dp
-#define dXdXkXdpXn0Xie    :,:,k,ie,4,n0     
-!u
-#define iXjXkXuXn0Xie     i,j,k,ie,1,n0     
-!v
-#define iXjXkXvXn0Xie     i,j,k,ie,2,n0  
-!t
-#define iXjXkXtXn0Xie     i,j,k,ie,3,n0     
-!dp
-#define iXjXkXdpXn0Xie    i,j,k,ie,4,n0 
-       
-!t
-#define dXdXkXtXn0Xie     :,:,k,ie,3,n0     
-
-!elem(ie)%state%v(:,:,1,k,nm1)
-#define dXdXkXuXnm1Xie    :,:,k,ie,1,nm1
-
-!elem(ie)%state%v(:,:,2,k,nm1)
-#define dXdXkXvXnm1Xie    :,:,k,ie,2,nm1
-
-!elem(ie)%state%v(:,:,1,k,np1)
-#define dXdXkXuXnp1Xie    :,:,k,ie,1,np1
-
-!elem(ie)%state%v(:,:,2,k,np1)
-#define dXdXkXvXnp1Xie    :,:,k,ie,2,np1 
-
-!elem(ie)%state%T(:,:,k,np1)
-#define dXdXkXtXnp1Xie    :,:,k,ie,3,np1 
-
-!elem(ie)%state%T(:,:,k,nm1)
-#define dXdXkXtXnm1Xie    :,:,k,ie,3,nm1
-
-!elem(ie)%state%dp3d(:,:,k,np1)
-#define dXdXkXdpXnp1Xie   :,:,k,ie,4,np1
-
-!elem(ie)%state%dp3d(:,:,k,nm1)
-#define dXdXkXdpXnm1Xie   :,:,k,ie,4,nm1
-
-!elem(ie)%state%phis
-#define dXdX1XphisX1Xie   :,:,1,ie,6,1
-
-!dp
-#define dXdXdXdpXn0Xie     :,:,:,ie,4,n0
-
-!elem(ie)%state%v(:,:,1,k,n0)
-#define dXdXkXuXn0Xie    :,:,k,ie,1,n0
-
-!elem(ie)%state%v(:,:,2,k,n0)
-#define dXdXkXvXn0Xie    :,:,k,ie,2,n0 
-
-!elem(ie)%state%Qdp(i,j,k,1,qn0)
-#define iXjXkXqXqn0Xie   i,j,k,ie,7,qn0 
-#endif
-
-
 
 use kinds
 use element_state_mod
@@ -112,7 +13,17 @@ use hybvcoord_mod
 implicit none
 
 type (element_t), allocatable  :: elem(:)
+
+#if STVER1
+! I J K IE ST TL
 real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
+#endif
+
+#if STVER2
+! I J K ST IE TL
+real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
+#endif
+
 type (derivative_t) :: deriv
 
 ! init params
@@ -234,34 +145,7 @@ Ttest = (/ &
 
 !------------- end of definign T for test
 
-!------------- copying elem%state into ST array
-!state vars in STATE: u,v,T,dp3d,ps_v = 5 vars + 35 tracers
-#if 0
-do ie = 1, nelemd; do k=1, nlev; do j=1,np; do i=1,np
-  ! u, v
-  ST(i,j,k,ie,indu,1:timelevels) = elem(ie)%state%v(i,j,1,k,1:timelevels)
-  ST(i,j,k,ie,indv,1:timelevels) = elem(ie)%state%v(i,j,2,k,1:timelevels)
-  ! T
-  ST(i,j,k,ie,indT,1:timelevels) = elem(ie)%state%T(i,j,k,1:timelevels)
-  ! dp
-  ST(i,j,k,ie,inddp,1:timelevels) = elem(ie)%state%dp3d(i,j,k,1:timelevels)
-  ! vapor
-  ST(i,j,k,ie,indvapor,1:timelevels) = elem(ie)%state%Qdp(i,j,k,1,1:timelevels)
-enddo; enddo; enddo; enddo
-! now, ps and phis are a different story, not a leveled var
-do ie = 1, nelemd; do k=1, nlev; do j=1,np; do i=1,np
-  ! ps
-  ST(i,j,k,ie,indps,1:timelevels) = elem(ie)%state%ps_v(i,j,1:timelevels)
-  ! phis
-  ST(i,j,k,ie,indphis,1:timelevels) = elem(ie)%state%phis(i,j)
-enddo; enddo; enddo; enddo
-#endif
-
-print *, 'hey', np
-
-!np1 fields will be changed
-
-!call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w)
+print *, 'Main ST routine', np
 
 ! ---------------- DO NOT MODIFY ------------------------
 ie = 3
@@ -275,12 +159,14 @@ Tt(i,j,k) = Ttest(ind)
 ind = ind+1
 enddo; enddo; enddo
 
-!print *, 'ORIGINAL diff', maxval(abs(Tt - elem(ie)%state%T(:,:,:,np1)))
-
 call compute_and_apply_rhs_st(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w, ST)
-print *, 'ST diff', maxval(abs(Tt - ST(:,:,:,ie,3,np1)))
-print *, 'ST', ST(:,:,:,ie,3,np1)
 
+#if STVER1
+print *, 'STVER1 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
+#endif
+#if STVER2
+print *, 'STVER2 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
+#endif
 
 
 end program main

@@ -7,7 +7,7 @@ module element_state_mod
   private
 
 
-#if 0
+#if ORIG
   type, public :: elem_state_t
 
     ! prognostic variables for preqx solver
@@ -19,7 +19,7 @@ module element_state_mod
     real (kind=real_kind) :: v   (np,np,2,nlev,timelevels)            ! velocity                           1
     real (kind=real_kind) :: T   (np,np,nlev,timelevels)              ! temperature                        2
     real (kind=real_kind) :: dp3d(np,np,nlev,timelevels)              ! delta p on levels                  8
-    real (kind=real_kind) :: ps_v(np,np,timielevels)                   ! surface pressure                   4
+    real (kind=real_kind) :: ps_v(np,np,timelevels)                   ! surface pressure                   4
     real (kind=real_kind) :: phis(np,np)                              ! surface geopotential (prescribed)  5
     real (kind=real_kind) :: Q   (np,np,nlev,qsize_d)                 ! Tracer concentration               6
     real (kind=real_kind) :: Qdp (np,np,nlev,qsize_d,timelevels)      ! Tracer mass                        7

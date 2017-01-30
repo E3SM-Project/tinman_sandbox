@@ -65,7 +65,7 @@ implicit none
   real (kind=real_kind) ::  u_m_umet, v_m_vmet, t_m_tmet 
 
 
-  print *, 'Hello Routine'
+  print *, 'Hello Original Routine'
   do ie=nets,nete
      phi => elem(ie)%derived%phi(:,:,:)
      dp  => elem(ie)%state%dp3d(:,:,:,n0)
