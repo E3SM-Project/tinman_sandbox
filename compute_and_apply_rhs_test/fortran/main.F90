@@ -42,6 +42,10 @@ integer, parameter :: loopmax = 10000
 
 real (kind=real_kind) :: Tt(np,np,nlev)
 
+print *, 'WOORLD'
+!call flush(6)
+!stop
+
   dt2 = 1.0
   eta_ave_w = 1.0
   nets = 1
@@ -58,6 +62,8 @@ real (kind=real_kind) :: Tt(np,np,nlev)
      deriv%Dvv(i,j) = Dvv_init((j-1)*np+i)
    enddo
   enddo 
+print *, nelemd
+
 
   allocate(elem(nelemd))
   ST = 0.0d0
@@ -146,7 +152,7 @@ enddo; enddo; enddo
 
 
 call cpu_time(start)
-do ind = 1, loopmax
+do ind = 1, 1!loopmax
 call compute_and_apply_rhs_st(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w, ST)
 enddo
 call cpu_time(finish)

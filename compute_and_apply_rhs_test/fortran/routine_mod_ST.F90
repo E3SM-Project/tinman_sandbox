@@ -18,7 +18,6 @@ subroutine compute_and_apply_rhs_st(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,nets
   use derivative_mod_base, only : derivative_t, divergence_sphere, gradient_sphere, vorticity_sphere, &
                                   vorticity_v2
   use hybvcoord_mod, only : hvcoord_t
-
   use physical_constants, only : cp, cpwater_vapor, Rgas, kappa
 
 implicit none
@@ -38,6 +37,50 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
   type (derivative_t)  , intent(in) :: deriv
   type (hvcoord_t)     , intent(in) :: hvcoord
   integer, intent(in) :: nets, nete, np1,nm1,n0,qn0
+  real*8, intent(in) :: dt2
+  real (kind=real_kind), intent(in) :: eta_ave_w 
+
+  integer :: ie
+
+
+  do ie  =  nets, nete
+    call caar(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,ie,eta_ave_w,ST)
+  enddo
+
+end subroutine compute_and_apply_rhs_st
+
+
+
+
+
+
+subroutine caar(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,ie,eta_ave_w,ST)
+
+  use kinds, only : real_kind, np, nlev, ntrac, nelemd, timelevels, numst
+  use element_state_mod
+  use element_mod
+  use derivative_mod_base, only : derivative_t, divergence_sphere, gradient_sphere, vorticity_sphere, &
+                                  vorticity_v2
+  use hybvcoord_mod, only : hvcoord_t
+  use physical_constants, only : cp, cpwater_vapor, Rgas, kappa
+
+implicit none
+
+  type (element_t), intent(inout), target :: elem(:)
+!  real (kind=real_kind), intent(inout) :: ST(np,np,nlev,nelemd,numst,timelevels)
+#if STVER1
+! I J K IE ST TL
+real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
+#endif
+
+#if STVER2
+! I J K ST IE TL
+real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
+#endif
+
+  type (derivative_t)  , intent(in) :: deriv
+  type (hvcoord_t)     , intent(in) :: hvcoord
+  integer, intent(in) :: ie,np1,nm1,n0,qn0
   real*8, intent(in) :: dt2
   real (kind=real_kind), intent(in) :: eta_ave_w 
 
@@ -73,21 +116,34 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
   real (kind=real_kind) ::  tempdp3d  (np,np)
   real (kind=real_kind) ::  cp2,cp_ratio,E,de,Qt,v1,v2
   real (kind=real_kind) ::  glnps1,glnps2,gpterm
-  integer :: i,j,k,kptr,ie
+  integer :: i,j,k,kptr
   real (kind=real_kind) ::  u_m_umet, v_m_vmet, t_m_tmet 
-
+  
+  integer :: tid, OMP_GET_MAX_THREADS, OMP_GET_THREAD_NUM
 
 !  print *, 'Hello Routine'
-  do ie=nets,nete
+
+  tid = OMP_GET_MAX_THREADS()     
+  print *, 'Max number TH ', tid
+
+
+     tid = OMP_GET_THREAD_NUM()     
+     print *, 'My tid is ', tid
+
      phi => elem(ie)%derived%phi(:,:,:)
 
      p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + ST( dXdX1XdpXn0Xie  ) /2
+
      do k=2,nlev
         p(:,:,k)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkXdpXn0Xie )/2
      enddo
 
-!#omp parallel do
+
      do k=1,nlev
+
+        tid = OMP_GET_THREAD_NUM()     
+        print *, 'next loop: My tid is ', tid
+
         grad_p(:,:,:,k) = gradient_sphere(p(:,:,k),deriv,elem(ie)%Dinv)
         rdp(:,:,k) = 1.0D0/ST( dXdXkXdpXn0Xie )
         do j=1,np
@@ -103,7 +159,10 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
         divdp(:,:,k)=divergence_sphere(vdp(:,:,:,k),deriv,elem(ie))
         vort(:,:,k)=vorticity_v2( ST( dXdXkXuXn0Xie ) , ST( dXdXkXvXn0Xie ) ,deriv,elem(ie))
      enddo
+
+
      if (qn0 == -1 ) then
+
         do k=1,nlev
            do j=1,np
               do i=1,np
@@ -186,8 +245,36 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
              elem(ie)%spheremp(:,:) * ( ST( dXdXkXdpXnm1Xie ) - &
              dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
      enddo ! k loop
-  end do
-end subroutine compute_and_apply_rhs_st
+
+
+end subroutine caar
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
   function Virtual_Temperature1d(Tin,rin) result(Tv)  
