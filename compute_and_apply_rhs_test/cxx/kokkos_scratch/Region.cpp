@@ -9,8 +9,7 @@ double init_map(double x, int n)
 }
 
 Region::Region( int num_elems )
-    : m_nelems( num_elems )
-    , m_2d_scalars( "2d scalars", num_elems )
+    : m_2d_scalars( "2d scalars", num_elems )
     , m_2d_tensors( "2d tensors", num_elems )
     , m_3d_scalars( "3d scalars", num_elems )
     , m_4d_scalars( "4d scalars", num_elems )

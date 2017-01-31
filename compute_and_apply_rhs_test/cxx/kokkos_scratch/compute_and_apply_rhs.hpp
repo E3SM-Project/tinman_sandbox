@@ -9,14 +9,14 @@ namespace TinMan
 {
 
 // Forward declarations
-class TestData;
+class Control;
 class Region;
 
-void compute_and_apply_rhs (const TestData& data, Region& region);
+void compute_and_apply_rhs (const Control& data, Region& region);
 
-void print_results_2norm (const TestData& data, const Region& region);
+// void print_results_2norm (const Control& data, const Region& region);
 
-void dump_results_to_file (const TestData& data, const Region& region);
+// void dump_results_to_file (const Control& data, const Region& region);
 
 } // Namespace TinMan
 

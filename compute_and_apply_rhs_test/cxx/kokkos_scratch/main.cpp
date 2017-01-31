@@ -19,12 +19,7 @@ bool is_unsigned_int(const char* str)
   return true;
 }
 
-int main (int argc, char** argv)
-{
-  int num_elems = 10;
-  bool dump_res = false;
-  int num_exec = 1;
-
+void parse_args(int argc, char** argv, int &num_elems, int &num_exec, bool &dump_results) {
   if (argc > 1) {
     int iarg = 1;
     while (iarg<argc)
@@ -55,9 +50,9 @@ int main (int argc, char** argv)
       {
         char* val = strchr(argv[iarg],'=')+1;
         if (strcmp(val,"yes")==0 || strcmp(val,"YES")==0)
-          dump_res = true;
+          dump_results = true;
         else if (strcmp(val,"no")==0 || strcmp(val,"NO")==0)
-          dump_res = false;
+          dump_results = false;
         else
         {
           std::cout << " ERROR! Unrecognized command line option '" << argv[iarg] << "'.\n"
@@ -87,6 +82,49 @@ int main (int argc, char** argv)
       ++iarg;
     }
   }
+}
+
+void run_simulation(int num_elems, int num_exec, bool dump_results) {
+  TinMan::Control data(num_elems);
+  TinMan::Region region(num_elems);
+
+  // Print norm of initial states, to check we are using same data in all tests
+  // print_results_2norm(data, region);
+
+  // Burn in before timing to reduce cache effect
+  TinMan::compute_and_apply_rhs(data, region);
+
+  std::unique_ptr<Timer::Timer[]> timers(new Timer::Timer[num_exec]);
+  for (int i=0; i<num_exec; ++i)
+  {
+    timers[i].startTimer();
+    TinMan::compute_and_apply_rhs(data, region);
+    data.update_time_levels();
+    timers[i].stopTimer();
+  }
+
+#ifdef KOKKOS_HAVE_DEFAULT_DEVICE_TYPE_OPENMP
+  Kokkos::OpenMP::fence();
+#endif
+
+  for(int i = 0; i < num_exec; ++i) {
+    std::cout << timers[i] << std::endl;
+  }
+
+  // print_results_2norm (data,region);
+
+  // if (dump_results)
+  // {
+  //   dump_results_to_file (data,region);
+  // }
+}
+
+int main (int argc, char** argv)
+{
+  int num_elems = 10;
+  int num_exec = 1;
+  bool dump_results = false;
+  parse_args(argc, argv, num_elems, num_exec, dump_results);
 
   if (num_elems < 1) {
     std::cerr << "Invalid number of elements: " << num_elems << std::endl;
@@ -99,51 +137,7 @@ int main (int argc, char** argv)
   Kokkos::OpenMP::print_configuration(std::cout,true);
 #endif
 
-  std::cout << " --- Initializing data...\n";
-  TinMan::TestData data(num_elems);
-  TinMan::Region* region = new TinMan::Region(num_elems); // A pointer, so the views are destryed before Kokkos::finalize
-
-  // Print norm of initial states, to check we are using same data in all tests
-  print_results_2norm (data, *region);
-
-  // Burn in before timing to reduce cache effect
-  TinMan::compute_and_apply_rhs(data,*region);
-
-  std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
-
-  //std::unique_ptr<Timer::Timer[]> timers(new Timer::Timer[num_exec]);
-  Timer::Timer global_timer;
-  global_timer.startTimer();
-  for (int i=0; i<num_exec; ++i)
-  {
-    //timers[i].startTimer();
-    TinMan::compute_and_apply_rhs(data,*region);
-    data.update_time_levels();
-    //timers[i].stopTimer();
-  }
-#ifdef KOKKOS_HAVE_DEFAULT_DEVICE_TYPE_OPENMP
-  Kokkos::OpenMP::fence();
-#endif
-  global_timer.stopTimer();
-
-/*
-  std::cout << "   ---> individual executions times:\n";
-  for(int i = 0; i < num_exec; ++i) {
-    std::cout << timers[i] << std::endl;
-  }
-*/
-  std::cout << "   ---> compute_and_apply_rhs execution total time: " << global_timer << "\n";
-
-  print_results_2norm (data,*region);
-
-  if (dump_res)
-  {
-    std::cout << " --- Dumping results to file...\n";
-    dump_results_to_file (data,*region);
-  }
-
-  std::cout << " --- Cleaning up data...\n";
-  delete region;
+  run_simulation(num_elems, num_exec, dump_results);
 
   Kokkos::finalize ();
   return 0;

@@ -5,11 +5,9 @@
 
 #include "Types.hpp"
 
-namespace TinMan
-{
+namespace TinMan {
 
-struct Constants
-{
+struct PhysicalConstants {
   static constexpr const Real rrearth = 1.0;
   static constexpr const Real eta_ave_w = 1.0;
   static constexpr const Real Rwater_vapor = 1.0;
@@ -17,76 +15,65 @@ struct Constants
   static constexpr const Real kappa = 1.0;
 };
 
-struct HVCoord
-{
-  Real ps0;         // base state surface-pressure for level definitions
-  Real hyai[NUM_LEV_P]; // ps0 component of hybrid coordinate - interfaces
-};
-
-class Control
-{
+class Control {
 public:
   // num_elems is te number of elements in the simulation
   // num_workers is the number of threads used to simulate
   // thread_id is between 0 and num_elems-1, inclusive
   // thread_id should be unique between threads
-  Control(int num_elems, int num_threads);
+  Control(int num_elems);
 
-  int nets(int thread_id) const;
-  int nete(int thread_id) const;
-  int n0(int thread_id) const;
-  int np1(int thread_id) const;
-  int nm1(int thread_id) const;
-  int qn0(int thread_id) const;
-  int dt2(int thread_id) const;
-private:
-  struct Control_Data {
-    int  nets;
-    int  nete;
-    int  n0;
-    int  np1;
-    int  nm1;
-    int  qn0;
-    Real dt2;
-  };
+  int host_num_elems() const { return m_host_num_elems; }
 
-  // Use this "struct" to ensure each Control_Data object fills a cache line
-  // This is necessary to prevent threads on different cores from causing false-sharing cache issues
-  template <typename cache_filler>
-  struct Cache_Wrapper : public cache_filler
-  {
-  private:
-    // x86 cache line size is 64
-    // CUDA cache line size may vary, but Fermi and Kepler are 128
-    constexpr const int cache_line_size = 128;
-    constexpr const int leftover_line = cache_line_size - (sizeof(cache_filler) % cache_line_size);
-    char filler[leftover_line];
-  };
-  ExecViewManaged<Cache_Wrapper<Control_Data> *> thread_control;
-};
+  /* These functions must be called from device code */
+  KOKKOS_INLINE_FUNCTION int num_elems() const {
+    return m_device_mem(0).num_elems;
+  }
+  /* Timelevels 1-3, respectively */
+  KOKKOS_INLINE_FUNCTION int n0() const { return m_device_mem(0).n0; }
+  KOKKOS_INLINE_FUNCTION int np1() const { return m_device_mem(0).np1; }
+  KOKKOS_INLINE_FUNCTION int nm1() const { return m_device_mem(0).nm1; }
+  /* Tracer timelevel */
+  KOKKOS_INLINE_FUNCTION int qn0() const { return m_device_mem(0).qn0; }
+  /* dt * 2 */
+  KOKKOS_INLINE_FUNCTION int dt2() const { return m_device_mem(0).dt2; }
 
-struct Derivative
-{
-public:
-  Derivative();
-  ExecViewManaged<Real[NP][NP]> Dvv;
-};
+  /* ps0 component of hybrid coordinate-interfaces
+   * The A part of the pressure at a level
+   * Complemented by hybrid_b, which is not needed in this code
+   */
+  KOKKOS_INLINE_FUNCTION Real hybrid_a(int level) const {
+    return m_hybrid_a(level);
+  }
+  /* Global constant - boundary condition at the top of the atmosphere
+   * This is used to ensure that the top level has pressure ptop
+   * The pressure at a level k is approximately:
+   * p(k) = A(k) ps0 + B(k) ps_v
+   */
+  KOKKOS_INLINE_FUNCTION Real ps0() const { return m_device_mem(0).ps0; }
 
-class TestData
-{
-public:
-  TestData (const int num_elems);
-
-  const Control&    control()   const { return m_control;   }
-  const Derivative& deriv()     const { return m_deriv;     }
-  const HVCoord&    hvcoord()   const { return m_hvcoord;   }
+  KOKKOS_INLINE_FUNCTION Real dvv(int x, int y) const { return m_dvv(x, y); }
 
   void update_time_levels();
 
+  struct Control_Data {
+    int num_elems;
+    int n0;
+    int np1;
+    int nm1;
+    int qn0;
+    Real dt2;
+
+    Real ps0; // base state surface-pressure for level definitions
+  };
 private:
-  Control     m_control   = {};
-  Derivative  m_deriv     = {};
-  HVCoord     m_hvcoord   = {};
+
+  const int m_host_num_elems;
+
+  /* Device objects */
+  ExecViewManaged<Control_Data[1]> m_device_mem;
+  ExecViewManaged<Real[NUM_LEV_P]> m_hybrid_a;
+  ExecViewManaged<Real[NP][NP]> m_dvv; // Laplacian
 };
 
 } // Namespace TinMan

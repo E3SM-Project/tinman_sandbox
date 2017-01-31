@@ -1,13 +1,22 @@
 #ifndef TINMAN_CONFIG_H
 #define TINMAN_CONFIG_H
 
+#include <Kokkos_Core.hpp>
+
 namespace TinMan {
 
-constexpr int NP              = 4;
-constexpr int NUM_LEV         = 72;
-constexpr int NUM_LEV_P       = NUM_LEV + 1;
-constexpr int QSIZE_D         = 4;
-constexpr int NUM_TIME_LEVELS = 3;
+#define NP 4
+#define NUM_LEV 72
+#define NUM_LEV_P (NUM_LEV + 1)
+#define QSIZE_D 4
+#define NUM_TIME_LEVELS 3
+
+// Until whenever CUDA supports constexpr properly
+// static constexpr const int NP = 4;
+// static constexpr const int NUM_LEV = 72;
+// static constexpr const int NUM_LEV_P = NUM_LEV + 1;
+// static constexpr const int QSIZE_D = 4;
+// static constexpr const int NUM_TIME_LEVELS = 3;
 
 } // namespace TinMan
 
