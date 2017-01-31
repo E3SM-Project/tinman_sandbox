@@ -5,7 +5,6 @@ use kinds
 use element_state_mod
 use element_mod
 use routine_mod, only : compute_and_apply_rhs
-!use routine_mod_st, only : compute_and_apply_rhs_st
 use derivative_mod_base
 use hybvcoord_mod
 use test_mod
@@ -13,21 +12,20 @@ use test_mod
 implicit none
 
   type (element_t), allocatable  :: elem(:)
-!  real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
   type (derivative_t) :: deriv
 
 ! init params
 
   real (kind=real_kind) :: Dvv_init(np*np)
   type (hvcoord_t)   :: hvcoord
-  integer :: nets, nete, nelem
+  integer :: nets, nete
   real*8 :: dt2, start, finish
   real (kind=real_kind) :: eta_ave_w 
   real (kind=real_kind) :: ii, jj, kk, iee
 
 ! local
   integer :: i,j,k,ie,tl, ind
-  integer, parameter :: loopmax = 30000
+  integer, parameter :: loopmax = 10000
 
   real (kind=real_kind) :: Tt(np,np,nlev)
 
@@ -37,9 +35,6 @@ implicit none
   nete = nelemd
 
 !----------------- INIT
-
-
-
   Dvv_init(1:16) = (/ -3.0,  -0.80901699437494745,   0.30901699437494745, &     
  -0.50000000000000000 ,4.0450849718747373, 0.0, -1.1180339887498949, &     
    1.5450849718747370, -1.5450849718747370, 1.1180339887498949, &     
@@ -51,7 +46,7 @@ implicit none
    enddo
   enddo 
 
-  allocate(elem(nelem))
+  allocate(elem(nelemd))
 
   do ie = nets,nete
   do k = 1,nlev
@@ -121,12 +116,21 @@ do ind = 1, loopmax
 call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w)
 enddo
 call cpu_time(finish)
-print '("Time = ",f6.4," seconds.")',finish-start
+print '("Time = ",f10.4," seconds.")',finish-start
+print *, 'Raw time = ', finish-start
 ! ---------------- DO NOT MODIFY ------------------------
-ie = 3
-!do k = 1,nlev; do j = 1,np; do i = 1,np
-!print *, elem(ie)%state%T(i,j,k,np1)
-!enddo; enddo; enddo
+ie = 1
+
+!do k = 1,nlev
+!print *, elem(ie)%state%T(1,1,k,np1),'d0,', elem(ie)%state%T(2,1,k,np1),'d0,', & 
+!elem(ie)%state%T(3,1,k,np1),'d0,',elem(ie)%state%T(4,1,k,np1),'d0,&'
+!print *, elem(ie)%state%T(1,2,k,np1),'d0,', elem(ie)%state%T(2,2,k,np1),'d0,', &
+!elem(ie)%state%T(3,2,k,np1),'d0,', elem(ie)%state%T(4,2,k,np1),'d0,&'
+!print *, elem(ie)%state%T(1,3,k,np1),'d0,', elem(ie)%state%T(2,3,k,np1),'d0,', &
+!elem(ie)%state%T(3,3,k,np1),'d0,', elem(ie)%state%T(4,3,k,np1),'d0,&'
+!print *, elem(ie)%state%T(1,4,k,np1),'d0,', elem(ie)%state%T(2,4,k,np1),'d0,', &
+!elem(ie)%state%T(3,4,k,np1),'d0,', elem(ie)%state%T(4,4,k,np1),'d0,&'
+!enddo
 
 ind = 1
 do k = 1,nlev; do j = 1,np; do i = 1,np

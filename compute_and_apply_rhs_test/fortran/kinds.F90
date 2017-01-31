@@ -12,7 +12,7 @@ public
 
   integer, public, parameter :: timelevels = 3
   integer, public, parameter :: np=4
-  integer, public, parameter :: nlev=3
+  integer, public, parameter :: nlev=72
   integer, public, parameter :: nlevp=nlev+1
   integer, public, parameter :: qsize_d=1
   integer, public, parameter :: ntrac = 1
