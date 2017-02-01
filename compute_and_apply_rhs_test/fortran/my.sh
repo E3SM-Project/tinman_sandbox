@@ -1,5 +1,6 @@
 #!/bin/bash   
 
+
 rm orig
 rm s1 s2 s3 s4
 rm s1omp s2omp s3omp s4omp 
