@@ -45,13 +45,6 @@ void compute_and_apply_rhs (const Control& data, Region& region)
   using Kokkos::subview;
   using Kokkos::ALL;
 
-  // Input parameters
-  const int n0   = data.n0();
-  const int np1  = data.np1();
-  const int nm1  = data.nm1();
-  const int qn0  = data.qn0();
-  const Real dt2 = data.dt2();
-
   // Compute the amount of scratch memory needed
   const int mem_2d_scalar = ScratchView<Real[NP][NP]>::shmem_size();
   const int mem_2d_vector = ScratchView<Real[2][NP][NP]>::shmem_size();
@@ -76,6 +69,13 @@ void compute_and_apply_rhs (const Control& data, Region& region)
   Kokkos::parallel_for(policy.set_scratch_size(0, Kokkos::PerTeam(mem_needed)),
                        KOKKOS_LAMBDA(const Kokkos::TeamPolicy<>::member_type &team) {
     const int ie = team.league_rank();
+
+    // Input parameters
+    const int n0   = data.n0();
+    const int np1  = data.np1();
+    const int nm1  = data.nm1();
+    const int qn0  = data.qn0();
+    const Real dt2 = data.dt2();
 
     // 3d scalars:
     ScratchView<Real[NUM_LEV][NP][NP]>    div_vdp(team.team_scratch(0));
