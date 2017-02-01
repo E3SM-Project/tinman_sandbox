@@ -38,9 +38,12 @@ real (kind=real_kind) :: ii, jj, kk, iee
 
 ! local
 integer :: i,j,k,ie,tl,ind
-integer, parameter :: loopmax = 10000
+
 
 real (kind=real_kind) :: Tt(np,np,nlev)
+
+!call flush(6)
+!stop
 
   dt2 = 1.0
   eta_ave_w = 1.0
@@ -81,17 +84,6 @@ real (kind=real_kind) :: Tt(np,np,nlev)
       elem(ie)%derived%vn0(i,j,1:2,k) = 1.0
       elem(ie)%derived%pecnd(i,j,k) = 1.0
       elem(ie)%derived%omega_p(i,j,k) = jj*jj
-
-!      elem(ie)%state%dp3d(i,j,k,1:timelevels) = 10*kk+iee+ii+jj + (/1,2,3/)
-!      elem(ie)%state%v(i,j,1,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*2.0
-!      elem(ie)%state%v(i,j,2,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*3.0
-!      elem(ie)%state%T(i,j,k,1:timelevels) = 1000-kk-ii-jj+iee/10 + (/1,2,3/)
-!only vapor
-!      elem(ie)%state%Qdp(i,j,k,1,qn0) = 1.0+SIN(ii*jj*kk)
-
-!        ST( iXjXkXdpX1Xie ) = 10*kk+iee+ii+jj + 1
-!        ST( iXjXkXdpX2Xie ) = 10*kk+iee+ii+jj + 2
-!        ST( iXjXkXdpX3Xie ) = 10*kk+iee+ii+jj + 3
 
       ST( iXjXkXdpXdXie ) = 10*kk+iee+ii+jj + (/1,2,3/)
       ST( iXjXkXuXdXie ) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*2.0

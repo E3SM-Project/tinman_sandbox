@@ -25,7 +25,6 @@ implicit none
 
 ! local
   integer :: i,j,k,ie,tl, ind
-  integer, parameter :: loopmax = 10000
 
   real (kind=real_kind) :: Tt(np,np,nlev)
 
