@@ -1,5 +1,7 @@
 #include "config1.h"
 #include "config2.h"
+#include "config3.h"
+#include "config4.h"
 
 module routine_mod_ST
 
@@ -24,6 +26,8 @@ implicit none
 
   type (element_t), intent(inout), target :: elem(:)
 !  real (kind=real_kind), intent(inout) :: ST(np,np,nlev,nelemd,numst,timelevels)
+
+!---------------- repeated block
 #if STVER1
 ! I J K IE ST TL
 real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
@@ -33,6 +37,18 @@ real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
 ! I J K ST IE TL
 real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
 #endif
+
+#if STVER3
+! I J K ST TL IE
+real (kind=real_kind) :: ST(np,np,nlev,numst,timelevels,nelemd)
+#endif
+
+! this is the original layout!
+#if STVER4
+! I J K TL ST IE
+real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
+#endif
+!---------------- end of repeated block
 
   type (derivative_t)  , intent(in) :: deriv
   type (hvcoord_t)     , intent(in) :: hvcoord
@@ -68,7 +84,8 @@ subroutine caar(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,ie,eta_ave_w,ST)
 implicit none
 
   type (element_t), intent(inout), target :: elem(:)
-!  real (kind=real_kind), intent(inout) :: ST(np,np,nlev,nelemd,numst,timelevels)
+
+!---------------- repeated block
 #if STVER1
 ! I J K IE ST TL
 real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
@@ -79,6 +96,17 @@ real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
 real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
 #endif
 
+#if STVER3
+! I J K ST TL IE
+real (kind=real_kind) :: ST(np,np,nlev,numst,timelevels,nelemd)
+#endif
+
+! this is the original layout!
+#if STVER4
+! I J K TL ST IE
+real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
+#endif
+!---------------- end of repeated block
   type (derivative_t)  , intent(in) :: deriv
   type (hvcoord_t)     , intent(in) :: hvcoord
   integer, intent(in) :: ie,np1,nm1,n0,qn0
@@ -129,7 +157,8 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
 !  print *, 'My tid is ', tid
 
 ! a dummy loop
-!$omp parallel do private(k,q) collapse(2)
+!!!$omp parallel do private(k,q)
+#if 0
   do k=1,nlev
   do q=2,35
 #if STVER1
@@ -168,6 +197,7 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
 #endif
   enddo
   enddo
+#endif
 ! end of the dummy
 
 

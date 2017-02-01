@@ -1,5 +1,7 @@
 #include "config1.h"
 #include "config2.h"
+#include "config3.h"
+#include "config4.h"
 
 module routine_mod_ST
 
@@ -24,6 +26,8 @@ implicit none
 
   type (element_t), intent(inout), target :: elem(:)
 !  real (kind=real_kind), intent(inout) :: ST(np,np,nlev,nelemd,numst,timelevels)
+
+!------------------ repeated block from main
 #if STVER1
 ! I J K IE ST TL
 real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
@@ -33,6 +37,18 @@ real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
 ! I J K ST IE TL
 real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
 #endif
+
+#if STVER3
+! I J K ST TL IE
+real (kind=real_kind) :: ST(np,np,nlev,numst,timelevels,nelemd)
+#endif
+
+! this is the original layout!
+#if STVER4
+! I J K TL ST IE
+real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
+#endif
+!----------------- end of repeated block
 
   type (derivative_t)  , intent(in) :: deriv
   type (hvcoord_t)     , intent(in) :: hvcoord
@@ -68,6 +84,8 @@ implicit none
 
   type (element_t), intent(inout), target :: elem(:)
 !  real (kind=real_kind), intent(inout) :: ST(np,np,nlev,nelemd,numst,timelevels)
+
+!------------------ repeated block from main
 #if STVER1
 ! I J K IE ST TL
 real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
@@ -77,6 +95,18 @@ real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
 ! I J K ST IE TL
 real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
 #endif
+
+#if STVER3
+! I J K ST TL IE
+real (kind=real_kind) :: ST(np,np,nlev,numst,timelevels,nelemd)
+#endif
+
+! this is the original layout!
+#if STVER4
+! I J K TL ST IE
+real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
+#endif
+!----------------- end of repeated block
 
   type (derivative_t)  , intent(in) :: deriv
   type (hvcoord_t)     , intent(in) :: hvcoord
@@ -122,13 +152,10 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
   integer :: tid, OMP_GET_MAX_THREADS, OMP_GET_THREAD_NUM
 
 !  print *, 'Hello Routine'
-
-  tid = OMP_GET_MAX_THREADS()     
-  print *, 'Max number TH ', tid
-
-
-     tid = OMP_GET_THREAD_NUM()     
-     print *, 'My tid is ', tid
+!  tid = OMP_GET_MAX_THREADS()     
+!  print *, 'Max number TH ', tid
+!  tid = OMP_GET_THREAD_NUM()     
+!  print *, 'My tid is ', tid
 
      phi => elem(ie)%derived%phi(:,:,:)
 
@@ -138,11 +165,10 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
         p(:,:,k)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkXdpXn0Xie )/2
      enddo
 
-
      do k=1,nlev
 
-        tid = OMP_GET_THREAD_NUM()     
-        print *, 'next loop: My tid is ', tid
+!        tid = OMP_GET_THREAD_NUM()     
+!        print *, 'next loop: My tid is ', tid
 
         grad_p(:,:,:,k) = gradient_sphere(p(:,:,k),deriv,elem(ie)%Dinv)
         rdp(:,:,k) = 1.0D0/ST( dXdXkXdpXn0Xie )
