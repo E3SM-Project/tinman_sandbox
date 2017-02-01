@@ -117,7 +117,7 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
   real (kind=real_kind) ::  tempdp3d  (np,np)
   real (kind=real_kind) ::  cp2,cp_ratio,E,de,Qt,v1,v2
   real (kind=real_kind) ::  glnps1,glnps2,gpterm
-  integer :: i,j,k,kptr
+  integer :: i,j,k,kptr,q
   real (kind=real_kind) ::  u_m_umet, v_m_vmet, t_m_tmet 
   
   integer :: tid, OMP_GET_MAX_THREADS, OMP_GET_THREAD_NUM
@@ -128,6 +128,18 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
 !  tid = OMP_GET_THREAD_NUM()     
 !  print *, 'My tid is ', tid
 
+! a dummy loop
+!$omp parallel do private(k,q) collapse(2)
+  do k=1,nlev
+  do q=2,35
+  ST( :,:,k,ie,6+q,np1) = 1.0d0
+  ST( :,:,k,ie,6+q,np1) = ST( :,:,k,ie,6+q,n0)+ST( :,:,k,ie,6+q,nm1)
+  ST( :,:,k,ie,6+q,np1) = sin(2.0)
+  enddo
+  enddo
+! end of the dummy
+
+
      phi => elem(ie)%derived%phi(:,:,:)
 
      p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + ST( dXdX1XdpXn0Xie  ) /2
@@ -136,7 +148,7 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
         p(:,:,k)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkXdpXn0Xie )/2
      enddo
 
-!$omp parallel do private(v1,v2,i,j,Qt,eta_ave_w,E,Ephi)
+!!!$omp parallel do private(v1,v2,i,j,Qt,eta_ave_w,E,Ephi)
      do k=1,nlev
 
 !        tid = OMP_GET_THREAD_NUM()     
