@@ -10,18 +10,20 @@ void gradient_sphere (const real* RESTRICT const s, const TestData& RESTRICT dat
 {
   typedef real Dvv_type[np][np];
 
+  /* Requires 2 cache lines */
   const Dvv_type& RESTRICT Dvv = data.deriv.Dvv;
-  real* Dinv = SLICE_5D (data.arrays.elem_Dinv,ielem,np,np,2,2);
 
-  real dsdx, dsdy;
+  /* Requires 2 cache lines */
   real v1[np][np];
+  /* Requires 2 cache lines */
   real v2[np][np];
+
   SIMD
   for (int j=0; j<np; ++j)
   {
     for (int l=0; l<np; ++l)
     {
-      dsdy = 0.0;
+      register real dsdy = 0.0;
       for (int i=0; i<np; ++i)
       {
         dsdy += Dvv[i][l]*AT_2D(s,j,i,np);
@@ -35,7 +37,7 @@ void gradient_sphere (const real* RESTRICT const s, const TestData& RESTRICT dat
   {
     for (int j=0; j<np; ++j)
     {
-      dsdx = 0.0;
+      register real dsdx = 0.0;
       for (int i=0; i<np; ++i)
       {
         dsdx += Dvv[i][l]*AT_2D(s,i,j,np);
@@ -43,6 +45,9 @@ void gradient_sphere (const real* RESTRICT const s, const TestData& RESTRICT dat
       v1[l][j] = dsdx * Constants::rrearth;
     }
   }
+
+  /* Requires 8 cache lines */
+  real* RESTRICT Dinv = SLICE_5D (data.arrays.elem_Dinv,ielem,np,np,2,2);
 
   SIMD
   for (int j=0; j<np; ++j)

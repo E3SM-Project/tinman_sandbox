@@ -6,6 +6,8 @@
 #include <cstring>
 #include <vector>
 
+#include "advisor-annotate.h"
+
 namespace Homme
 {
 int num_elems = 10;
@@ -24,6 +26,7 @@ bool is_unsigned_int(const char* str)
 
 int main (int argc, char** argv)
 {
+  ANNOTATE_DISABLE_COLLECTION_PUSH;
   using namespace Homme;
 
   bool dump_res = false;
@@ -93,6 +96,7 @@ int main (int argc, char** argv)
   // Burn in to avoid cache effects
   compute_and_apply_rhs(data);
 
+  ANNOTATE_DISABLE_COLLECTION_POP;
   std::vector<Timer::Timer> timers(num_exec);
   for (int i=0; i<num_exec; ++i)
   {
@@ -100,6 +104,7 @@ int main (int argc, char** argv)
     compute_and_apply_rhs(data);
     timers[i].stopTimer();
   }
+  ANNOTATE_DISABLE_COLLECTION_PUSH;
 
   for(int i = 0; i < num_exec; ++i) {
     std::cout << timers[i] << std::endl;

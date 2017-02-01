@@ -28,7 +28,7 @@ void gradient_sphere (const ViewUnmanaged<Real[NP][NP]> s, const TestData& data,
       }
 
       v1[l][j] = dsdx * rrearth;
-      v2[j][l] - dsdy * rrearth;
+      v2[j][l] = dsdy * rrearth;
     }
   }
 
@@ -68,7 +68,7 @@ void gradient_sphere (Kokkos::TeamPolicy<>::member_type &team,
     }
 
     v1[l][j] = dsdx * rrearth;
-    v2[j][l] - dsdy * rrearth;
+    v2[j][l] = dsdy * rrearth;
   });
 
   constexpr const int grad_iters = NP * NP;

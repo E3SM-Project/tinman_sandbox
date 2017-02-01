@@ -65,19 +65,36 @@
 // =================== ARRAY SLICING ================== //
 
 template <int innermost_dim>
-constexpr int OUTER_SLICE_IDX(const int & index) {
-  return innermost_dim * index;
+constexpr int PRODUCT() {
+  return innermost_dim;
 }
 
 template <int outer_dim, typename... dim_list>
-constexpr int OUTER_SLICE_IDX(const int & index) {
-  return outer_dim * OUTER_SLICE_IDX<dim_list...>(index);
+constexpr int PRODUCT() {
+  return outer_dim * PRODUCT<dim_list...>();
+}
+
+template <int outermost_dim, typename int_t>
+constexpr int CALC_IDX(int_t indice) {
+  return indice;
+}
+
+template <int outer_dim, typename... dim_list,
+          typename int_t, typename... int_list>
+constexpr int CALC_IDX(int_t indice, int_list... args) {
+  return CALC_IDX<dim_list..., int_list...>(args...) + indice * PRODUCT<dim_list...>();
 }
 
 template <typename... dim_list>
 constexpr Homme::real *OUTER_SLICE(const Homme::real * const ptr,
                                    const int & index) {
-  return &ptr[ OUTER_SLICE_IDX<dim_list>(index) ];
+  return &ptr[ PRODUCT<dim_list...>() * index ];
+}
+
+template <typename... dim_list, typename... int_list>
+constexpr Homme::real & AT(const Homme::real * const ptr,
+                         int_list... indices) {
+  return ptr[ CALC_IDX<dim_list..., int_list...>(indices...) ];
 }
 
 // Take slice of 3d array with given first index and last two dimensions
