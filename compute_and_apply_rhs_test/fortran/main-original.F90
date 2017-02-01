@@ -25,13 +25,8 @@ implicit none
 
 ! local
   integer :: i,j,k,ie,tl, ind
-  integer, parameter :: loopmax = 10000
 
   real (kind=real_kind) :: Tt(np,np,nlev)
-
-
-print *, 'HELLOOOOO'
-
 
   dt2 = 1.0
   eta_ave_w = 1.0

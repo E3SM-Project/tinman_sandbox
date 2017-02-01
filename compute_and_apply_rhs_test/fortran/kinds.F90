@@ -24,5 +24,7 @@ public
   integer, public, parameter :: qn0 = 1
   integer, public, parameter :: numst = 41
 
+  integer, public, parameter :: loopmax = 5000
+
 end module kinds
 

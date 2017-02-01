@@ -1,5 +1,4 @@
-#
-!
+
 ! This module should 'use' only module 'kinds'
 !
 module physical_constants
