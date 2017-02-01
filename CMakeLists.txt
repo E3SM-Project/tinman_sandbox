@@ -16,6 +16,12 @@ IF(${CUDA_BUILD})
   MESSAGE("Building for CUDA")
 ENDIF()
 
+OPTION(USE_HWLOC "Whether hwloc is being used or not. May be required by Kokkos")
+
+IF(${USE_HWLOC})
+  MESSAGE("Linking to hwloc")
+ENDIF()
+
 INCLUDE (SetCompilerFlags)
 
 ADD_SUBDIRECTORY (compute_and_apply_rhs_test)

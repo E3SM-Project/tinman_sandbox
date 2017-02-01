@@ -17,4 +17,8 @@ ENDIF()
 SET(Kokkos_LIBRARIES "kokkos")
 TARGET_LINK_LIBRARIES(kokkos-scratch ${Kokkos_LIBRARIES} -L${KOKKOS_PATH}/lib)
 
+IF(${USE_HWLOC})
+  TARGET_LINK_LIBRARIES(kokkos-scratch hwloc numa)
+ENDIF()
+
 SET_TARGET_PROPERTIES(kokkos-scratch PROPERTIES LINKER_LANGUAGE CXX)
