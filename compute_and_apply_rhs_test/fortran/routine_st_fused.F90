@@ -132,9 +132,40 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
 !$omp parallel do private(k,q) collapse(2)
   do k=1,nlev
   do q=2,35
+#if STVER1
   ST( :,:,k,ie,6+q,np1) = 1.0d0
   ST( :,:,k,ie,6+q,np1) = ST( :,:,k,ie,6+q,n0)+ST( :,:,k,ie,6+q,nm1)
   ST( :,:,k,ie,6+q,np1) = sin(2.0)
+
+  ST( :,:,k,ie,6+q,np1) = 1.0d0
+  ST( :,:,k,ie,6+q,np1) = ST( :,:,k,ie,6+q,n0)+ST( :,:,k,ie,6+q,nm1)
+  ST( :,:,k,ie,6+q,np1) = sin(2.0)
+
+  ST( :,:,k,ie,6+q,np1) = 1.0d0
+  ST( :,:,k,ie,6+q,np1) = ST( :,:,k,ie,6+q,n0)+ST( :,:,k,ie,6+q,nm1)
+  ST( :,:,k,ie,6+q,np1) = sin(2.0)
+
+  ST( :,:,k,ie,6+q,np1) = 1.0d0
+  ST( :,:,k,ie,6+q,np1) = ST( :,:,k,ie,6+q,n0)+ST( :,:,k,ie,6+q,nm1)
+  ST( :,:,k,ie,6+q,np1) = sin(2.0)
+#endif
+#if STVER2
+  ST( :,:,k,6+q,ie,np1) = 1.0d0
+  ST( :,:,k,6+q,ie,np1) = ST( :,:,k,6+q,ie,n0)+ST( :,:,k,6+q,ie,nm1)
+  ST( :,:,k,6+q,ie,np1) = sin(2.0)
+
+  ST( :,:,k,6+q,ie,np1) = 1.0d0
+  ST( :,:,k,6+q,ie,np1) = ST( :,:,k,6+q,ie,n0)+ST( :,:,k,6+q,ie,nm1)
+  ST( :,:,k,6+q,ie,np1) = sin(2.0)
+
+  ST( :,:,k,6+q,ie,np1) = 1.0d0
+  ST( :,:,k,6+q,ie,np1) = ST( :,:,k,6+q,ie,n0)+ST( :,:,k,6+q,ie,nm1)
+  ST( :,:,k,6+q,ie,np1) = sin(2.0)
+
+  ST( :,:,k,6+q,ie,np1) = 1.0d0
+  ST( :,:,k,6+q,ie,np1) = ST( :,:,k,6+q,ie,n0)+ST( :,:,k,6+q,ie,nm1)
+  ST( :,:,k,6+q,ie,np1) = sin(2.0)
+#endif
   enddo
   enddo
 ! end of the dummy
