@@ -211,7 +211,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
      enddo
 
 #if HOMP
-!$omp parallel do private(v1,v2,i,j,Qt,eta_ave_w,E,Ephi)
+!$omp parallel do private(k,i,j,v1,v2,Qt,eta_ave_w,E,Ephi)
 #endif
      do k=1,nlev
 
@@ -263,7 +263,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
      v_vadv=0
 
 #if HOMP
-!$omp parallel do private(v1,v2,gpterm,glnps1,glnps2)
+!$omp parallel do private(k,v1,v2,gpterm,glnps1,glnps2)
 #endif
      vertloop: do k=1,nlev
         do j=1,np

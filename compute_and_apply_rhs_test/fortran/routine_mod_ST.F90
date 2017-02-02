@@ -203,7 +203,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
      else
 !this loop, moisture
 #if HOMP
-!$omp parallel do private(i,j,Qt)
+!$omp parallel do private(k,i,j,Qt)
 #endif
         do k=1,nlev
            do j=1,np
@@ -223,7 +223,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
      T_vadv=0
      v_vadv=0
 #if HOMP
-!$omp parallel do
+!$omp parallel do private(k)
 #endif
      do k=1,nlev  !  Loop index added (AAM)
         elem(ie)%derived%eta_dot_dpdn(:,:,k) = &
@@ -234,7 +234,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
      elem(ie)%derived%eta_dot_dpdn(:,:,nlev+1) = &
           elem(ie)%derived%eta_dot_dpdn(:,:,nlev+1) + eta_ave_w*eta_dot_dpdn(:,:,nlev+1)
 #if HOMP
-!$omp parallel do private(i,j,v1,v2,gpterm,glnps1,glnps2,E,Ephi,vgrad_T)
+!$omp parallel do private(k,i,j,v1,v2,gpterm,glnps1,glnps2,E,Ephi,vgrad_T,vtemp)
 #endif
      vertloop: do k=1,nlev
         do j=1,np
