@@ -205,11 +205,14 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 
      p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + ST( dXdX1XdpXn0Xie  ) /2
 
+! this can be rewritten
      do k=2,nlev
         p(:,:,k)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkXdpXn0Xie )/2
      enddo
 
-!!!$omp parallel do private(v1,v2,i,j,Qt,eta_ave_w,E,Ephi)
+#if HOMP
+!$omp parallel do private(v1,v2,i,j,Qt,eta_ave_w,E,Ephi)
+#endif
      do k=1,nlev
 
 !        tid = OMP_GET_THREAD_NUM()     
@@ -250,7 +253,6 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 
      enddo
 
-!!!$omp parallel private(T_vadv,v_vadv)
      call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) ,T_v,p, ST( dXdXdXdpXn0Xie ) )
      call preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
 
@@ -259,9 +261,10 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
      !eta_dot_dpdn=0
      T_vadv=0
      v_vadv=0
-!!!$omp end parallel
 
-!!!$omp parallel do private(v1,v2,gpterm,glnps1,glnps2)
+#if HOMP
+!$omp parallel do private(v1,v2,gpterm,glnps1,glnps2)
+#endif
      vertloop: do k=1,nlev
         do j=1,np
            do i=1,np
@@ -297,30 +300,6 @@ end subroutine caar
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   function Virtual_Temperature1d(Tin,rin) result(Tv)  
   use kinds, only : real_kind
   use physical_constants, only : Rwater_vapor, Rgas
@@ -346,6 +325,9 @@ end subroutine caar
     real(kind=real_kind) Ckk,Ckl          ! diagonal term of energy conversion matrix
     real(kind=real_kind) suml(np,np)      ! partial sum over l = (1, k-1)
 
+#if HOMP
+!$omp parallel do private(k,j,i,ckk,term,ckl)
+#endif
        do j=1,np   !   Loop inversion (AAM)
           do i=1,np
              ckk = 0.5d0/p(i,j,1)
@@ -388,6 +370,9 @@ end subroutine caar
     integer i,j,k                         ! longitude, level indices
     real(kind=real_kind) Hkk,Hkl          ! diagonal term of energy conversion matrix
     real(kind=real_kind), dimension(np,np,nlev) :: phii       ! Geopotential at interfaces
+#if HOMP
+!$omp parallel do private(k,j,i,hkk,hkl)
+#endif
        do j=1,np   !   Loop inversion (AAM)
           do i=1,np
              hkk = dp(i,j,nlev)*0.5d0/p(i,j,nlev)

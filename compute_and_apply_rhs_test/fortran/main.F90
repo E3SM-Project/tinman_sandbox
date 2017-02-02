@@ -170,7 +170,7 @@ print *, 'STVER2 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
 print *, 'STVER3 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
 #endif
 #if STVER4
-print *, 'STVER3 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
+print *, 'STVER4 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
 #endif
 
 end program main

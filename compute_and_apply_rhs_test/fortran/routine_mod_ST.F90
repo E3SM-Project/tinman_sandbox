@@ -165,6 +165,9 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
         p(:,:,k)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkXdpXn0Xie )/2
      enddo
 
+#if HOMP
+!$omp parallel do private(k,i,j,v1,v2,vtemp)
+#endif
      do k=1,nlev
 
 !        tid = OMP_GET_THREAD_NUM()     
@@ -199,6 +202,9 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
         end do
      else
 !this loop, moisture
+#if HOMP
+!$omp parallel do private(i,j,Qt)
+#endif
         do k=1,nlev
            do j=1,np
               do i=1,np
@@ -216,6 +222,9 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
      eta_dot_dpdn=0
      T_vadv=0
      v_vadv=0
+#if HOMP
+!$omp parallel do
+#endif
      do k=1,nlev  !  Loop index added (AAM)
         elem(ie)%derived%eta_dot_dpdn(:,:,k) = &
              elem(ie)%derived%eta_dot_dpdn(:,:,k) + eta_ave_w*eta_dot_dpdn(:,:,k)
@@ -224,6 +233,9 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
      enddo
      elem(ie)%derived%eta_dot_dpdn(:,:,nlev+1) = &
           elem(ie)%derived%eta_dot_dpdn(:,:,nlev+1) + eta_ave_w*eta_dot_dpdn(:,:,nlev+1)
+#if HOMP
+!$omp parallel do private(i,j,v1,v2,gpterm,glnps1,glnps2,E,Ephi,vgrad_T)
+#endif
      vertloop: do k=1,nlev
         do j=1,np
            do i=1,np
@@ -263,6 +275,9 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
         end do
      end do vertloop
 
+#if HOMP
+!$omp parallel do private(k)
+#endif
      do k=1,nlev
         ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXuXnm1Xie ) + dt2*vtens1(:,:,k) )
         ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXvXnm1Xie ) + dt2*vtens2(:,:,k) )
@@ -274,27 +289,6 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 
 
 end subroutine caar
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -328,6 +322,9 @@ end subroutine caar
     real(kind=real_kind) Ckk,Ckl          ! diagonal term of energy conversion matrix
     real(kind=real_kind) suml(np,np)      ! partial sum over l = (1, k-1)
 
+#if HOMP
+!$omp parallel do private(k,j,i,ckk,term,ckl)
+#endif
        do j=1,np   !   Loop inversion (AAM)
           do i=1,np
              ckk = 0.5d0/p(i,j,1)
@@ -370,6 +367,9 @@ end subroutine caar
     integer i,j,k                         ! longitude, level indices
     real(kind=real_kind) Hkk,Hkl          ! diagonal term of energy conversion matrix
     real(kind=real_kind), dimension(np,np,nlev) :: phii       ! Geopotential at interfaces
+#if HOMP
+!$omp parallel do private(k,j,i,hkk,hkl)
+#endif
        do j=1,np   !   Loop inversion (AAM)
           do i=1,np
              hkk = dp(i,j,nlev)*0.5d0/p(i,j,nlev)
