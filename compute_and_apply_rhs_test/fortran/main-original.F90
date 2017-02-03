@@ -19,7 +19,8 @@ implicit none
   real (kind=real_kind) :: Dvv_init(np*np)
   type (hvcoord_t)   :: hvcoord
   integer :: nets, nete
-  real*8 :: dt2, start, finish
+  real*8 :: dt2, finish
+  integer :: start
   real (kind=real_kind) :: eta_ave_w 
   real (kind=real_kind) :: ii, jj, kk, iee
 
@@ -110,13 +111,13 @@ print *, 'Main original, np=', np
 
 !np1 fields will be changed
 
-call cpu_time(start)
+call tick(start)
 do ind = 1, loopmax
 call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w)
 enddo
-call cpu_time(finish)
-print '("Time = ",f10.4," seconds.")',finish-start
-print *, 'Raw time = ', finish-start
+finish = tock(start)
+print *, 'Raw time = ', finish
+
 ! ---------------- DO NOT MODIFY ------------------------
 ie = 1
 
