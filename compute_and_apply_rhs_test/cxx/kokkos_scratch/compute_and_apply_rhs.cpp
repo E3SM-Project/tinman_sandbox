@@ -91,14 +91,14 @@ void compute_and_apply_rhs (const Control& data, Region& region)
     ScratchView<Real[NUM_LEV][2][NP][NP]> grad_p(team.team_scratch(0));
 
     if(ie < data.num_elems()) {
-      Kokkos::parallel_for(Kokkos::TeamVectorRange(team, NP * NP), [&](const int idx) {
+      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
         const int igp = idx / NP;
         const int jgp = idx % NP;
         pressure(0,igp,jgp) = data.hybrid_a(0)*data.ps0() + 0.5*region.DP3D(ie, n0)(0,igp,jgp);
       });
 
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
-        for(int ilev = 1; ilev < NUM_LEV, ilev++) {
+        for(int ilev = 1; ilev < NUM_LEV; ilev++) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
           pressure(ilev, igp, jgp) = pressure(ilev - 1, igp, jgp)
