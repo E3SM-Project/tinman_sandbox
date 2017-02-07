@@ -40,6 +40,7 @@ void preq_omega_ps(const ScratchView<Real[NUM_LEV][NP][NP]> p,
                    const ScratchView<Real[NUM_LEV][NP][NP]> div_vdp,
                    ScratchView<Real[NUM_LEV][NP][NP]> omega_p);
 
+
 void compute_and_apply_rhs (const Control& data, Region& region)
 {
   using Kokkos::subview;
@@ -81,7 +82,7 @@ void compute_and_apply_rhs (const Control& data, Region& region)
     ScratchView<Real[NUM_LEV][NP][NP]>    div_vdp(team.team_scratch(0));
     ScratchView<Real[NUM_LEV][NP][NP]>    kappa_star(team.team_scratch(0));
     ScratchView<Real[NUM_LEV][NP][NP]>    omega_p(team.team_scratch(0));
-    ScratchView<Real[NUM_LEV][NP][NP]>    p(team.team_scratch(0));
+    ScratchView<Real[NUM_LEV][NP][NP]>    pressure(team.team_scratch(0));
     ScratchView<Real[NUM_LEV][NP][NP]>    T_v(team.team_scratch(0));
     ScratchView<Real[NUM_LEV][NP][NP]>    vgrad_p(team.team_scratch(0));
     ScratchView<Real[NUM_LEV][NP][NP]>    vort(team.team_scratch(0));
@@ -90,22 +91,20 @@ void compute_and_apply_rhs (const Control& data, Region& region)
     ScratchView<Real[NUM_LEV][2][NP][NP]> grad_p(team.team_scratch(0));
 
     if(ie < data.num_elems()) {
-      for (int igp=0; igp<NP; ++igp)
-      {
-        for (int jgp=0; jgp<NP; ++jgp)
-        {
-          p(0,igp,jgp) = data.hybrid_a(0)*data.ps0() + 0.5*region.DP3D(ie, n0)(0,igp,jgp);
-        }
-      }
+      Kokkos::parallel_for(Kokkos::TeamVectorRange(team, NP * NP), [&](const int idx) {
+        const int igp = idx / NP;
+        const int jgp = idx % NP;
+        pressure(0,igp,jgp) = data.hybrid_a(0)*data.ps0() + 0.5*region.DP3D(ie, n0)(0,igp,jgp);
+      });
 
-      Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV - 1), [&](const int ilev) {
-        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+        for(int ilev = 1; ilev < NUM_LEV, ilev++) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
-          p(ilev + 1, igp, jgp) = p(ilev, igp, jgp)
-            + 0.5*region.DP3D(ie, n0)(ilev, igp, jgp)
-            + 0.5*region.DP3D(ie, n0)(ilev + 1, igp, jgp);
-        });
+          pressure(ilev, igp, jgp) = pressure(ilev - 1, igp, jgp)
+            + 0.5*region.DP3D(ie, n0)(ilev - 1, igp, jgp)
+            + 0.5*region.DP3D(ie, n0)(ilev, igp, jgp);
+        }
       });
 
       team.team_barrier();
@@ -113,7 +112,7 @@ void compute_and_apply_rhs (const Control& data, Region& region)
       Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
 
         // Create subviews to explicitly have static dimensions
-        ScratchView<Real[NP][NP]> p_ilev = subview(p, ilev, ALL(), ALL());
+        ScratchView<Real[NP][NP]> p_ilev = subview(pressure, ilev, ALL(), ALL());
         ScratchView<Real[2][NP][NP]> grad_p_ilev = subview(grad_p, ilev, ALL(), ALL(), ALL());
         gradient_sphere(team, p_ilev, data, region.DINV(ie), grad_p_ilev);
 
@@ -170,8 +169,8 @@ void compute_and_apply_rhs (const Control& data, Region& region)
 
       ExecViewUnmanaged<Real[NP][NP]> phis_ie = region.PHIS(ie);
       ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> phi_ie = region.PHI(ie);
-      preq_hydrostatic(team, phis_ie, T_v, p, region.DP3D(ie, n0), PhysicalConstants::Rgas, phi_ie);
-      preq_omega_ps(p, vgrad_p, div_vdp, omega_p);
+      preq_hydrostatic(team, phis_ie, T_v, pressure, region.DP3D(ie, n0), PhysicalConstants::Rgas, phi_ie);
+      preq_omega_ps(pressure, vgrad_p, div_vdp, omega_p);
 
       {
         ScratchView<Real[NUM_LEV_P][NP][NP]>  eta_dot_dpdn_ie(team.team_scratch(0));
@@ -229,7 +228,7 @@ void compute_and_apply_rhs (const Control& data, Region& region)
             Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
               const int igp = idx / NP;
               const int jgp = idx % NP;
-              Real gpterm = T_v(ilev,igp,jgp) / p(ilev,igp,jgp);
+              Real gpterm = T_v(ilev,igp,jgp) / pressure(ilev,igp,jgp);
     
               Real glnps1 = PhysicalConstants::Rgas*gpterm*grad_p(ilev,0,igp,jgp);
               Real glnps2 = PhysicalConstants::Rgas*gpterm*grad_p(ilev,1,igp,jgp);
