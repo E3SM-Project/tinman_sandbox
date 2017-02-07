@@ -190,16 +190,25 @@ void compute_and_apply_rhs (const Control& data, Region& region)
         /* Reduce the scope of these scratch views so they can be cleaned up when no longer needed */
         ScratchView<Real[NUM_LEV][NP][NP]> ttens(team.team_scratch(0));
         ScratchView<Real[NUM_LEV][NP][NP]> vtens1(team.team_scratch(0));
-        /* TODO: Find out what vtens2 is supposed to be used for */
         ScratchView<Real[NUM_LEV][NP][NP]> vtens2(team.team_scratch(0));
         {
           ScratchView<Real[NP][NP]> Ephi(team.team_scratch(0));
           ScratchView<Real[NP][NP]> vgrad_T(team.team_scratch(0));
           ScratchView<Real[2][NP][NP]> grad_tmp(team.team_scratch(0));
-          /* TODO: Find out what T_vadv is supposed to be initialized to */
           ScratchView<Real[NUM_LEV][NP][NP]> T_vadv(team.team_scratch(0));
-          /* TODO: Find out what v_vadv is supposed to be initialized to */
           ScratchView<Real[NUM_LEV][NP][NP][2]> v_vadv(team.team_scratch(0));
+          Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
+            Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+              const int igp = idx / NP;
+              const int jgp = idx % NP;
+              // T_vadv initialized
+              T_vadv(ilev, igp, jgp) = 0.0;
+              // v_vadv initialized
+              v_vadv(ilev, igp, jgp) = 0.0;
+            });
+          });
+          team.team_barrier();
+
           Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV_P), [&](const int ilev) {
             Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
               const int igp = idx / NP;
@@ -251,7 +260,7 @@ void compute_and_apply_rhs (const Control& data, Region& region)
             const int igp = idx / NP;
             const int jgp = idx % NP;
             (region.U(ie, np1))(ilev, igp, jgp) = region.SPHEREMP(ie)(igp, jgp) * ((region.U(ie, nm1))(ilev, igp, jgp) + dt2 * vtens1(ilev, igp, jgp));
-            (region.V(ie, np1))(ilev, igp, jgp) = region.SPHEREMP(ie)(igp, jgp) * ((region.V(ie, nm1))(ilev, igp, jgp) + dt2 * vtens1(ilev, igp, jgp));
+            (region.V(ie, np1))(ilev, igp, jgp) = region.SPHEREMP(ie)(igp, jgp) * ((region.V(ie, nm1))(ilev, igp, jgp) + dt2 * vtens2(ilev, igp, jgp));
             (region.T(ie, np1))(ilev, igp, jgp) = region.SPHEREMP(ie)(igp, jgp) * ((region.T(ie, nm1))(ilev, igp, jgp) + dt2 * ttens(ilev, igp, jgp));
             (region.DP3D(ie, np1))(ilev, igp, jgp) = region.SPHEREMP(ie)(igp, jgp) * ((region.DP3D(ie, nm1))(ilev, igp, jgp) + dt2 * div_vdp(ilev, igp, jgp));
           });
