@@ -1,5 +1,7 @@
 #include "config1.h"
 #include "config2.h"
+#include "config3.h"
+#include "config4.h"
 
 program main
 
@@ -15,6 +17,7 @@ implicit none
 
 type (element_t), allocatable  :: elem(:)
 
+!----------------- repeated block
 #if STVER1
 ! I J K IE ST TL
 real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
@@ -25,6 +28,18 @@ real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
 real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
 #endif
 
+#if STVER3
+! I J K ST TL IE
+real (kind=real_kind) :: ST(np,np,nlev,numst,timelevels,nelemd)
+#endif
+
+! this is the original layout!
+#if STVER4
+! I J K TL ST IE
+real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
+#endif
+!----------------- end of repeated block
+
 type (derivative_t) :: deriv
 
 ! init params
@@ -32,17 +47,17 @@ type (derivative_t) :: deriv
 real (kind=real_kind) :: Dvv_init(np*np)
 type (hvcoord_t)   :: hvcoord
 integer :: nets, nete
-real*8 :: dt2, start, finish
+real*8 :: dt2, finish
+integer :: start
 real (kind=real_kind) :: eta_ave_w 
 real (kind=real_kind) :: ii, jj, kk, iee
 
 ! local
 integer :: i,j,k,ie,tl,ind
-integer, parameter :: loopmax = 10000
+
 
 real (kind=real_kind) :: Tt(np,np,nlev)
 
-print *, 'WOORLD'
 !call flush(6)
 !stop
 
@@ -62,8 +77,6 @@ print *, 'WOORLD'
      deriv%Dvv(i,j) = Dvv_init((j-1)*np+i)
    enddo
   enddo 
-print *, nelemd
-
 
   allocate(elem(nelemd))
   ST = 0.0d0
@@ -87,17 +100,6 @@ print *, nelemd
       elem(ie)%derived%vn0(i,j,1:2,k) = 1.0
       elem(ie)%derived%pecnd(i,j,k) = 1.0
       elem(ie)%derived%omega_p(i,j,k) = jj*jj
-
-!      elem(ie)%state%dp3d(i,j,k,1:timelevels) = 10*kk+iee+ii+jj + (/1,2,3/)
-!      elem(ie)%state%v(i,j,1,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*2.0
-!      elem(ie)%state%v(i,j,2,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*3.0
-!      elem(ie)%state%T(i,j,k,1:timelevels) = 1000-kk-ii-jj+iee/10 + (/1,2,3/)
-!only vapor
-!      elem(ie)%state%Qdp(i,j,k,1,qn0) = 1.0+SIN(ii*jj*kk)
-
-!        ST( iXjXkXdpX1Xie ) = 10*kk+iee+ii+jj + 1
-!        ST( iXjXkXdpX2Xie ) = 10*kk+iee+ii+jj + 2
-!        ST( iXjXkXdpX3Xie ) = 10*kk+iee+ii+jj + 3
 
       ST( iXjXkXdpXdXie ) = 10*kk+iee+ii+jj + (/1,2,3/)
       ST( iXjXkXuXdXie ) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*2.0
@@ -151,13 +153,12 @@ ind = ind+1
 enddo; enddo; enddo
 
 
-call cpu_time(start)
-do ind = 1, 1!loopmax
+call tick(start)
+do ind = 1, loopmax
 call compute_and_apply_rhs_st(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w, ST)
 enddo
-call cpu_time(finish)
-print '("Time = ",f10.4," seconds.")',finish-start
-print *, 'Raw time = ', finish-start
+finish = tock(start)
+print *, 'Raw time = ', finish
 
 #if STVER1
 print *, 'STVER1 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
@@ -165,7 +166,12 @@ print *, 'STVER1 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
 #if STVER2
 print *, 'STVER2 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
 #endif
-
+#if STVER3
+print *, 'STVER3 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
+#endif
+#if STVER4
+print *, 'STVER4 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
+#endif
 
 end program main
 
