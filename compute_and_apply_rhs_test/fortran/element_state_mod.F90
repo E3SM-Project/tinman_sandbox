@@ -6,8 +6,6 @@ module element_state_mod
 
   private
 
-
-#if ORIG
   type, public :: elem_state_t
 
     ! prognostic variables for preqx solver
@@ -25,8 +23,6 @@ module element_state_mod
     real (kind=real_kind) :: Qdp (np,np,nlev,qsize_d,timelevels)      ! Tracer mass                        7
 
   end type elem_state_t
-#endif
-
 
   contains
 end module element_state_mod

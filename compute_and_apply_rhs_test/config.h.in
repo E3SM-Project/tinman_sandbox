@@ -2,6 +2,6 @@
 
 #define PLEV 72
 
-#define QSIZE_D 4
+#define QSIZE_D 1
 
 #define NUM_TIME_LEVELS 3

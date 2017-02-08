@@ -18,13 +18,14 @@ public
   integer, public, parameter :: ntrac = 1
   integer, public, parameter :: nelemd = 3
   integer, public, parameter :: npsq=np*np
-  integer, public, parameter :: np1 = 2
-  integer, public, parameter :: nm1 = 3
-  integer, public, parameter :: n0 = 1
+  integer, public            :: np1 = 2
+  integer, public            :: nm1 = 3
+  integer, public            :: n0 = 1
   integer, public, parameter :: qn0 = 1
   integer, public, parameter :: numst = 41
 
-  integer, public, parameter :: loopmax = 10000
+  integer, public, parameter :: loopmax =  1  ! Do not go above ~10 if you update
+                                              ! time levels, or will get NaN's
 
 contains
 
