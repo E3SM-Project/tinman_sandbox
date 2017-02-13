@@ -1,13 +1,13 @@
 
 module hybvcoord_mod
 use kinds,              only: r8 => real_kind, iulog
-use dimensions_mod,     only: plev => nlev, plevp => nlevp
+use kinds,              only: plev => nlev, plevp => nlevp
 use physical_constants, only: p0
 
 implicit none
 private
 
-!-----------------------------------------------------------------------
+!----------------------------------------------------------------------- 
 ! hvcoord_t: Hybrid level definitions: p = a*p0 + b*ps
 !            interfaces   p(k) = hyai(k)*ps0 + hybi(k)*ps
 !            midpoints    p(k) = hyam(k)*ps0 + hybm(k)*ps
@@ -22,7 +22,7 @@ type, public :: hvcoord_t
   real(r8) prsfac       ! log pressure extrapolation factor (time, space independent)
   real(r8) etam(plev)   ! eta-levels at midpoints
   real(r8) etai(plevp)  ! eta-levels at interfaces
-  integer  nprlev       ! number of pure pressure levels at top
+  integer  nprlev       ! number of pure pressure levels at top  
   integer  pad
 end type
 

@@ -115,7 +115,7 @@ int main (int argc, char** argv)
     global_timer.startTimer();
     //timers[i].startTimer();
     compute_and_apply_rhs(data);
-    data.update_time_levels();
+    //data.update_time_levels();
     //timers[i].stopTimer();
     global_timer.stopTimer();
   }
