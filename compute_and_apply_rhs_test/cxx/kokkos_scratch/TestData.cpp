@@ -3,7 +3,8 @@
 namespace TinMan {
 
 Control::Control(int num_elems)
-    : m_host_num_elems(num_elems), m_device_mem("Control information"),
+    : m_num_elems(num_elems), m_n0(0), m_np1(1), m_nm1(2), m_qn0(0), m_dt2(1.0),
+      m_ps0(1.0),
       m_hybrid_a(
           "Hybrid coordinates; translates between pressure and velocity"),
       m_dvv("Laplacian") {
@@ -27,31 +28,12 @@ Control::Control(int num_elems)
 
   Kokkos::deep_copy(m_dvv, dvv_host);
 
-  ExecViewManaged<Control_Data[1]>::HostMirror host_mem =
-      Kokkos::create_mirror_view(m_device_mem);
-  host_mem(0).num_elems = num_elems;
-  host_mem(0).n0 = 0;
-  host_mem(0).np1 = 1;
-  host_mem(0).nm1 = 2;
-  host_mem(0).qn0 = 0;
-  host_mem(0).dt2 = 1.0;
-  host_mem(0).ps0 = 1.0;
-
-  Kokkos::deep_copy(m_device_mem, host_mem);
-
   ExecViewManaged<Real[NUM_LEV_P]>::HostMirror host_hybrid_a =
       Kokkos::create_mirror_view(m_hybrid_a);
   for (int i = 0; i < NUM_LEV_P; ++i) {
     host_hybrid_a(i) = 1.0;
   }
   Kokkos::deep_copy(m_hybrid_a, host_hybrid_a);
-}
-
-void Control::update_time_levels() {
-  int tmp = m_device_mem(0).np1;
-  m_device_mem(0).np1 = m_device_mem(0).nm1;
-  m_device_mem(0).nm1 = m_device_mem(0).n0;
-  m_device_mem(0).n0 = tmp;
 }
 
 } // Namespace TinMan
