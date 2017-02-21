@@ -35,14 +35,14 @@ Control::Control(int num_elems)
   host_mem(0).nm1 = 2;
   host_mem(0).qn0 = 0;
   host_mem(0).dt2 = 1.0;
-  host_mem(0).ps0 = 1.0;
+  host_mem(0).ps0 = 10.0;
 
   Kokkos::deep_copy(m_device_mem, host_mem);
 
   ExecViewManaged<Real[NUM_LEV_P]>::HostMirror host_hybrid_a =
       Kokkos::create_mirror_view(m_hybrid_a);
   for (int i = 0; i < NUM_LEV_P; ++i) {
-    host_hybrid_a(i) = 1.0;
+    host_hybrid_a(i) = NUM_LEV + 1 - i;
   }
   Kokkos::deep_copy(m_hybrid_a, host_hybrid_a);
 }

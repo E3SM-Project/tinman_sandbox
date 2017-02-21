@@ -2,8 +2,6 @@
 
 namespace TinMan {
 
-double init_map(double x, int n) { return std::pow(sin(n * x), 2); }
-
 Region::Region(int num_elems)
     : m_2d_scalars("2d scalars", num_elems),
       m_2d_tensors("2d tensors", num_elems),
@@ -28,77 +26,59 @@ Region::Region(int num_elems)
   ExecViewManaged<Real *[NUM_LEV_P][NP][NP]>::HostMirror h_eta_dot_dpdn =
       Kokkos::create_mirror_view(m_eta_dot_dpdn);
 
-  // Initialize arrays using sin^2(n*x) map.
-  // This is easily portable across different platforms and/or
-  // languages without relying on implementation details
-
-  // Set seed for the init map
-  constexpr Real x = 0.123456789;
-
-  int n = 1;
   // Now fill all the arrays
   for (int ie = 0; ie < num_elems; ++ie) {
     for (int igp = 0; igp < NP; ++igp) {
       for (int jgp = 0; jgp < NP; ++jgp) {
+
+        double iie = ie + 1;
+        double iip = igp + 1;
+        double jjp = jgp + 1;
+
         // Initializing h_2d_tensors and h_2d_scalars
-        h_2d_tensors(ie, IDX_D, 0, 0, igp, jgp) = init_map(x, n++);
-        h_2d_tensors(ie, IDX_D, 0, 1, igp, jgp) = init_map(x, n++);
-        h_2d_tensors(ie, IDX_D, 1, 0, igp, jgp) = init_map(x, n++);
-        h_2d_tensors(ie, IDX_D, 1, 1, igp, jgp) = init_map(x, n++);
+        h_2d_tensors(ie, IDX_D, 0, 0, igp, jgp) = 1.0;
+        h_2d_tensors(ie, IDX_D, 0, 1, igp, jgp) = 0.0;
+        h_2d_tensors(ie, IDX_D, 1, 0, igp, jgp) = 0.0;
+        h_2d_tensors(ie, IDX_D, 1, 1, igp, jgp) = 2.0;
 
-        Real detD = h_2d_tensors(ie, IDX_D, 0, 0, igp, jgp) *
-                        h_2d_tensors(ie, IDX_D, 1, 0, igp, jgp) -
-                    h_2d_tensors(ie, IDX_D, 0, 1, igp, jgp) *
-                        h_2d_tensors(ie, IDX_D, 1, 1, igp, jgp);
+        h_2d_tensors(ie, IDX_DINV, 0, 0, igp, jgp) = 1.0;
+        h_2d_tensors(ie, IDX_DINV, 0, 1, igp, jgp) = 0.0;
+        h_2d_tensors(ie, IDX_DINV, 1, 0, igp, jgp) = 0.0;
+        h_2d_tensors(ie, IDX_DINV, 1, 1, igp, jgp) = 0.5;
 
-        h_2d_tensors(ie, IDX_DINV, 0, 0, igp, jgp) =
-            h_2d_tensors(ie, IDX_D, 1, 1, igp, jgp) / detD;
-        h_2d_tensors(ie, IDX_DINV, 0, 1, igp, jgp) =
-            -h_2d_tensors(ie, IDX_D, 0, 1, igp, jgp) / detD;
-        h_2d_tensors(ie, IDX_DINV, 1, 0, igp, jgp) =
-            -h_2d_tensors(ie, IDX_D, 1, 0, igp, jgp) / detD;
-        h_2d_tensors(ie, IDX_DINV, 1, 1, igp, jgp) =
-            h_2d_tensors(ie, IDX_D, 0, 0, igp, jgp) / detD;
-
-        h_2d_scalars(ie, IDX_FCOR, igp, jgp) = init_map(x, n++);
-        h_2d_scalars(ie, IDX_SPHEREMP, igp, jgp) = init_map(x, n++);
-        h_2d_scalars(ie, IDX_METDET, igp, jgp) = init_map(x, n++);
-        h_2d_scalars(ie, IDX_PHIS, igp, jgp) = init_map(x, n++);
+        h_2d_scalars(ie, IDX_FCOR, igp, jgp)     = sin(iip + jjp);
+        h_2d_scalars(ie, IDX_METDET, igp, jgp)   = iip*jjp;
+        h_2d_scalars(ie, IDX_PHIS, igp, jgp)     = iip + jjp;
+        h_2d_scalars(ie, IDX_SPHEREMP, igp, jgp) = 2*iip;
 
         // Initializing arrays that contain [NUM_LEV]
         for (int il = 0; il < NUM_LEV; ++il) {
+          double iil = il + 1;
+
           // h_3d_scalars
-          h_3d_scalars(ie, IDX_OMEGA_P, il, igp, jgp) = init_map(x, n++);
-          h_3d_scalars(ie, IDX_PECND, il, igp, jgp) = init_map(x, n++);
-          h_3d_scalars(ie, IDX_PHI, il, igp, jgp) = init_map(x, n++);
-          h_3d_scalars(ie, IDX_UN0, il, igp, jgp) = init_map(x, n++);
-          h_3d_scalars(ie, IDX_VN0, il, igp, jgp) = init_map(x, n++);
+          h_3d_scalars(ie, IDX_PHI, il, igp, jgp)     = cos(iip + 3*jjp) + iil;
+          h_3d_scalars(ie, IDX_UN0, il, igp, jgp)     = 1.0;
+          h_3d_scalars(ie, IDX_VN0, il, igp, jgp)     = 1.0;
+          h_3d_scalars(ie, IDX_PECND, il, igp, jgp)   = 1.0;
+          h_3d_scalars(ie, IDX_OMEGA_P, il, igp, jgp) = jjp*jjp;
 
           // Initializing h_Qdp
-          for (int iq = 0; iq < QSIZE_D; ++iq) {
-            // 0 <= ie < num_elems
-            // 0 <= il < NUM_LEV
-            // 0 <= iq < QSIZE_D
-            // 0 <= igp < NP
-            // 0 <= jgp < NP
-            // NUM_ELEMS, QSIZE_D, 2, NUM_LEV, NP, NP
-            h_Qdp(ie, iq, 0, il, igp, jgp) = init_map(x, n++);
-            h_Qdp(ie, iq, 1, il, igp, jgp) = init_map(x, n++);
-          }
+          h_Qdp(ie, 0, 0, il, igp, jgp) = 1.0 + sin(iip*jjp*iil);
 
           // Initializing arrays that contain [NUM_TIME_LEVELS]
           for (int it = 0; it < NUM_TIME_LEVELS; ++it) {
+            double iit = it + 1;
             // Initializing h_element_states
-            h_4d_scalars(ie, it, IDX_U, il, igp, jgp) = init_map(x, n++);
-            h_4d_scalars(ie, it, IDX_V, il, igp, jgp) = init_map(x, n++);
-            h_4d_scalars(ie, it, IDX_T, il, igp, jgp) = init_map(x, n++);
-            h_4d_scalars(ie, it, IDX_DP3D, il, igp, jgp) = init_map(x, n++);
+            h_4d_scalars(ie, it, IDX_DP3D, il, igp, jgp) = 10.0*iil + iie + iip + jjp + iit;
+            h_4d_scalars(ie, it, IDX_U, il, igp, jgp)    = 1.0 + 0.5*iil + iip + jjp + 0.2*iie + 2.0*iit;
+            h_4d_scalars(ie, it, IDX_V, il, igp, jgp)    = 1.0 + 0.5*iil + iip + jjp + 0.2*iie + 3.0*iit;
+            h_4d_scalars(ie, it, IDX_T, il, igp, jgp)    = 1000.0 + sin(iip + jjp + iil);
           }
         }
 
         // Initializing h_eta_dot_dpdn
         for (int il = 0; il < NUM_LEV_P; ++il) {
-          h_eta_dot_dpdn(ie, il, igp, jgp) = init_map(x, n++);
+          h_eta_dot_dpdn(ie, il, igp, jgp) = 0.0;
         }
       }
     }

@@ -112,7 +112,7 @@ implicit none
       elem(ie)%state%v(i,j,2,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*3.0
       elem(ie)%state%T(i,j,k,1:timelevels) = 1000-kk-ii-jj+iee/10 + (/1,2,3/)
       elem(ie)%state%Qdp(i,j,k,1,qn0) = 1.0+SIN(ii*jj*kk)
-      elem(ie)%state%phis(i,j) = 2*ii*jj
+      elem(ie)%state%phis(i,j) = ii + jj
 #else
       ST( iXjXkXdpXdXie )   = 10*kk+iee+ii+jj + (/1,2,3/)
       ST( iXjXkXuXdXie )    = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*2.0

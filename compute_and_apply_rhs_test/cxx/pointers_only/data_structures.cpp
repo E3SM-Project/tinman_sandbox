@@ -75,7 +75,7 @@ void Arrays::init_data ()
           AT_4D (elem_derived_pecnd,  ie,il,ip,jp,  nlev,np,np  ) = 1.0;
           AT_4D (elem_derived_omega_p,ie,il,ip,jp,  nlev,np,np  ) = jjp*jjp;
 
-          AT_6D(elem_state_Qdp,ie,il,ip,jp,1,0,nlev,np,np,qsize_d,2) = 1.0 + sin(iip*jjp*iil);
+          AT_6D(elem_state_Qdp,ie,il,ip,jp,0,0,nlev,qsize_d,2,np,np) = 1.0 + sin(iip*jjp*iil);
 
           for (int it=0; it<timelevels; ++it)
           {
@@ -84,7 +84,7 @@ void Arrays::init_data ()
             AT_5D(elem_state_dp3d,ie,it,il,ip,jp,  timelevels,nlev,np,np)   = 10.0*iil + iie + iip + jjp + iit;
             AT_6D(elem_state_v,   ie,it,il,ip,jp,0,timelevels,nlev,np,np,2) = 1.0 + 0.5*iil + iip + jjp + 0.2*iie + 2.0*iit;
             AT_6D(elem_state_v,   ie,it,il,ip,jp,1,timelevels,nlev,np,np,2) = 1.0 + 0.5*iil + iip + jjp + 0.2*iie + 3.0*iit;
-            AT_5D(elem_state_T,   ie,it,il,ip,jp,  timelevels,nlev,np,np)   = 1000.0 + sin(iip + jjp + iil);
+            AT_5D(elem_state_T,   ie,it,il,ip,jp,  timelevels,nlev,np,np)   = 1000.0 - iil - iip - jjp + 0.1*iie + iit;
           }
         }
       }

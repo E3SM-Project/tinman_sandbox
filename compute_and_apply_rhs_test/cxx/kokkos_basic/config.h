@@ -6,7 +6,7 @@ namespace TinMan {
 constexpr int NP              = 4;
 constexpr int NUM_LEV         = 72;
 constexpr int NUM_LEV_P       = NUM_LEV + 1;
-constexpr int QSIZE_D         = 4;
+constexpr int QSIZE_D         = 1;
 constexpr int NUM_TIME_LEVELS = 3;
 
 } // namespace TinMan

@@ -8,11 +8,13 @@
 namespace TinMan {
 
 struct PhysicalConstants {
-  static constexpr const Real rrearth = 1.0;
-  static constexpr const Real eta_ave_w = 1.0;
-  static constexpr const Real Rwater_vapor = 1.0;
-  static constexpr const Real Rgas = 10.0;
-  static constexpr const Real kappa = 1.0;
+  static constexpr const Real Rwater_vapor = 461.5;
+  static constexpr const Real Rgas         = 287.04;
+  static constexpr const Real cp           = 1005.0;
+  static constexpr const Real kappa        = Rgas/cp;
+  static constexpr const Real rrearth      = 1.0/6.376e6;
+
+  static constexpr const Real eta_ave_w    = 1.0;
 };
 
 class Control {
