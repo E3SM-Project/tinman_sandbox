@@ -4,16 +4,19 @@
 #include "Region.hpp"
 #include "TestData.hpp"
 #include "sphere_operators.hpp"
+#include "ScratchManager.hpp"
+#include "ScratchMemoryDefs.hpp"
 
 #include <fstream>
+#include <iomanip>
 
 namespace TinMan
 {
 
 KOKKOS_INLINE_FUNCTION
 void preq_hydrostatic(const ExecViewUnmanaged<Real[NP][NP]> phis,
-                      const ScratchView<Real[NUM_LEV][NP][NP]> T_v,
-                      const ScratchView<Real[NUM_LEV][NP][NP]> p,
+                      const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v,
+                      const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
                       const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> dp,
                       Real Rgas,
                       ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> phi);
@@ -21,24 +24,24 @@ void preq_hydrostatic(const ExecViewUnmanaged<Real[NP][NP]> phis,
 KOKKOS_INLINE_FUNCTION
 void preq_hydrostatic(const Kokkos::TeamPolicy<>::member_type &team,
                       const ExecViewUnmanaged<Real[NP][NP]> phis,
-                      const ScratchView<Real[NUM_LEV][NP][NP]> T_v,
-                      const ScratchView<Real[NUM_LEV][NP][NP]> p,
+                      const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v,
+                      const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
                       const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> dp,
                       Real Rgas,
                       ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> phi);
 
 KOKKOS_INLINE_FUNCTION
 void preq_omega_ps(const Kokkos::TeamPolicy<>::member_type &team,
-                   const ScratchView<Real[NUM_LEV][NP][NP]> p,
-                   const ScratchView<Real[NUM_LEV][NP][NP]> vgrad_p,
-                   const ScratchView<Real[NUM_LEV][NP][NP]> div_vdp,
-                   ScratchView<Real[NUM_LEV][NP][NP]> omega_p);
+                   const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
+                   const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> vgrad_p,
+                   const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp,
+                   ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p);
 
 KOKKOS_INLINE_FUNCTION
-void preq_omega_ps(const ScratchView<Real[NUM_LEV][NP][NP]> p,
-                   const ScratchView<Real[NUM_LEV][NP][NP]> vgrad_p,
-                   const ScratchView<Real[NUM_LEV][NP][NP]> div_vdp,
-                   ScratchView<Real[NUM_LEV][NP][NP]> omega_p);
+void preq_omega_ps(const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
+                   const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> vgrad_p,
+                   const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp,
+                   ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p);
 
 
 void compute_and_apply_rhs (const Control& data, Region& region)
@@ -46,30 +49,24 @@ void compute_and_apply_rhs (const Control& data, Region& region)
   using Kokkos::subview;
   using Kokkos::ALL;
 
-  // Compute the amount of scratch memory needed
-  const int mem_2d_scalar = ScratchView<Real[NP][NP]>::shmem_size();
-  const int mem_2d_vector = ScratchView<Real[2][NP][NP]>::shmem_size();
-  const int mem_3d_scalar = ScratchView<Real[NUM_LEV][NP][NP]>::shmem_size();
-  const int mem_3d_p_scalar = ScratchView<Real[NUM_LEV_P][NP][NP]>::shmem_size();
-  const int mem_3d_vector = ScratchView<Real[NUM_LEV][2][NP][NP]>::shmem_size();
-
-  constexpr const int num_2d_tmp_scalars = 5;
-  constexpr const int num_2d_tmp_vectors = 2;
-  constexpr const int num_3d_tmp_scalars = 11;
-  constexpr const int num_3d_tmp_vectors = 3;
-  constexpr const int num_3d_p_tmp_scalars = 1;
-
-  const int mem_needed = num_2d_tmp_scalars * mem_2d_scalar
-                       + num_2d_tmp_vectors * mem_2d_vector
-                       + num_3d_tmp_scalars * mem_3d_scalar
-                       + num_3d_tmp_vectors * mem_3d_vector
-                       + num_3d_p_tmp_scalars * mem_3d_p_scalar;
-
   Kokkos::TeamPolicy<> policy(data.host_num_elems(), Kokkos::AUTO);
 
-  Kokkos::parallel_for(policy.set_scratch_size(0, Kokkos::PerTeam(mem_needed)),
+  const int mem_needed = ScratchMemoryDefs::CAARS_ScratchManager::memory_needed(policy.team_size());
+
+  policy = policy.set_scratch_size(0, Kokkos::PerTeam(mem_needed));
+
+  Kokkos::parallel_for(policy,
                        KOKKOS_LAMBDA(const Kokkos::TeamPolicy<>::member_type &team) {
+
+    // The manager for scratch memory
+    ScratchMemoryDefs::CAARS_ScratchManager scratch_manager;
+
+    // We only need to get a pointer out of the scratch space, doesn't really matter
+    // how much we ask for, as long as it fits. 1 byte should do
+    scratch_manager.set_scratch_memory(reinterpret_cast<Real*>(team.team_scratch(0).get_shmem(1)));
+
     const int ie = team.league_rank();
+    const int team_rank = team.team_rank(); // This is the thread id
 
     // Input parameters
     const int n0   = data.n0();
@@ -79,16 +76,12 @@ void compute_and_apply_rhs (const Control& data, Region& region)
     const Real dt2 = data.dt2();
 
     // 3d scalars:
-    ScratchView<Real[NUM_LEV][NP][NP]>    div_vdp(team.team_scratch(0));
-    ScratchView<Real[NUM_LEV][NP][NP]>    kappa_star(team.team_scratch(0));
-    ScratchView<Real[NUM_LEV][NP][NP]>    omega_p(team.team_scratch(0));
-    ScratchView<Real[NUM_LEV][NP][NP]>    pressure(team.team_scratch(0));
-    ScratchView<Real[NUM_LEV][NP][NP]>    T_v(team.team_scratch(0));
-    ScratchView<Real[NUM_LEV][NP][NP]>    vgrad_p(team.team_scratch(0));
-    ScratchView<Real[NUM_LEV][NP][NP]>    vort(team.team_scratch(0));
+    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp    (scratch_manager.get_team_scratch<ID_3D_SCALAR,0>()); //
+    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure   (scratch_manager.get_team_scratch<ID_3D_SCALAR,1>()); //
+    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> vort       (scratch_manager.get_team_scratch<ID_3D_SCALAR,2>());
 
     // 3d vectors:
-    ScratchView<Real[NUM_LEV][2][NP][NP]> grad_p(team.team_scratch(0));
+    ExecViewUnmanaged<Real[NUM_LEV][2][NP][NP]> grad_p(scratch_manager.get_team_scratch<ID_3D_VECTOR,0>());
 
     if(ie < data.num_elems()) {
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
@@ -109,14 +102,16 @@ void compute_and_apply_rhs (const Control& data, Region& region)
 
       team.team_barrier();
 
+      ExecViewUnmanaged<Real[2][NP][NP]> vdp_ilev(scratch_manager.get_thread_scratch<ID_2D_VECTOR,0>(team_rank));
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> vgrad_p    (scratch_manager.get_team_scratch<ID_3D_SCALAR,3>());
+
       Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
 
         // Create subviews to explicitly have static dimensions
-        ScratchView<Real[NP][NP]> p_ilev = subview(pressure, ilev, ALL(), ALL());
-        ScratchView<Real[2][NP][NP]> grad_p_ilev = subview(grad_p, ilev, ALL(), ALL(), ALL());
-        gradient_sphere(team, p_ilev, data, region.DINV(ie), grad_p_ilev);
+        ExecViewUnmanaged<Real[NP][NP]> p_ilev = subview(pressure, ilev, ALL(), ALL());
+        ExecViewUnmanaged<Real[2][NP][NP]> grad_p_ilev = subview(grad_p, ilev, ALL(), ALL(), ALL());
+        gradient_sphere(team, p_ilev, data, scratch_manager, region.DINV(ie), grad_p_ilev);
 
-        ScratchView<Real[2][NP][NP]> vdp_ilev(team.team_scratch(0));
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
@@ -131,15 +126,17 @@ void compute_and_apply_rhs (const Control& data, Region& region)
           (region.VN0(ie, ilev))(igp, jgp) += PhysicalConstants::eta_ave_w * vdp_ilev(1, igp, jgp);
         });
 
-        ScratchView<Real[NP][NP]> div_vdp_ilev = subview(div_vdp, ilev, ALL(), ALL());
+        ExecViewUnmanaged<Real[NP][NP]> div_vdp_ilev = subview(div_vdp, ilev, ALL(), ALL());
         divergence_sphere(team, vdp_ilev, data, region.METDET(ie), region.DINV(ie), div_vdp_ilev);
 
         // Create subviews to explicitly have static dimensions
-        ScratchView<Real[NP][NP]> vort_ilev = subview(vort, ilev, ALL(), ALL());
+        ExecViewUnmanaged<Real[NP][NP]> vort_ilev = subview(vort, ilev, ALL(), ALL());
 
         vorticity_sphere(team, region.UN0(ie, ilev), region.VN0(ie, ilev), data, region.METDET(ie), region.D(ie), vort_ilev);
       });
 
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> kappa_star (scratch_manager.get_team_scratch<ID_3D_SCALAR,4>()); //
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v        (scratch_manager.get_team_scratch<ID_3D_SCALAR,5>());
       if (qn0==-1)
       {
         Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
@@ -167,105 +164,106 @@ void compute_and_apply_rhs (const Control& data, Region& region)
 
       team.team_barrier();
 
-      ExecViewUnmanaged<Real[NP][NP]> phis_ie = region.PHIS(ie);
-      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> phi_ie = region.PHI(ie);
+      ExecViewUnmanaged<Real[NP][NP]>          phis_ie = region.PHIS(ie);
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> phi_ie  = region.PHI(ie);
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p (scratch_manager.get_team_scratch<ID_3D_SCALAR,6>());
+
       preq_hydrostatic(team, phis_ie, T_v, pressure, region.DP3D(ie, n0), PhysicalConstants::Rgas, phi_ie);
       preq_omega_ps(pressure, vgrad_p, div_vdp, omega_p);
 
-      {
-        ScratchView<Real[NUM_LEV_P][NP][NP]>  eta_dot_dpdn_ie(team.team_scratch(0));
-        Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV_P), [&](const int ilev) {
-          Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
-            const int igp = idx / NP;
-            const int jgp = idx % NP;
-            (region.ETA_DPDN(ie))(ilev, igp, jgp) += PhysicalConstants::eta_ave_w * eta_dot_dpdn_ie(ilev,igp,jgp);
+      ExecViewUnmanaged<Real[NUM_LEV_P][NP][NP]>  eta_dot_dpdn_ie(scratch_manager.get_team_scratch<ID_3D_P_SCALAR,0>());
+      Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV_P), [&](const int ilev) {
+        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+          const int igp = idx / NP;
+          const int jgp = idx % NP;
+          auto etadpdn = region.ETA_DPDN(ie);
+          etadpdn(ilev, igp, jgp) += PhysicalConstants::eta_ave_w * eta_dot_dpdn_ie(ilev,igp,jgp);
+          if (ilev<NUM_LEV)
             (region.OMEGA_P(ie, ilev))(igp, jgp) += PhysicalConstants::eta_ave_w * omega_p(ilev,igp,jgp);
-          });
         });
-      }
+      });
 
       team.team_barrier();
 
-      {
-        /* Reduce the scope of these scratch views so they can be cleaned up when no longer needed */
-        ScratchView<Real[NUM_LEV][NP][NP]> ttens(team.team_scratch(0));
-        ScratchView<Real[NUM_LEV][NP][NP]> vtens1(team.team_scratch(0));
-        ScratchView<Real[NUM_LEV][NP][NP]> vtens2(team.team_scratch(0));
-        {
-          ScratchView<Real[NP][NP]> Ephi(team.team_scratch(0));
-          ScratchView<Real[NP][NP]> vgrad_T(team.team_scratch(0));
-          ScratchView<Real[2][NP][NP]> grad_tmp(team.team_scratch(0));
-          ScratchView<Real[NUM_LEV][NP][NP]> T_vadv(team.team_scratch(0));
-          ScratchView<Real[NUM_LEV][NP][NP][2]> v_vadv(team.team_scratch(0));
-          Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
-            Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
-              const int igp = idx / NP;
-              const int jgp = idx % NP;
-              // T_vadv initialized
-              T_vadv(ilev, igp, jgp) = 0.0;
-              // v_vadv initialized
-              v_vadv(ilev, igp, jgp) = 0.0;
-            });
-          });
-          team.team_barrier();
+      // Note: the only purpose of T_vadv is to be stuffed (with other terms) into ttens. By making ttens share
+      //       the same ptr of T_vadv, we save memory and flops. The same holds for vtens and v_vadv
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]>    T_vadv (scratch_manager.get_team_scratch<ID_3D_SCALAR,7>());
+      ExecViewUnmanaged<Real[NUM_LEV][2][NP][NP]> v_vadv (scratch_manager.get_team_scratch<ID_3D_VECTOR,1>());
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]>    ttens  (T_vadv.data());//scratch_manager.get_team_scratch<ID_3D_SCALAR_8>());
+      ExecViewUnmanaged<Real[NUM_LEV][2][NP][NP]> vtens  (v_vadv.data());//scratch_manager.get_team_scratch<ID_3D_SCALAR_8>());
 
-          Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV_P), [&](const int ilev) {
-            Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
-              const int igp = idx / NP;
-              const int jgp = idx % NP;
-              Real v1 = region.U(ie, n0)(ilev,igp,jgp);
-              Real v2 = region.V(ie, n0)(ilev,igp,jgp);
-    
-              Ephi(igp,jgp) = 0.5 * (v1*v1 + v2*v2) + (region.PHI(ie))(ilev,igp,jgp) + (region.PECND(ie, ilev))(igp,jgp);
-            });
-    
-            // Create subviews to explicitly have static dimensions
-            ExecViewUnmanaged<Real[NP][NP]> T_ie_n0_ilev = subview(region.T(ie, n0), ilev, ALL(), ALL());
-            gradient_sphere(team, T_ie_n0_ilev, data, region.DINV(ie), grad_tmp);
-    
-            Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
-              const int igp = idx / NP;
-              const int jgp = idx % NP;
-              Real v1 = region.U(ie, n0)(ilev,igp,jgp);
-              Real v2 = region.V(ie, n0)(ilev,igp,jgp);
-    
-              vgrad_T(igp, jgp) = v1*grad_tmp(0,igp,jgp) + v2*grad_tmp(1,igp,jgp);
-            });
-    
-            gradient_sphere(team, Ephi, data, region.DINV(ie), grad_tmp);
-    
-            Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
-              const int igp = idx / NP;
-              const int jgp = idx % NP;
-              Real gpterm = T_v(ilev,igp,jgp) / pressure(ilev,igp,jgp);
-    
-              Real glnps1 = PhysicalConstants::Rgas*gpterm*grad_p(ilev,0,igp,jgp);
-              Real glnps2 = PhysicalConstants::Rgas*gpterm*grad_p(ilev,1,igp,jgp);
-    
-              Real v1 = region.U(ie, n0)(ilev,igp,jgp);
-              Real v2 = region.V(ie, n0)(ilev,igp,jgp);
-    
-              vtens1(ilev, igp, jgp) = v_vadv(ilev, igp, jgp, 0) + v2 * ((region.FCOR(ie))(igp, jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps1;
-              vtens2(ilev, igp, jgp) = v_vadv(ilev, igp, jgp, 1) - v1 * ((region.FCOR(ie))(igp, jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps2;
-    
-              ttens(ilev, igp, jgp)  = T_vadv(ilev, igp, jgp) - vgrad_T(igp, jgp) + kappa_star(ilev,igp,jgp)*T_v(ilev,igp,jgp)*omega_p(ilev,igp,jgp);
-            });
-          });
-        }
-  
-        team.team_barrier();
-  
-        Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
-          Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
-            const int igp = idx / NP;
-            const int jgp = idx % NP;
-            (region.U(ie, np1))(ilev, igp, jgp) = region.SPHEREMP(ie)(igp, jgp) * ((region.U(ie, nm1))(ilev, igp, jgp) + dt2 * vtens1(ilev, igp, jgp));
-            (region.V(ie, np1))(ilev, igp, jgp) = region.SPHEREMP(ie)(igp, jgp) * ((region.V(ie, nm1))(ilev, igp, jgp) + dt2 * vtens2(ilev, igp, jgp));
-            (region.T(ie, np1))(ilev, igp, jgp) = region.SPHEREMP(ie)(igp, jgp) * ((region.T(ie, nm1))(ilev, igp, jgp) + dt2 * ttens(ilev, igp, jgp));
-            (region.DP3D(ie, np1))(ilev, igp, jgp) = region.SPHEREMP(ie)(igp, jgp) * ((region.DP3D(ie, nm1))(ilev, igp, jgp) + dt2 * div_vdp(ilev, igp, jgp));
-          });
+      ExecViewUnmanaged<Real[NP][NP]> Ephi              (scratch_manager.get_thread_scratch<ID_2D_SCALAR,0>(team_rank));
+      ExecViewUnmanaged<Real[NP][NP]> vgrad_T           (scratch_manager.get_thread_scratch<ID_2D_SCALAR,1>(team_rank));
+      ExecViewUnmanaged<Real[2][NP][NP]> grad_tmp       (scratch_manager.get_thread_scratch<ID_2D_VECTOR,0>(team_rank));
+
+      Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
+        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+          const int igp = idx / NP;
+          const int jgp = idx % NP;
+          // T_vadv initialized
+          T_vadv(ilev, igp, jgp) = 0.0;
+          // v_vadv initialized
+          v_vadv(ilev, 0, igp, jgp) = v_vadv(ilev, 1, igp, jgp) = 0.0;
         });
-      }
+      });
+
+      team.team_barrier();
+
+      Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
+        // Create subviews to explicitly have static dimensions
+        ExecViewUnmanaged<Real[NP][NP]> T_ie_n0_ilev = subview(region.T(ie, n0), ilev, ALL(), ALL());
+        gradient_sphere(team, T_ie_n0_ilev, data, scratch_manager, region.DINV(ie), grad_tmp);
+
+        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+          const int igp = idx / NP;
+          const int jgp = idx % NP;
+          Real v1 = region.U(ie, n0)(ilev,igp,jgp);
+          Real v2 = region.V(ie, n0)(ilev,igp,jgp);
+
+          vgrad_T(igp, jgp) = v1*grad_tmp(0,igp,jgp) + v2*grad_tmp(1,igp,jgp);
+        });
+
+        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+          const int igp = idx / NP;
+          const int jgp = idx % NP;
+          Real v1 = region.U(ie, n0)(ilev,igp,jgp);
+          Real v2 = region.V(ie, n0)(ilev,igp,jgp);
+
+          Ephi(igp,jgp) = 0.5 * (v1*v1 + v2*v2) + (region.PHI(ie))(ilev,igp,jgp) + (region.PECND(ie, ilev))(igp,jgp);
+        });
+        gradient_sphere(team, Ephi, data, scratch_manager, region.DINV(ie), grad_tmp);
+
+        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+          const int igp = idx / NP;
+          const int jgp = idx % NP;
+          Real gpterm = T_v(ilev,igp,jgp) / pressure(ilev,igp,jgp);
+
+          Real glnps1 = PhysicalConstants::Rgas*gpterm*grad_p(ilev,0,igp,jgp);
+          Real glnps2 = PhysicalConstants::Rgas*gpterm*grad_p(ilev,1,igp,jgp);
+
+          Real v1 = region.U(ie, n0)(ilev,igp,jgp);
+          Real v2 = region.V(ie, n0)(ilev,igp,jgp);
+
+          vtens(ilev, 0, igp, jgp) = v_vadv(ilev, 0, igp, jgp) + v2 * ((region.FCOR(ie))(igp, jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps1;
+          vtens(ilev, 1, igp, jgp) = v_vadv(ilev, 1, igp, jgp) - v1 * ((region.FCOR(ie))(igp, jgp) + vort(ilev,igp,jgp)) - grad_tmp(1,igp,jgp) - glnps2;
+
+          ttens(ilev, igp, jgp)  = T_vadv(ilev, igp, jgp) - vgrad_T(igp, jgp) + kappa_star(ilev,igp,jgp)*T_v(ilev,igp,jgp)*omega_p(ilev,igp,jgp);
+        });
+      });
+
+      team.team_barrier();
+
+      Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
+        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+          const int igp = idx / NP;
+          const int jgp = idx % NP;
+          (region.U(ie, np1))(ilev, igp, jgp) = region.SPHEREMP(ie)(igp, jgp) * ((region.U(ie, nm1))(ilev, igp, jgp) + dt2 * vtens(ilev, 0, igp, jgp));
+          (region.V(ie, np1))(ilev, igp, jgp) = region.SPHEREMP(ie)(igp, jgp) * ((region.V(ie, nm1))(ilev, igp, jgp) + dt2 * vtens(ilev, 1, igp, jgp));
+          (region.T(ie, np1))(ilev, igp, jgp) = region.SPHEREMP(ie)(igp, jgp) * ((region.T(ie, nm1))(ilev, igp, jgp) + dt2 * ttens(ilev, igp, jgp));
+          (region.DP3D(ie, np1))(ilev, igp, jgp) = region.SPHEREMP(ie)(igp, jgp) * ((region.DP3D(ie, nm1))(ilev, igp, jgp) - dt2 * div_vdp(ilev, igp, jgp));
+        });
+      });
+
     }
   });
 }
@@ -273,8 +271,8 @@ void compute_and_apply_rhs (const Control& data, Region& region)
 KOKKOS_INLINE_FUNCTION
 void preq_hydrostatic (const Kokkos::TeamPolicy<>::member_type &team,
                        const ExecViewUnmanaged<Real[NP][NP]> phis,
-                       const ScratchView<Real[NUM_LEV][NP][NP]> T_v,
-                       const ScratchView<Real[NUM_LEV][NP][NP]> p,
+                       const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v,
+                       const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
                        const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> dp,
                        Real Rgas,
                        ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> phi)
@@ -305,8 +303,8 @@ void preq_hydrostatic (const Kokkos::TeamPolicy<>::member_type &team,
 
 KOKKOS_INLINE_FUNCTION
 void preq_hydrostatic (const ExecViewUnmanaged<Real[NP][NP]> phis,
-                       const ScratchView<Real[NUM_LEV][NP][NP]> T_v,
-                       const ScratchView<Real[NUM_LEV][NP][NP]> p,
+                       const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v,
+                       const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
                        const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> dp,
                        Real Rgas,
                        ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> phi)
@@ -342,10 +340,10 @@ void preq_hydrostatic (const ExecViewUnmanaged<Real[NP][NP]> phis,
 
 KOKKOS_INLINE_FUNCTION
 void preq_omega_ps(const Kokkos::TeamPolicy<>::member_type &team,
-                   const ScratchView<Real[NUM_LEV][NP][NP]> p,
-                   const ScratchView<Real[NUM_LEV][NP][NP]> vgrad_p,
-                   const ScratchView<Real[NUM_LEV][NP][NP]> div_vdp,
-                   ScratchView<Real[NUM_LEV][NP][NP]> omega_p)
+                   const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
+                   const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> vgrad_p,
+                   const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp,
+                   ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p)
 {
   Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
                        KOKKOS_LAMBDA(const int loop_idx) {
@@ -377,10 +375,10 @@ void preq_omega_ps(const Kokkos::TeamPolicy<>::member_type &team,
 }
 
 KOKKOS_INLINE_FUNCTION
-void preq_omega_ps(const ScratchView<Real[NUM_LEV][NP][NP]> p,
-                   const ScratchView<Real[NUM_LEV][NP][NP]> vgrad_p,
-                   const ScratchView<Real[NUM_LEV][NP][NP]> div_vdp,
-                   ScratchView<Real[NUM_LEV][NP][NP]> omega_p)
+void preq_omega_ps(const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> p,
+                   const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> vgrad_p,
+                   const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp,
+                   ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p)
 {
   Real ckk, ckl, term;
   Real suml[NP][NP];
@@ -415,30 +413,41 @@ void preq_omega_ps(const ScratchView<Real[NUM_LEV][NP][NP]> p,
   }
 }
 
-// void print_results_2norm (const Control& data, const Region& region)
-// {
-//   // Input parameters
-//   const int np1  = data.np1();
+void print_results_2norm (const Control& data, const Region& region)
+{
+  using Kokkos::subview;
+  using Kokkos::ALL;
 
-//   auto scalars_4d = region.get_4d_scalars();
+  // Input parameters
+  const int num_elems = data.host_num_elems();
+  const int np1  = data.np1();
 
-//   Real vnorm(0.), tnorm(0.), dpnorm(0.);
-//   for (int ie=0; ie<; ++ie)
-//   {
-//     for (int ilev=0; ilev<NUM_LEV; ++ilev)
-//     {
-//       for (int igp=0; igp<NP; ++igp)
-//       {
-//         for (int jgp=0; jgp<NP; ++jgp)
-//         {
-//           vnorm  += std::pow( scalars_4d(ie,np1,IDX_U,ilev,igp,jgp)   , 2 );
-//           vnorm  += std::pow( scalars_4d(ie,np1,IDX_V,ilev,igp,jgp)   , 2 );
-//           tnorm  += std::pow( scalars_4d(ie,np1,IDX_T,ilev,igp,jgp)   , 2 );
-//           dpnorm += std::pow( scalars_4d(ie,np1,IDX_DP3D,ilev,igp,jgp), 2 );
-//         }
-//       }
-//     }
-//   }
+  typedef ExecViewManaged<Real[NUM_LEV][NP][NP]>::HostMirror MirrorView;
+
+  Real vnorm(0.), tnorm(0.), dpnorm(0.);
+  for (int ie=0; ie<num_elems; ++ie)
+  {
+    MirrorView U_host = Kokkos::create_mirror_view(region.U(ie, np1));
+    MirrorView V_host = Kokkos::create_mirror_view(region.V(ie, np1));
+    MirrorView T_host = Kokkos::create_mirror_view(region.T(ie, np1));
+    MirrorView P_host = Kokkos::create_mirror_view(region.DP3D(ie, np1));
+
+    Kokkos::deep_copy (U_host,region.U(ie, np1));
+    Kokkos::deep_copy (V_host,region.V(ie, np1));
+    Kokkos::deep_copy (T_host,region.T(ie, np1));
+    Kokkos::deep_copy (P_host,region.DP3D(ie, np1));
+
+    vnorm  += std::pow( compute_norm( U_host ), 2 );
+    vnorm  += std::pow( compute_norm( V_host ), 2 );
+    tnorm  += std::pow( compute_norm( T_host ), 2 );
+    dpnorm += std::pow( compute_norm( P_host ), 2 );
+  }
+
+  std::cout << "   ---> Norms:\n"
+            << "          ||v||_2  = " << std::setprecision(18) << std::sqrt (vnorm) << "\n"
+            << "          ||T||_2  = " << std::setprecision(18) << std::sqrt (tnorm) << "\n"
+            << "          ||dp||_2 = " << std::setprecision(18) << std::sqrt (dpnorm) << "\n";
+}
 
 //   std::cout << "   ---> Norms:\n"
 //             << "          ||v||_2  = " << std::sqrt(vnorm) << "\n"

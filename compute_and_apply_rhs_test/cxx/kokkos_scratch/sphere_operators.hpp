@@ -5,6 +5,7 @@
 #include "Types.hpp"
 
 #include <Kokkos_Core.hpp>
+#include "ScratchMemoryDefs.hpp"
 
 namespace TinMan
 {
@@ -22,6 +23,7 @@ KOKKOS_INLINE_FUNCTION
 void gradient_sphere (const Kokkos::TeamPolicy<>::member_type &team,
                       const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> s,
                       const Control& data,
+                      ScratchMemoryDefs::CAARS_ScratchManager& scratch_manager,
                       const ExecViewUnmanaged<Real[2][2][NP][NP]> DInv,
                       ViewType<Real[2][NP][NP],MemSpaceOut,Kokkos::MemoryUnmanaged> grad_s);
 
@@ -105,12 +107,13 @@ KOKKOS_INLINE_FUNCTION
 void gradient_sphere (const Kokkos::TeamPolicy<>::member_type &team,
                       const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> s,
                       const Control& data,
+                      ScratchMemoryDefs::CAARS_ScratchManager& scratch_manager,
                       const ExecViewUnmanaged<Real[2][2][NP][NP]> DInv,
                       ViewType<Real[2][NP][NP],MemSpaceOut,Kokkos::MemoryUnmanaged> grad_s)
 {
   Real rrearth = PhysicalConstants::rrearth;
 
-  ScratchView<Real[2][NP][NP]> v(team.team_scratch(0));
+  ScratchView<Real[2][NP][NP]> v(scratch_manager.get_thread_scratch<ID_2D_VECTOR,0>(team.team_rank()));
   constexpr const int contra_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, contra_iters),
                        [&](const int loop_idx) {
