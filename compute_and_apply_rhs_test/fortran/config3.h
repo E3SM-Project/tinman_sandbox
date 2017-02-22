@@ -15,6 +15,8 @@
 #define iXjXkXvX3Xie      i,j,k,2,3,ie
 #define iXjXkXtX3Xie      i,j,k,3,3,ie
 #define iXjXkXdpX3Xie     i,j,k,4,3,ie
+#define iXjX1XphisX1Xie   i,j,1,6,1,ie
+
 #define iXjXkXuXdXie      i,j,k,1,1:timelevels,ie
 #define iXjXkXvXdXie      i,j,k,2,1:timelevels,ie
 #define iXjXkXtXdXie      i,j,k,3,1:timelevels,ie
@@ -41,6 +43,9 @@
 #define dXdXkXuXn0Xie     :,:,k,1,n0,ie
 #define dXdXkXvXn0Xie     :,:,k,2,n0,ie
 #define iXjXkXqXqn0Xie    i,j,k,7,qn0,ie
+
+#define dXdXdXuXnm1Xie    :,:,:,1,nm1,ie
+#define dXdXdXvXnm1Xie    :,:,:,2,nm1,ie
 
 #define dXdXdXtXnp1Xie    :,:,:,3,np1,ie
 #endif

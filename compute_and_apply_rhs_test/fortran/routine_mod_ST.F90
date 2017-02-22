@@ -54,7 +54,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
   type (hvcoord_t)     , intent(in) :: hvcoord
   integer, intent(in) :: nets, nete, np1,nm1,n0,qn0
   real*8, intent(in) :: dt2
-  real (kind=real_kind), intent(in) :: eta_ave_w 
+  real (kind=real_kind), intent(in) :: eta_ave_w
 
   integer :: ie
 
@@ -112,19 +112,18 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
   type (hvcoord_t)     , intent(in) :: hvcoord
   integer, intent(in) :: ie,np1,nm1,n0,qn0
   real*8, intent(in) :: dt2
-  real (kind=real_kind), intent(in) :: eta_ave_w 
+  real (kind=real_kind), intent(in) :: eta_ave_w
 
 !local
   real (kind=real_kind), pointer, dimension(:,:,:)   :: phi
-  real (kind=real_kind), pointer, dimension(:,:,:)   :: dp
   real (kind=real_kind), dimension(np,np,nlev)   :: omega_p
   real (kind=real_kind), dimension(np,np,nlev)   :: T_v
   real (kind=real_kind), dimension(np,np,nlev)   :: divdp
   real (kind=real_kind), dimension(np,np,nlev+1)   :: eta_dot_dpdn  ! half level vertical velocity on p-grid
   real (kind=real_kind), dimension(np,np)      :: sdot_sum   ! temporary field
   real (kind=real_kind), dimension(np,np,2)    :: vtemp     ! generic gradient storage
-  real (kind=real_kind), dimension(np,np,2,nlev):: vdp       !                            
-  real (kind=real_kind), dimension(np,np,2     ):: v         !                            
+  real (kind=real_kind), dimension(np,np,2,nlev):: vdp       !
+  real (kind=real_kind), dimension(np,np,2     ):: v         !
   real (kind=real_kind), dimension(np,np)      :: vgrad_T    ! v.grad(T)
   real (kind=real_kind), dimension(np,np)      :: Ephi       ! kinetic energy + PHI term
   real (kind=real_kind), dimension(np,np,2,nlev) :: grad_p
@@ -147,14 +146,14 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
   real (kind=real_kind) ::  cp2,cp_ratio,E,de,Qt,v1,v2
   real (kind=real_kind) ::  glnps1,glnps2,gpterm
   integer :: i,j,k,kptr
-  real (kind=real_kind) ::  u_m_umet, v_m_vmet, t_m_tmet 
-  
+  real (kind=real_kind) ::  u_m_umet, v_m_vmet, t_m_tmet
+
   integer :: tid, OMP_GET_MAX_THREADS, OMP_GET_THREAD_NUM
 
 !  print *, 'Hello Routine'
-!  tid = OMP_GET_MAX_THREADS()     
+!  tid = OMP_GET_MAX_THREADS()
 !  print *, 'Max number TH ', tid
-!  tid = OMP_GET_THREAD_NUM()     
+!  tid = OMP_GET_THREAD_NUM()
 !  print *, 'My tid is ', tid
 
      phi => elem(ie)%derived%phi(:,:,:)
@@ -170,7 +169,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 #endif
      do k=1,nlev
 
-!        tid = OMP_GET_THREAD_NUM()     
+!        tid = OMP_GET_THREAD_NUM()
 !        print *, 'next loop: My tid is ', tid
 
         grad_p(:,:,:,k) = gradient_sphere(p(:,:,k),deriv,elem(ie)%Dinv)
@@ -233,9 +232,11 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
      enddo
      elem(ie)%derived%eta_dot_dpdn(:,:,nlev+1) = &
           elem(ie)%derived%eta_dot_dpdn(:,:,nlev+1) + eta_ave_w*eta_dot_dpdn(:,:,nlev+1)
+
 #if HOMP
 !$omp parallel do private(k,i,j,v1,v2,gpterm,glnps1,glnps2,E,Ephi,vgrad_T,vtemp)
 #endif
+
      vertloop: do k=1,nlev
         do j=1,np
            do i=1,np
@@ -278,9 +279,10 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 #if HOMP
 !$omp parallel do private(k)
 #endif
+
      do k=1,nlev
         ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXuXnm1Xie ) + dt2*vtens1(:,:,k) )
-        ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXvXnm1Xie ) + dt2*vtens2(:,:,k) )
+        ST( dXdXkXvXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXvXnm1Xie ) + dt2*vtens2(:,:,k) )
         ST( dXdXkXtXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXtXnm1Xie ) + dt2*ttens(:,:,k)  )
         ST( dXdXkXdpXnp1Xie ) = &
              elem(ie)%spheremp(:,:) * ( ST( dXdXkXdpXnm1Xie ) - &
@@ -297,7 +299,7 @@ end subroutine caar
 
 
 
-  function Virtual_Temperature1d(Tin,rin) result(Tv)  
+  function Virtual_Temperature1d(Tin,rin) result(Tv)
   use kinds, only : real_kind
   use physical_constants, only : Rwater_vapor, Rgas
     real (kind=real_kind),intent(in) :: Tin
@@ -318,7 +320,7 @@ end subroutine caar
     real(kind=real_kind), intent(out):: omega_p(np,np,nlev)   ! vertical pressure velocity
 
     integer i,j,k                         ! longitude, level indices
-    real(kind=real_kind) term             ! one half of basic term in omega/p summation 
+    real(kind=real_kind) term             ! one half of basic term in omega/p summation
     real(kind=real_kind) Ckk,Ckl          ! diagonal term of energy conversion matrix
     real(kind=real_kind) suml(np,np)      ! partial sum over l = (1, k-1)
 
@@ -359,11 +361,11 @@ end subroutine caar
     use kinds, only : real_kind, np, nlev
     use physical_constants, only : rgas
     implicit none
-    real(kind=real_kind), intent(out) :: phi(np,np,nlev)     
+    real(kind=real_kind), intent(out) :: phi(np,np,nlev)
     real(kind=real_kind), intent(in) :: phis(np,np)
     real(kind=real_kind), intent(in) :: T_v(np,np,nlev)
-    real(kind=real_kind), intent(in) :: p(np,np,nlev)   
-    real(kind=real_kind), intent(in) :: dp(np,np,nlev)  
+    real(kind=real_kind), intent(in) :: p(np,np,nlev)
+    real(kind=real_kind), intent(in) :: dp(np,np,nlev)
     integer i,j,k                         ! longitude, level indices
     real(kind=real_kind) Hkk,Hkl          ! diagonal term of energy conversion matrix
     real(kind=real_kind), dimension(np,np,nlev) :: phii       ! Geopotential at interfaces
@@ -375,7 +377,7 @@ end subroutine caar
              hkk = dp(i,j,nlev)*0.5d0/p(i,j,nlev)
              hkl = 2*hkk
              phii(i,j,nlev)  = Rgas*T_v(i,j,nlev)*hkl
-             phi(i,j,nlev) = phis(i,j) + Rgas*T_v(i,j,nlev)*hkk 
+             phi(i,j,nlev) = phis(i,j) + Rgas*T_v(i,j,nlev)*hkk
           end do
           do k=nlev-1,2,-1
              do i=1,np
