@@ -22,7 +22,7 @@ void Arrays::init_data ()
   elem_state_v              = new real[num_elems*timelevels*nlev*np*np*2] {};
   elem_state_T              = new real[num_elems*timelevels*nlev*np*np]   {};
   elem_state_phis           = new real[num_elems*np*np]                   {};
-  elem_state_Qdp            = new real[num_elems*nlev*qsize_d*2*np*np]    {};
+  elem_state_Qdp            = new real[num_elems*qsize_d*2*nlev*np*np]    {};
 
   elem_derived_eta_dot_dpdn = new real[num_elems*nlevp*np*np]  {};
   elem_derived_omega_p      = new real[num_elems*nlev*np*np]   {};
@@ -51,7 +51,7 @@ void Arrays::init_data ()
 
         AT_3D(elem_fcor,      ie,ip,jp,np,np)  = sin(iip + jjp);
         AT_3D(elem_metdet,    ie,ip,jp,np,np)  = iip*jjp;
-        AT_3D(elem_rmetdet,   ie,ip,jp,np,np)  = 1./ AT_3D(elem_metdet,ie,ip,jp,np,np);
+        AT_3D(elem_rmetdet,   ie,ip,jp,np,np)  = 1./ (AT_3D(elem_metdet,ie,ip,jp,np,np));
         AT_3D(elem_spheremp,  ie,ip,jp,np,np)  = 2*iip;
         AT_3D(elem_state_phis,ie,ip,jp,np,np)  = iip + jjp;
 
@@ -75,7 +75,7 @@ void Arrays::init_data ()
           AT_4D (elem_derived_pecnd,  ie,il,ip,jp,  nlev,np,np  ) = 1.0;
           AT_4D (elem_derived_omega_p,ie,il,ip,jp,  nlev,np,np  ) = jjp*jjp;
 
-          AT_6D(elem_state_Qdp,ie,il,ip,jp,0,0,nlev,qsize_d,2,np,np) = 1.0 + sin(iip*jjp*iil);
+          AT_6D(elem_state_Qdp,ie,0,0,il,ip,jp,qsize_d,2,nlev,np,np) = 1.0 + sin(iip*jjp*iil);
 
           for (int it=0; it<timelevels; ++it)
           {

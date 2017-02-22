@@ -105,7 +105,7 @@ int main (int argc, char** argv)
   print_results_2norm (data);
 
   // Burn in to avoid cache effects
-  compute_and_apply_rhs(data);
+  //compute_and_apply_rhs(data);
 
   std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
   //std::vector<Timer::Timer> timers(num_exec);

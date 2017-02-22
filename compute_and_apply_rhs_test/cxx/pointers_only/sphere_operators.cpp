@@ -1,6 +1,7 @@
 #include "sphere_operators.hpp"
 #include "dimensions.hpp"
 #include "test_macros.hpp"
+#include <iostream>
 
 namespace Homme
 {
@@ -118,8 +119,8 @@ void vorticity_sphere (const real* const v, const TestData& data,
       dudy = dvdx = 0.;
       for (int kgp=0; kgp<np; ++kgp)
       {
-        dudy += Dvv[kgp][jgp] * vcov[igp][kgp][1];
-        dvdx += Dvv[kgp][igp] * vcov[kgp][jgp][0];
+        dvdx += Dvv[kgp][igp] * vcov[kgp][jgp][1];
+        dudy += Dvv[kgp][jgp] * vcov[igp][kgp][0];
       }
 
       AT_2D(vort,igp,jgp,np) = (dvdx - dudy) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
