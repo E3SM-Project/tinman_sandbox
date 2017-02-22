@@ -72,17 +72,18 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
   auto Qdp          = region.get_Qdp();
   auto eta_dot_dpdn = region.get_eta_dot_dpdn();
 
-  Kokkos::parallel_for(Kokkos::TeamPolicy<>(nete - nets + 1, Kokkos::AUTO),
+  // Serivce Views
+  ViewManaged<Real[NP][NP]>             vgrad_T ("vgrad_T");
+  ViewManaged<Real[NUM_LEV][NP][NP]>    ttens   ("ttens");
+  ViewManaged<Real[NUM_LEV][NP][NP]>    T_vadv  ("T_vadv");
+  ViewManaged<Real[NUM_LEV][2][NP][NP]> v_vadv  ("v_vadv");
+  ViewManaged<Real[NUM_LEV][2][NP][NP]> vtens   ("vtens");
+
+  Kokkos::TeamPolicy<> policy(nete - nets, Kokkos::AUTO);
+
+  Kokkos::parallel_for(policy,
                        KOKKOS_LAMBDA(const Kokkos::TeamPolicy<>::member_type &team) {
     const int ie = nets + team.league_rank();
-
-    // Serivce arrays
-    Real vgrad_T[NP][NP]                   = {};
-    Real ttens[NUM_LEV][NP][NP]            = {};
-    Real T_vadv[NUM_LEV][NP][NP]           = {};
-    Real v_vadv[NUM_LEV][NP][NP][2]        = {};
-    Real vtens1[NUM_LEV][NP][NP]           = {};
-    Real vtens2[NUM_LEV][NP][NP]           = {};
 
     // Subviews in the current element
     ViewUnmanaged<Real[NUM_2D_SCALARS][NP][NP]> scalars_2d_ie = subview(scalars_2d, ie, ALL(), ALL(), ALL());
@@ -108,23 +109,22 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
     Real gpterm = 0;
 
     if(ie < nete) {
-      for (int igp=0; igp<NP; ++igp)
-      {
-        for (int jgp=0; jgp<NP; ++jgp)
-        {
-          p(0,igp,jgp) = data.hvcoord().hyai[0]*data.hvcoord().ps0 + 0.5*dp3d_ie_n0(0,igp,jgp);
-        }
-      }
 
-      Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV - 1), [&](const int ilev) {
-        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), KOKKOS_LAMBDA(const int idx) {
+      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+        const int igp = idx / NP;
+        const int jgp = idx % NP;
+        p(0,igp,jgp) = data.hvcoord().hyai[0]*data.hvcoord().ps0 + 0.5*dp3d_ie_n0(0,igp,jgp);
+      });
+      for(int ilev = 1; ilev < NUM_LEV; ilev++) {
+        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
-          p(ilev + 1, igp, jgp) = p(ilev, igp, jgp)
-                            + 0.5*dp3d_ie_n0(ilev, igp, jgp)
-                            + 0.5*dp3d_ie_n0(ilev + 1, igp, jgp);
+          p(ilev, igp, jgp) = p(ilev - 1, igp, jgp)
+                            + 0.5*dp3d_ie_n0(ilev - 1, igp, jgp)
+                            + 0.5*dp3d_ie_n0(ilev, igp, jgp);
+
         });
-      });
+      }
 
       team.team_barrier();
 
@@ -148,7 +148,7 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
 
         divergence_sphere(team, subview(vdp, ilev, ALL(), ALL(), ALL()), data, metDet_ie, DInv_ie, subview(div_vdp, ilev, ALL(), ALL()));
 
-        vorticity_sphere(team, subview(scalars_3d_ie, IDX_UN0, ilev, ALL(), ALL()), subview(scalars_3d_ie, IDX_VN0, ilev, ALL(), ALL()), data,
+        vorticity_sphere(team, subview(U_ie_n0,ilev,ALL(),ALL()), subview(V_ie_n0,ilev,ALL(),ALL()), data,
                          metDet_ie, subview (tensors_2d_ie, IDX_D, ALL(), ALL(), ALL(), ALL()), subview(vort, ilev, ALL(), ALL()));
       });
 
@@ -185,25 +185,34 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
-          if (ilev<NUM_LEV)
-            eta_dot_dpdn(ie,ilev,igp,jgp)         += data.constants().eta_ave_w * eta_dot_dpdn_ie(ilev,igp,jgp);
-          scalars_3d_ie(IDX_OMEGA_P,ilev,igp,jgp) += data.constants().eta_ave_w * omega_p(ilev,igp,jgp);
+          eta_dot_dpdn(ie,ilev,igp,jgp)         += data.constants().eta_ave_w * eta_dot_dpdn_ie(ilev,igp,jgp);
         });
       });
 
       team.team_barrier();
 
-      Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV_P), [&](const int ilev) {
+     Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
-          v1 = U_ie_n0(ilev,igp,jgp);
-          v2 = V_ie_n0(ilev,igp,jgp);
-
-          Ephi(igp,jgp) = 0.5 * (v1*v1 + v2*v2) + scalars_3d_ie(IDX_PHI,ilev,igp,jgp) + scalars_3d_ie(IDX_PECND,ilev,igp,jgp);
+          // T_vadv initialized
+          T_vadv(ilev, igp, jgp) = 0.0;
+          // v_vadv initialized
+          v_vadv(ilev, 0, igp, jgp) = v_vadv(ilev, 1, igp, jgp) = 0.0;
         });
+      });
+
+      Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
 
         gradient_sphere(team, subview(T_ie_n0, ilev, ALL(), ALL()), data, DInv_ie, grad_tmp);
+        Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+          const int igp = idx / NP;
+          const int jgp = idx % NP;
+          v1 = U_ie_n0(ilev,igp,jgp);
+          v2 = V_ie_n0(ilev,igp,jgp);
+
+          vgrad_T(igp,jgp) = v1*grad_tmp(0,igp,jgp) + v2*grad_tmp(1,igp,jgp);
+        });
 
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
           const int igp = idx / NP;
@@ -211,9 +220,9 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
           v1 = U_ie_n0(ilev,igp,jgp);
           v2 = V_ie_n0(ilev,igp,jgp);
 
-          vgrad_T[igp][jgp] = v1*grad_tmp(0,igp,jgp) + v2*grad_tmp(1,igp,jgp);
+          scalars_3d_ie(IDX_OMEGA_P,ilev,igp,jgp) += data.constants().eta_ave_w * omega_p(ilev,igp,jgp);
+          Ephi(igp,jgp) = 0.5 * (v1*v1 + v2*v2) + scalars_3d_ie(IDX_PHI,ilev,igp,jgp) + scalars_3d_ie(IDX_PECND,ilev,igp,jgp);
         });
-
         gradient_sphere(team, Ephi, data, DInv_ie, grad_tmp);
 
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
@@ -227,10 +236,10 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
           v1 = U_ie_n0(ilev,igp,jgp);
           v2 = V_ie_n0(ilev,igp,jgp);
 
-          vtens1[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][0] + v2 * (scalars_2d_ie(IDX_FCOR,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps1;
-          vtens2[ilev][igp][jgp] = v_vadv[ilev][igp][jgp][1] - v1 * (scalars_2d_ie(IDX_FCOR,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(1,igp,jgp) - glnps2;
+          vtens(ilev,0,igp,jgp) = - v_vadv(ilev,0,igp,jgp) + v2 * (scalars_2d_ie(IDX_FCOR,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(0,igp,jgp) - glnps1;
+          vtens(ilev,1,igp,jgp) = - v_vadv(ilev,1,igp,jgp) - v1 * (scalars_2d_ie(IDX_FCOR,igp,jgp) + vort(ilev,igp,jgp)) - grad_tmp(1,igp,jgp) - glnps2;
 
-          ttens[ilev][igp][jgp]  = T_vadv[ilev][igp][jgp] - vgrad_T[igp][jgp] + kappa_star(ilev,igp,jgp)*T_v(ilev,igp,jgp)*omega_p(ilev,igp,jgp);
+          ttens(ilev,igp,jgp)  = T_vadv(ilev,igp,jgp) - vgrad_T(igp,jgp) + kappa_star(ilev,igp,jgp)*T_v(ilev,igp,jgp)*omega_p(ilev,igp,jgp);
         });
       });
 
@@ -240,9 +249,9 @@ void compute_and_apply_rhs (const TestData& data, Region& region)
         Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
           const int igp = idx / NP;
           const int jgp = idx % NP;
-          scalars_4d_ie(np1, IDX_U, ilev, igp, jgp)    = spheremp_ie(igp, jgp) * (scalars_4d_ie(nm1, IDX_U,    ilev, igp, jgp) + dt2 * vtens1[ilev][igp][jgp]);
-          scalars_4d_ie(np1, IDX_V, ilev, igp, jgp)    = spheremp_ie(igp, jgp) * (scalars_4d_ie(nm1, IDX_V,    ilev, igp, jgp) + dt2 * vtens2[ilev][igp][jgp]);
-          scalars_4d_ie(np1, IDX_T, ilev, igp, jgp)    = spheremp_ie(igp, jgp) * (scalars_4d_ie(nm1, IDX_T,    ilev, igp, jgp) + dt2 * ttens[ilev][igp][jgp]);
+          scalars_4d_ie(np1, IDX_U, ilev, igp, jgp)    = spheremp_ie(igp, jgp) * (scalars_4d_ie(nm1, IDX_U,    ilev, igp, jgp) + dt2 * vtens(ilev,0,igp,jgp));
+          scalars_4d_ie(np1, IDX_V, ilev, igp, jgp)    = spheremp_ie(igp, jgp) * (scalars_4d_ie(nm1, IDX_V,    ilev, igp, jgp) + dt2 * vtens(ilev,1,igp,jgp));
+          scalars_4d_ie(np1, IDX_T, ilev, igp, jgp)    = spheremp_ie(igp, jgp) * (scalars_4d_ie(nm1, IDX_T,    ilev, igp, jgp) + dt2 * ttens(ilev,igp,jgp));
           scalars_4d_ie(np1, IDX_DP3D, ilev, igp, jgp) = spheremp_ie(igp, jgp) * (scalars_4d_ie(nm1, IDX_DP3D, ilev, igp, jgp) - dt2 * div_vdp(ilev, igp, jgp));
         });
       });
@@ -417,9 +426,9 @@ void print_results_2norm (const TestData& data, const Region& region)
   }
 
   std::cout << "   ---> Norms:\n"
-            << "          ||v||_2  = " << std::setprecision(18) << std::sqrt (vnorm) << "\n"
-            << "          ||T||_2  = " << std::setprecision(18) << std::sqrt (tnorm) << "\n"
-            << "          ||dp||_2 = " << std::setprecision(18) << std::sqrt (dpnorm) << "\n";
+            << "          ||v||_2  = " << std::setprecision(17) << std::sqrt (vnorm) << "\n"
+            << "          ||T||_2  = " << std::setprecision(17) << std::sqrt (tnorm) << "\n"
+            << "          ||dp||_2 = " << std::setprecision(17) << std::sqrt (dpnorm) << "\n";
 }
 
 void dump_results_to_file (const TestData& data, const Region& region)

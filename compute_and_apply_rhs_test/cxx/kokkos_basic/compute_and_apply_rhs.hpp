@@ -18,11 +18,11 @@ void print_results_2norm (const TestData& data, const Region& region);
 
 void dump_results_to_file (const TestData& data, const Region& region);
 
-template<typename DataType>
-Real compute_norm (const ViewUnmanaged<DataType> view)
+template<typename ViewType>
+Real compute_norm (const ViewType view)
 {
   size_t length = view.size();
-  typename ViewUnmanaged<DataType>::pointer_type data = view.data();
+  typename ViewType::pointer_type data = view.data();
 
   // Note: use Kahan algorithm to maintain accuracy
   Real norm = 0;

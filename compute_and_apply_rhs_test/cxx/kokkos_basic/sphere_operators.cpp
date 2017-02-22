@@ -228,8 +228,8 @@ void vorticity_sphere (const Kokkos::TeamPolicy<>::member_type &team,
     dudy = dvdx = 0.;
     for (int kgp=0; kgp<NP; ++kgp)
     {
-      dudy += Dvv[kgp][jgp] * vcov[1][igp][kgp];
-      dvdx += Dvv[kgp][igp] * vcov[0][kgp][jgp];
+      dvdx += Dvv[kgp][igp] * vcov[1][kgp][jgp];
+      dudy += Dvv[kgp][jgp] * vcov[0][igp][kgp];
     }
 
     vort(igp,jgp) = rrearth * (dvdx - dudy) / metDet(igp,jgp);

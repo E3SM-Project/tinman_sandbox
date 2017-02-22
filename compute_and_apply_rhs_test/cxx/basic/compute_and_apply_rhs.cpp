@@ -7,6 +7,7 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 
 namespace Homme
 {
@@ -152,14 +153,14 @@ void compute_and_apply_rhs (TestData& data)
     }
     else
     {
-      Qdp_ie = SLICE_6D (data.arrays.elem_state_Qdp,ie,nlev,qsize_d,2,np,np);
+      Qdp_ie = SLICE_6D_IJK (data.arrays.elem_state_Qdp,ie,0,qn0,qsize_d,2,nlev,np,np);
       for (int ilev=0; ilev<nlev; ++ilev)
       {
         for (int igp=0; igp<np; ++igp)
         {
           for (int jgp=0; jgp<np; ++jgp)
           {
-            Qt = AT_5D(Qdp_ie,ilev,1,qn0,igp,jgp,qsize_d,2,np,np) / AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
+            Qt = AT_3D(Qdp_ie,ilev,igp,jgp,np,np) / AT_3D(dp3d_n0,ilev,igp,jgp,np,np);
             T_v[ilev][igp][jgp] = AT_3D(T_n0,ilev,igp,jgp,np,np)*(1.0+ (data.constants.Rwater_vapor/data.constants.Rgas - 1.0)*Qt);
             kappa_star[ilev][igp][jgp] = data.constants.kappa;
           }
@@ -343,6 +344,25 @@ void preq_omega_ps (const real* const p, const real* const vgrad_p,
   }
 }
 
+real compute_norm (const real* const field, int length)
+{
+  // Note: use Kahan algorithm to maintain accuracy
+  real norm = 0;
+  real temp;
+  real c = 0;
+  real y = 0;
+  for (int i=0; i<length; ++i)
+  {
+    y = field[i]*field[i] - c;
+    temp = norm + y;
+    c = (temp - norm) - y;
+    norm = temp;
+  }
+
+  return std::sqrt(norm);
+}
+
+
 void print_results_2norm (const TestData& data)
 {
   // Input parameters
@@ -361,25 +381,15 @@ void print_results_2norm (const TestData& data)
     T_np1    = SLICE_5D_IJ(data.arrays.elem_state_T,ie,np1,timelevels,nlev,np,np);
     dp3d_np1 = SLICE_5D_IJ(data.arrays.elem_state_dp3d,ie,np1,timelevels,nlev,np,np);
 
-    for (int ilev=0; ilev<nlev; ++ilev)
-    {
-      for (int igp=0; igp<np; ++igp)
-      {
-        for (int jgp=0; jgp<np; ++jgp)
-        {
-          vnorm  += std::pow( AT_4D(v_np1,ilev,igp,jgp,0,np,np,2), 2 );
-          vnorm  += std::pow( AT_4D(v_np1,ilev,igp,jgp,1,np,np,2), 2 );
-          tnorm  += std::pow( AT_3D(T_np1,ilev,igp,jgp,np,np), 2 );
-          dpnorm += std::pow( AT_3D(dp3d_np1,ilev,igp,jgp,np,np), 2 );
-        }
-      }
-    }
+    vnorm  += std::pow( compute_norm(v_np1,nlev*np*np*2), 2 );
+    tnorm  += std::pow( compute_norm(T_np1,nlev*np*np), 2 );
+    dpnorm += std::pow( compute_norm(dp3d_np1,nlev*np*np), 2 );
   }
 
   std::cout << "   ---> Norms:\n"
-            << "          ||v||_2  = " << std::sqrt (vnorm) << "\n"
-            << "          ||T||_2  = " << std::sqrt (tnorm) << "\n"
-            << "          ||dp||_2 = " << std::sqrt (dpnorm) << "\n";
+            << "          ||v||_2  = " << std::setprecision(17) << std::sqrt (vnorm) << "\n"
+            << "          ||T||_2  = " << std::setprecision(17) << std::sqrt (tnorm) << "\n"
+            << "          ||dp||_2 = " << std::setprecision(17) << std::sqrt (dpnorm) << "\n";
 }
 
 void dump_results_to_file (const TestData& data)

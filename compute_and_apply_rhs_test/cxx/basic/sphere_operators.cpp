@@ -78,8 +78,8 @@ void divergence_sphere (const real* const v, const TestData& data,
       dudx = dvdy = 0.;
       for (int kgp=0; kgp<np; ++kgp)
       {
-        dudx += Dvv[kgp][igp] * gv[kgp][jgp][0];
         dvdy += Dvv[kgp][jgp] * gv[igp][kgp][1];
+        dudx += Dvv[kgp][igp] * gv[kgp][jgp][0];
       }
 
       AT_2D(div,igp,jgp,np) = (dudx + dvdy) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
@@ -118,8 +118,8 @@ void vorticity_sphere (const real* const v, const TestData& data,
       dudy = dvdx = 0.;
       for (int kgp=0; kgp<np; ++kgp)
       {
-        dudy += Dvv[kgp][jgp] * vcov[igp][kgp][1];
-        dvdx += Dvv[kgp][igp] * vcov[kgp][jgp][0];
+        dvdx += Dvv[kgp][igp] * vcov[kgp][jgp][1];
+        dudy += Dvv[kgp][jgp] * vcov[igp][kgp][0];
       }
 
       AT_2D(vort,igp,jgp,np) = (dvdx - dudy) * AT_2D(rmetdet,igp,jgp,np) * rrearth;

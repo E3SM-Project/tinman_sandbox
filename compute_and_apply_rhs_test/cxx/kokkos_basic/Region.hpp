@@ -43,7 +43,7 @@ private:
   ViewManaged< Real*[NUM_2D_TENSORS][2][2][NP][NP] >                     m_2d_tensors;
 
   // TODO: should this be divided into components and put into 3d scalars?
-  ViewManaged< Real *[NUM_LEV][QSIZE_D][2][NP][NP]> m_Qdp;
+  ViewManaged< Real *[QSIZE_D][2][NUM_LEV][NP][NP]> m_Qdp;
 
   ViewManaged< Real *[NUM_LEV_P][NP][NP] > m_eta_dot_dpdn;
 
@@ -73,7 +73,7 @@ public:
     return m_4d_scalars;
   }
 
-  ViewUnmanaged< Real*[NUM_LEV][QSIZE_D][2][NP][NP] > get_Qdp () const
+  ViewUnmanaged< Real*[QSIZE_D][2][NUM_LEV][NP][NP] > get_Qdp () const
   {
     return m_Qdp;
   }

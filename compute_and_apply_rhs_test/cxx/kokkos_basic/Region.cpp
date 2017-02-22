@@ -60,7 +60,7 @@ Region::Region( int num_elems )
           m_3d_scalars(ie,IDX_OMEGA_P,il,ip,jp) = jjp*jjp;
 
           // Initializing m_Qdp
-          m_Qdp(ie,il,0,0,ip,jp) = 1.0 + sin(iip*jjp*iil);
+          m_Qdp(ie,0,0,il,ip,jp) = 1.0 + sin(iip*jjp*iil);
 
           // Initializing arrays that contain [NUM_TIME_LEVELS]
           for (int it=0; it<NUM_TIME_LEVELS; ++it)
@@ -71,7 +71,7 @@ Region::Region( int num_elems )
             m_4d_scalars(ie,it,IDX_DP3D,il,ip,jp) = 10.0*iil + iie + iip + jjp + iit;
             m_4d_scalars(ie,it,IDX_U,   il,ip,jp) = 1.0 + 0.5*iil + iip + jjp + 0.2*iie + 2.0*iit;
             m_4d_scalars(ie,it,IDX_V,   il,ip,jp) = 1.0 + 0.5*iil + iip + jjp + 0.2*iie + 3.0*iit;
-            m_4d_scalars(ie,it,IDX_T,   il,ip,jp) = 1000.0 + sin(iip + jjp + iil);
+            m_4d_scalars(ie,it,IDX_T,   il,ip,jp) = 1000.0 - iil - iip - jjp +0.1*iie + iit;
           }
         }
 
