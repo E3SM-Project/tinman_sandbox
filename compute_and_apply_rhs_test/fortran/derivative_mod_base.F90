@@ -18,7 +18,7 @@ private
   public  :: divergence_sphere
 
 contains
-    
+
 !----------------------------------------------------------------
 
 !DIR$ ATTRIBUTES FORCEINLINE :: gradient_sphere
@@ -66,7 +66,7 @@ contains
 
 
 
-    
+
 !DIR$ ATTRIBUTES FORCEINLINE :: vorticity_sphere
   function vorticity_sphere(v,deriv,elem) result(vort)
 !
@@ -83,7 +83,7 @@ contains
     integer i
     integer j
     integer l
-    
+
     real(kind=real_kind) ::  dvdx00,dudy00
     real(kind=real_kind) ::  vco(np,np,2)
     real(kind=real_kind) ::  vtemp(np,np)
@@ -107,7 +107,7 @@ contains
              dvdx00 = dvdx00 + deriv%Dvv(i,l  )*vco(i,j  ,2)
              dudy00 = dudy00 + deriv%Dvv(i,l  )*vco(j  ,i,1)
           enddo
- 
+
           vort(l  ,j  ) = dvdx00
           vtemp(j  ,l  ) = dudy00
        enddo
@@ -138,7 +138,7 @@ contains
     integer i
     integer j
     integer l
-    
+
     real(kind=real_kind) ::  dvdx00,dudy00
     real(kind=real_kind) ::  vco(np,np,2)
     real(kind=real_kind) ::  vtemp(np,np)
@@ -146,8 +146,8 @@ contains
     ! convert to covariant form
     do j=1,np
        do i=1,np
-          vco(i,j,1)=(elem%D(i,j,1,1)*v(i,j) + elem%D(i,j,2,1)*u(i,j))
-          vco(i,j,2)=(elem%D(i,j,1,2)*v(i,j) + elem%D(i,j,2,2)*u(i,j))
+          vco(i,j,1)=(elem%D(i,j,1,1)*u(i,j) + elem%D(i,j,2,1)*v(i,j))
+          vco(i,j,2)=(elem%D(i,j,1,2)*u(i,j) + elem%D(i,j,2,2)*v(i,j))
        enddo
     enddo
 
@@ -162,7 +162,7 @@ contains
              dvdx00 = dvdx00 + deriv%Dvv(i,l  )*vco(i,j  ,2)
              dudy00 = dudy00 + deriv%Dvv(i,l  )*vco(j  ,i,1)
           enddo
- 
+
           vort(l  ,j  ) = dvdx00
           vtemp(j  ,l  ) = dudy00
        enddo
@@ -209,7 +209,7 @@ contains
        enddo
     enddo
 
-    ! compute d/dx and d/dy         
+    ! compute d/dx and d/dy
     do j=1,np
        do l=1,np
           dudx00=0.0d0
@@ -226,7 +226,7 @@ contains
 
 !dir$ simd
     div(:,:)=(div(:,:)+vvtemp(:,:))*(elem%rmetdet(:,:)*rrearth)
-    
+
   end function divergence_sphere
 
 
