@@ -5,6 +5,25 @@
 
 
 program main
+  use kinds, only: nelemd
+
+implicit none
+
+  integer :: num_args
+  character(len=20)     :: arg
+
+  num_args = command_argument_count()
+
+  if (num_args==1) then
+    call get_command_argument(1,arg)
+    read (arg, *)  nelemd
+  endif
+
+  call main_body
+
+end program main
+
+subroutine main_body
 
   use kinds
   use element_state_mod
@@ -49,6 +68,8 @@ implicit none
 #elif STVER4
   real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 #endif
+
+print *, "Main: nelemd = ", nelemd
 
   dt2 = 1.0
   eta_ave_w = 1.0
@@ -240,4 +261,4 @@ implicit none
   print *, "||T||_2  = ", compute_norm(t_norm ,nelemd)
   print *, "||dp||_2 = ", compute_norm(dp_norm,nelemd)
 
-end program main
+end subroutine main_body

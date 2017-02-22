@@ -16,7 +16,7 @@ public
   integer, public, parameter :: nlevp=nlev+1
   integer, public, parameter :: qsize_d=1
   integer, public, parameter :: ntrac = 1
-  integer, public, parameter :: nelemd = 3
+  integer, public            :: nelemd = 3
   integer, public, parameter :: npsq=np*np
   integer, public            :: np1 = 2
   integer, public            :: nm1 = 3
