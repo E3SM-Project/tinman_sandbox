@@ -245,8 +245,8 @@ void vorticity_sphere (const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnma
       dudy = dvdx = 0.;
       for (int kgp=0; kgp<NP; ++kgp)
       {
-        dudy += data.dvv(kgp, jgp) * vcov[1][igp][kgp];
-        dvdx += data.dvv(kgp, igp) * vcov[0][kgp][jgp];
+        dvdx += data.dvv(kgp, igp) * vcov[1][kgp][jgp];
+        dudy += data.dvv(kgp, jgp) * vcov[0][igp][kgp];
       }
 
       vort(igp,jgp) = rrearth * (dvdx - dudy) / metDet(igp,jgp);
@@ -287,8 +287,8 @@ void vorticity_sphere (const Kokkos::TeamPolicy<>::member_type &team,
     dudy = dvdx = 0.;
     for (int kgp=0; kgp<NP; ++kgp)
     {
-      dudy += data.dvv(kgp, jgp) * vcov[1][igp][kgp];
-      dvdx += data.dvv(kgp, igp) * vcov[0][kgp][jgp];
+      dvdx += data.dvv(kgp, igp) * vcov[1][kgp][jgp];
+      dudy += data.dvv(kgp, jgp) * vcov[0][igp][kgp];
     }
 
     vort(igp,jgp) = rrearth * (dvdx - dudy) / metDet(igp,jgp);

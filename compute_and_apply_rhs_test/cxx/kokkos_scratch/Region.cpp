@@ -72,7 +72,7 @@ Region::Region(int num_elems)
             h_4d_scalars(ie, it, IDX_DP3D, il, igp, jgp) = 10.0*iil + iie + iip + jjp + iit;
             h_4d_scalars(ie, it, IDX_U, il, igp, jgp)    = 1.0 + 0.5*iil + iip + jjp + 0.2*iie + 2.0*iit;
             h_4d_scalars(ie, it, IDX_V, il, igp, jgp)    = 1.0 + 0.5*iil + iip + jjp + 0.2*iie + 3.0*iit;
-            h_4d_scalars(ie, it, IDX_T, il, igp, jgp)    = 1000.0 + sin(iip + jjp + iil);
+            h_4d_scalars(ie, it, IDX_T, il, igp, jgp)    = 1000.0 - iil - iip - jjp +0.1*iie + iit;
           }
         }
 

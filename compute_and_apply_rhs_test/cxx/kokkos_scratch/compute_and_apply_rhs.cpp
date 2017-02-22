@@ -131,10 +131,11 @@ void compute_and_apply_rhs (const Control& data, Region& region)
 
         // Create subviews to explicitly have static dimensions
         ExecViewUnmanaged<Real[NP][NP]> vort_ilev = subview(vort, ilev, ALL(), ALL());
+        ExecViewUnmanaged<Real[NP][NP]> U_ilev = subview(region.U(ie, n0), ilev, ALL(), ALL());
+        ExecViewUnmanaged<Real[NP][NP]> V_ilev = subview(region.V(ie, n0), ilev, ALL(), ALL());
 
-        vorticity_sphere(team, region.UN0(ie, ilev), region.VN0(ie, ilev), data, region.METDET(ie), region.D(ie), vort_ilev);
+        vorticity_sphere(team, U_ilev, V_ilev, data, region.METDET(ie), region.D(ie), vort_ilev);
       });
-
       ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> kappa_star (scratch_manager.get_team_scratch<ID_3D_SCALAR,4>()); //
       ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v        (scratch_manager.get_team_scratch<ID_3D_SCALAR,5>());
       if (qn0==-1)
@@ -150,7 +151,7 @@ void compute_and_apply_rhs (const Control& data, Region& region)
       }
       else
       {
-        ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> qdp = region.QDP(ie, qn0, 1);
+        ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> qdp = region.QDP(ie, 0, qn0);
         Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
           Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
             const int igp = idx / NP;
@@ -288,7 +289,7 @@ void preq_hydrostatic (const Kokkos::TeamPolicy<>::member_type &team,
     phii[NUM_LEV - 1][igp][jgp] = Rgas * T_v(NUM_LEV - 1, igp, jgp) * hkl;
     phi(NUM_LEV - 1, igp, jgp) = phis(igp, jgp) + Rgas * T_v(NUM_LEV - 1, igp, jgp) * hkk;
 
-    for(int ilev = NUM_LEV - 2; ilev > 1; --ilev) {
+    for(int ilev = NUM_LEV - 2; ilev > 0; --ilev) {
       hkk = 0.5 * dp(ilev,igp,jgp) / p(ilev,igp,jgp);
       hkl = 2.0 * hkk;
       phii[ilev][igp][jgp] = phii[ilev + 1][igp][jgp] + Rgas * T_v(ilev, igp, jgp)*hkl;
@@ -320,7 +321,7 @@ void preq_hydrostatic (const ExecViewUnmanaged<Real[NP][NP]> phis,
       phii[NUM_LEV-1][igp][jgp] = Rgas*T_v(NUM_LEV-1,igp,jgp)*hkl;
       phi(NUM_LEV-1,igp,jgp) = phis(igp,jgp) + Rgas*T_v(NUM_LEV-1,igp,jgp)*hkk;
     }
-    for (int ilev=NUM_LEV-2; ilev>1; --ilev)
+    for (int ilev=NUM_LEV-2; ilev>0; --ilev)
     {
       for (int igp=0; igp<NP; ++igp)
       {
@@ -444,9 +445,9 @@ void print_results_2norm (const Control& data, const Region& region)
   }
 
   std::cout << "   ---> Norms:\n"
-            << "          ||v||_2  = " << std::setprecision(18) << std::sqrt (vnorm) << "\n"
-            << "          ||T||_2  = " << std::setprecision(18) << std::sqrt (tnorm) << "\n"
-            << "          ||dp||_2 = " << std::setprecision(18) << std::sqrt (dpnorm) << "\n";
+            << "          ||v||_2  = " << std::setprecision(17) << std::sqrt (vnorm) << "\n"
+            << "          ||T||_2  = " << std::setprecision(17) << std::sqrt (tnorm) << "\n"
+            << "          ||dp||_2 = " << std::setprecision(17) << std::sqrt (dpnorm) << "\n";
 }
 
 //   std::cout << "   ---> Norms:\n"

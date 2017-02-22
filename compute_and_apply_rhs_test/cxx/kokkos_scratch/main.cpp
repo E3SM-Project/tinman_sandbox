@@ -92,7 +92,7 @@ void run_simulation(int num_elems, int num_exec, bool dump_results) {
   print_results_2norm(data, region);
 
   // Burn in before timing to reduce cache effect
-  TinMan::compute_and_apply_rhs(data, region);
+  //TinMan::compute_and_apply_rhs(data, region);
 
   std::unique_ptr<Timer::Timer[]> timers(new Timer::Timer[num_exec]);
   for (int i=0; i<num_exec; ++i)
