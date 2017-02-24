@@ -9,6 +9,7 @@
 
 namespace TinMan {
 
+namespace {
 // The number of fields for each dimension
 constexpr const int NUM_4D_SCALARS = 4;
 constexpr const int NUM_3D_SCALARS = 5;
@@ -38,6 +39,7 @@ constexpr const int IDX_PHIS = 3;
 // 2D Tensors
 constexpr const int IDX_D = 0;
 constexpr const int IDX_DINV = 1;
+}
 
 /* Per element data - specific velocity, temperature, pressure, etc. */
 class Region {
@@ -222,7 +224,8 @@ public:
   /* 2D Scalars */
   KOKKOS_INLINE_FUNCTION
   ExecViewUnmanaged<const Real[NP][NP]> FCOR(int ie) const {
-    return Kokkos::subview(m_2d_scalars, ie, IDX_FCOR, Kokkos::ALL, Kokkos::ALL);
+    return Kokkos::subview(m_2d_scalars, ie, IDX_FCOR, Kokkos::ALL,
+                           Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION

@@ -523,9 +523,9 @@ struct update_state {
   KOKKOS_INLINE_FUNCTION
   void operator()(Kokkos::TeamPolicy<>::member_type team) const {
 
-    Real *memory = ScratchView<Real *>(
-        team.team_scratch(0), FastMemManager::memory_needed(team.team_size())/sizeof(Real))
-                       .ptr_on_device();
+    Real *memory = ScratchView<Real *>(team.team_scratch(0),
+                                       shmem_size(team.team_size()) /
+                                           sizeof(Real)).ptr_on_device();
     FastMemManager fast_mem(memory);
 
     // Used 5 times per index - basically the most important variable
@@ -588,44 +588,6 @@ void compute_and_apply_rhs(const Control &data, Region &region) {
   update_state f(data, region);
   Kokkos::parallel_for(Kokkos::TeamPolicy<>(data.num_elems(), Kokkos::AUTO), f);
   region.next_compute_apply_rhs();
-}
-
-KOKKOS_INLINE_FUNCTION
-void preq_omega_ps(const ScratchView<Real[NUM_LEV][NP][NP]> pressure,
-                   const ScratchView<Real[NUM_LEV][NP][NP]> vgrad_p,
-                   const ScratchView<Real[NUM_LEV][NP][NP]> div_vdp,
-                   ScratchView<Real[NUM_LEV][NP][NP]> omega_p) {
-  Real ckk, ckl, term;
-  Real suml[NP][NP];
-  for (int jgp = 0; jgp < NP; ++jgp) {
-    for (int igp = 0; igp < NP; ++igp) {
-      ckk = 0.5 / pressure(0, igp, jgp);
-      term = div_vdp(0, igp, jgp);
-      omega_p(0, igp, jgp) =
-          vgrad_p(0, igp, jgp) / pressure(0, igp, jgp) - ckk * term;
-      suml[igp][jgp] = term;
-    }
-    for (int ilev = 1; ilev < NUM_LEV - 1; ++ilev) {
-      for (int igp = 0; igp < NP; ++igp) {
-        ckk = 0.5 / pressure(ilev, igp, jgp);
-        ckl = 2.0 * ckk;
-        term = div_vdp(ilev, igp, jgp);
-        omega_p(ilev, igp, jgp) =
-            vgrad_p(ilev, igp, jgp) / pressure(ilev, igp, jgp) -
-            ckl * suml[igp][jgp] - ckk * term;
-
-        suml[igp][jgp] += term;
-      }
-    }
-    for (int igp = 0; igp < NP; ++igp) {
-      ckk = 0.5 / pressure(NUM_LEV - 1, igp, jgp);
-      ckl = 2.0 * ckk;
-      term = div_vdp(NUM_LEV - 1, igp, jgp);
-      omega_p(NUM_LEV - 1, igp, jgp) =
-          vgrad_p(NUM_LEV - 1, igp, jgp) / pressure(NUM_LEV - 1, igp, jgp) -
-          ckl * suml[igp][jgp] - ckk * term;
-    }
-  }
 }
 
 void print_results_2norm(const Control &data, const Region &region) {
