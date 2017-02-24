@@ -9,39 +9,39 @@
 
 namespace TinMan {
 
+// The number of fields for each dimension
+constexpr const int NUM_4D_SCALARS = 4;
+constexpr const int NUM_3D_SCALARS = 5;
+constexpr const int NUM_2D_SCALARS = 4;
+constexpr const int NUM_2D_TENSORS = 2;
+
+// Some constexpr for the index of different variables in the views
+// 4D Scalars
+constexpr const int IDX_U = 0;
+constexpr const int IDX_V = 1;
+constexpr const int IDX_T = 2;
+constexpr const int IDX_DP3D = 3;
+
+// 3D Scalars
+constexpr const int IDX_OMEGA_P = 0;
+constexpr const int IDX_PECND = 1;
+constexpr const int IDX_PHI = 2;
+constexpr const int IDX_UN0 = 3;
+constexpr const int IDX_VN0 = 4;
+
+// 2D Scalars
+constexpr const int IDX_FCOR = 0;
+constexpr const int IDX_SPHEREMP = 1;
+constexpr const int IDX_METDET = 2;
+constexpr const int IDX_PHIS = 3;
+
+// 2D Tensors
+constexpr const int IDX_D = 0;
+constexpr const int IDX_DINV = 1;
+
 /* Per element data - specific velocity, temperature, pressure, etc. */
 class Region {
 private:
-  // The number of fields for each dimension
-  static constexpr const int NUM_4D_SCALARS = 4;
-  static constexpr const int NUM_3D_SCALARS = 5;
-  static constexpr const int NUM_2D_SCALARS = 4;
-  static constexpr const int NUM_2D_TENSORS = 2;
-
-  // Some constexpr for the index of different variables in the views
-  // 4D Scalars
-  static constexpr const int IDX_U = 0;
-  static constexpr const int IDX_V = 1;
-  static constexpr const int IDX_T = 2;
-  static constexpr const int IDX_DP3D = 3;
-
-  // 3D Scalars
-  static constexpr const int IDX_OMEGA_P = 0;
-  static constexpr const int IDX_PECND = 1;
-  static constexpr const int IDX_PHI = 2;
-  static constexpr const int IDX_UN0 = 3;
-  static constexpr const int IDX_VN0 = 4;
-
-  // 2D Scalars
-  static constexpr const int IDX_FCOR = 0;
-  static constexpr const int IDX_SPHEREMP = 1;
-  static constexpr const int IDX_METDET = 2;
-  static constexpr const int IDX_PHIS = 3;
-
-  // 2D Tensors
-  static constexpr const int IDX_D = 0;
-  static constexpr const int IDX_DINV = 1;
-
   /* Contains U, V, T, DP3D */
   ExecViewManaged<Real * [NUM_TIME_LEVELS][NUM_4D_SCALARS][NUM_LEV][NP][NP]>
   m_4d_scalars, m_4d_scalars_update;
@@ -222,7 +222,7 @@ public:
   /* 2D Scalars */
   KOKKOS_INLINE_FUNCTION
   ExecViewUnmanaged<const Real[NP][NP]> FCOR(int ie) const {
-    return Kokkos::subview(m_2d_scalars, ie, IDX_VN0, Kokkos::ALL, Kokkos::ALL);
+    return Kokkos::subview(m_2d_scalars, ie, IDX_FCOR, Kokkos::ALL, Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION
