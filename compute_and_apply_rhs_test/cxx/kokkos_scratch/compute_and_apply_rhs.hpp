@@ -14,7 +14,7 @@ class Region;
 
 void compute_and_apply_rhs (const Control& data, Region& region);
 
-// void print_results_2norm (const Control& data, const Region& region);
+void print_results_2norm (const Control& data, const Region& region);
 
 // void dump_results_to_file (const Control& data, const Region& region);
 

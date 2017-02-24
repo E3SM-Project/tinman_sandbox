@@ -77,9 +77,8 @@ struct update_state {
     });
     gradient_sphere<ScratchSpace, ExecSpace, ScratchSpace, FastMemManager,
                     block_2d_vectors, vector_mem>(
-        team, fast_mem,
-        static_cast<ScratchView<const Real[NP][NP]> >(Ephi), m_data,
-        m_region.DINV(ie), Ephi_grad);
+        team, fast_mem, static_cast<ScratchView<const Real[NP][NP]> >(Ephi),
+        m_data, m_region.DINV(ie), Ephi_grad);
     // We shouldn't need a block here, as the parallel loops were vector level,
     // not thread level
   }
@@ -321,7 +320,7 @@ struct update_state {
                         ScratchView<Real[NUM_LEV][NP][NP]> pressure) const {
     const int ie = team.league_rank();
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                         [&](const int idx) {
+                         KOKKOS_LAMBDA(const int idx) {
       const int igp = idx / NP;
       const int jgp = idx % NP;
       pressure(0, igp, jgp) = m_data.hybrid_a(0) * m_data.ps0() +
@@ -485,8 +484,8 @@ struct update_state {
           fast_mem.get_thread_scratch<block_2d_vectors, 0>(team.team_rank()));
 
       gradient_sphere<ExecSpace, ExecSpace, ScratchSpace, FastMemManager,
-                      block_2d_vectors, 1>(team, fast_mem, T_ie_n0_ilev,
-                                           m_data, m_region.DINV(ie), grad_tmp);
+                      block_2d_vectors, 1>(team, fast_mem, T_ie_n0_ilev, m_data,
+                                           m_region.DINV(ie), grad_tmp);
 
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                            [&](const int idx) {
@@ -523,8 +522,9 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void operator()(Kokkos::TeamPolicy<>::member_type team) const {
-    Real *memory =
-        ScratchView<Real[total_memory]>(team.team_scratch(0)).ptr_on_device();
+    Real *memory = ScratchView<Real *>(
+        team.team_scratch(0), FastMemManager::memory_needed(team.team_size()))
+                       .ptr_on_device();
     FastMemManager fast_mem(memory);
 
     // Used 5 times per index - basically the most important variable
@@ -627,40 +627,36 @@ void preq_omega_ps(const ScratchView<Real[NUM_LEV][NP][NP]> pressure,
   }
 }
 
-// void print_results_2norm (const Control& data, const Region& region)
-// {
-//   // Input parameters
-//   const int np1  = data.np1();
+void print_results_2norm(const Control &data, const Region &region) {
+  // Input parameters
+  const int np1 = data.np1();
 
-//   auto scalars_4d = region.get_4d_scalars();
+  Real unorm(0.), vnorm(0.), tnorm(0.), dpnorm(0.);
+  for (int ie = 0; ie < data.num_elems(); ++ie) {
 
-//   Real vnorm(0.), tnorm(0.), dpnorm(0.);
-//   for (int ie=0; ie<; ++ie)
-//   {
-//     for (int ilev=0; ilev<NUM_LEV; ++ilev)
-//     {
-//       for (int igp=0; igp<NP; ++igp)
-//       {
-//         for (int jgp=0; jgp<NP; ++jgp)
-//         {
-//           vnorm  += std::pow( scalars_4d(ie,np1,IDX_U,ilev,igp,jgp)
-// , 2 );
-//           vnorm  += std::pow( scalars_4d(ie,np1,IDX_V,ilev,igp,jgp)
-// , 2 );
-//           tnorm  += std::pow( scalars_4d(ie,np1,IDX_T,ilev,igp,jgp)
-// , 2 );
-//           dpnorm += std::pow(
-// scalars_4d(ie,np1,IDX_DP3D,ilev,igp,jgp), 2 );
-//         }
-//       }
-//     }
-//   }
+    auto U = Kokkos::create_mirror_view(region.U(ie, data.n0()));
+    auto V = Kokkos::create_mirror_view(region.V(ie, data.n0()));
+    auto T = Kokkos::create_mirror_view(region.T(ie, data.n0()));
+    auto DP3D = Kokkos::create_mirror_view(region.DP3D(ie, data.n0()));
 
-//   std::cout << "   ---> Norms:\n"
-//             << "          ||v||_2  = " << std::sqrt(vnorm) << "\n"
-//             << "          ||T||_2  = " << std::sqrt(tnorm) << "\n"
-//             << "          ||dp||_2 = " << std::sqrt(dpnorm) << "\n";
-// }
+    for (int ilev = 0; ilev < NUM_LEV; ++ilev) {
+      for (int igp = 0; igp < NP; ++igp) {
+        for (int jgp = 0; jgp < NP; ++jgp) {
+          unorm += U(ilev, igp, jgp) * U(ilev, igp, jgp);
+          vnorm += V(ilev, igp, jgp) * V(ilev, igp, jgp);
+          tnorm += T(ilev, igp, jgp) * T(ilev, igp, jgp);
+          dpnorm += DP3D(ilev, igp, jgp) * DP3D(ilev, igp, jgp);
+        }
+      }
+    }
+  }
+
+  std::cout << "   ---> Norms:\n"
+            << "          ||u||_2  = " << std::sqrt(unorm) << "\n"
+            << "          ||v||_2  = " << std::sqrt(vnorm) << "\n"
+            << "          ||T||_2  = " << std::sqrt(tnorm) << "\n"
+            << "          ||dp||_2 = " << std::sqrt(dpnorm) << "\n";
+}
 
 // void dump_results_to_file (const Control& data, const Region& region)
 // {

@@ -111,7 +111,8 @@ public:
            ScratchOffset<thread_sizes_pack, BLOCK_ID, COUNTER_ID>::value;
   }
 
-  static constexpr int memory_needed(const int team_size) {
+  KOKKOS_INLINE_FUNCTION static constexpr int
+  memory_needed(const int team_size) {
     return sizeof(Real) * (sum_team_sizes + sum_thread_sizes * team_size);
   }
 

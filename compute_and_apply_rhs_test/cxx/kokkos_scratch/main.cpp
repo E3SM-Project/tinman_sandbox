@@ -111,7 +111,7 @@ void run_simulation(int num_elems, int num_exec, bool dump_results) {
     std::cout << timers[i] << std::endl;
   }
 
-  // print_results_2norm (data,region);
+  print_results_2norm (data,region);
 
   // if (dump_results)
   // {
