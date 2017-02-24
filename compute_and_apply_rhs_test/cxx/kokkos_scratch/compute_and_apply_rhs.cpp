@@ -474,7 +474,7 @@ struct update_state {
 
     // Updates OMEGA_P, T, and DP3D
     // Depends on T, OMEGA_P, T_v, U, V, SPHEREMP, and omega_p
-    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV_P),
+    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV),
                          [&](const int ilev) {
       // Create subviews to explicitly have static dimensions
       ExecViewUnmanaged<const Real[NP][NP]> T_ie_n0_ilev = Kokkos::subview(
@@ -522,8 +522,9 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void operator()(Kokkos::TeamPolicy<>::member_type team) const {
+
     Real *memory = ScratchView<Real *>(
-        team.team_scratch(0), FastMemManager::memory_needed(team.team_size()))
+        team.team_scratch(0), FastMemManager::memory_needed(team.team_size())/sizeof(Real))
                        .ptr_on_device();
     FastMemManager fast_mem(memory);
 
