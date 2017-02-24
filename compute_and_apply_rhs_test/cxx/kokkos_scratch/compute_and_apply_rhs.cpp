@@ -16,11 +16,11 @@ struct update_state {
   const Control m_data;
   const Region m_region;
 
-  static constexpr const size_t num_2d_scalars = 1;
-  static constexpr const size_t num_2d_vectors = 2;
-  static constexpr const size_t num_3d_scalars = 2;
-  static constexpr const size_t num_3d_vectors = 1;
-  static constexpr const size_t num_3d_p_scalars = 1;
+  static constexpr const size_t num_2d_scalars = 2;
+  static constexpr const size_t num_2d_vectors = 3;
+  static constexpr const size_t num_3d_scalars = 4;
+  static constexpr const size_t num_3d_vectors = 0;
+  static constexpr const size_t num_3d_p_scalars = 0;
 
   static constexpr const size_t size_2d_scalars = NP * NP;
   static constexpr const size_t size_2d_vectors = 2 * NP * NP;
@@ -53,7 +53,7 @@ struct update_state {
   // For each thread, requires 3 x NP x NP memory
   // Depends on PHI, PECND
   // Modifies Ephi_grad
-  template <typename Grad_View>
+  template <typename Grad_View, size_t scalar_mem, size_t vector_mem>
   KOKKOS_INLINE_FUNCTION void
   compute_energy_grad(Kokkos::TeamPolicy<>::member_type &team,
                       FastMemManager fast_mem, const int ilev,
@@ -61,7 +61,9 @@ struct update_state {
     const int ie = team.league_rank();
 
     ScratchView<Real[NP][NP]> Ephi(
-        fast_mem.get_team_scratch<block_2d_scalars, 0>());
+        fast_mem.get_thread_scratch<block_2d_scalars, scalar_mem>(
+            team.team_rank()));
+
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                          [&](const int idx) {
       const int igp = idx / NP;
@@ -74,8 +76,8 @@ struct update_state {
                        m_region.PECND(ie, ilev)(igp, jgp);
     });
     gradient_sphere<ScratchSpace, ExecSpace, ScratchSpace, FastMemManager,
-                    block_2d_vectors, 0>(
-        team, fast_mem, ilev,
+                    block_2d_vectors, vector_mem>(
+        team, fast_mem,
         static_cast<ScratchView<const Real[NP][NP]> >(Ephi), m_data,
         m_region.DINV(ie), Ephi_grad);
     // We shouldn't need a block here, as the parallel loops were vector level,
@@ -98,23 +100,22 @@ struct update_state {
           subview(pressure, ilev, Kokkos::ALL(), Kokkos::ALL());
 
       ScratchView<Real[NP][NP]> vort(
-          fast_mem.get_thread_scratch<block_2d_scalars, 0>(ilev));
-
+          fast_mem.get_thread_scratch<block_2d_scalars, 0>(team.team_rank()));
       vorticity_sphere<ExecSpace, ScratchSpace, FastMemManager,
                        block_2d_vectors, 0>(
-          team, fast_mem, ilev, m_region.UN0(ie, ilev), m_region.VN0(ie, ilev),
+          team, fast_mem, m_region.UN0(ie, ilev), m_region.VN0(ie, ilev),
           m_data, m_region.METDET(ie), m_region.D(ie), vort);
 
-      ScratchView<Real[2][NP][NP]> Ephi_grad(
-          fast_mem.get_thread_scratch<block_2d_vectors, 0>(ilev));
-      compute_energy_grad(team, fast_mem, ilev, Ephi_grad);
-
       ScratchView<Real[2][NP][NP]> grad_p(
-          fast_mem.get_thread_scratch<block_2d_vectors, 1>(ilev));
-
+          fast_mem.get_thread_scratch<block_2d_vectors, 0>(team.team_rank()));
       gradient_sphere<ScratchSpace, ExecSpace, ScratchSpace, FastMemManager,
-                      block_2d_vectors, 0>(team, fast_mem, ilev, p_ilev, m_data,
+                      block_2d_vectors, 1>(team, fast_mem, p_ilev, m_data,
                                            m_region.DINV(ie), grad_p);
+
+      ScratchView<Real[2][NP][NP]> Ephi_grad(
+          fast_mem.get_thread_scratch<block_2d_vectors, 1>(team.team_rank()));
+      compute_energy_grad<ScratchView<Real[2][NP][NP]>, 1, 2>(team, fast_mem,
+                                                              ilev, Ephi_grad);
 
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                            [&](const int idx) {
@@ -246,18 +247,18 @@ struct update_state {
     Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
                          KOKKOS_LAMBDA(const int loop_idx) {
       ScratchView<Real[NP][NP]> suml(
-          fast_mem.get_thread_scratch<block_2d_scalars, 0>(loop_idx));
+          fast_mem.get_thread_scratch<block_2d_scalars, 0>(team.team_rank()));
       const int jgp = loop_idx / NP;
       const int igp = loop_idx % NP;
       ScratchView<Real[2][NP][NP]> grad_p(
-          fast_mem.get_thread_scratch<block_2d_vectors, 0>(loop_idx));
+          fast_mem.get_thread_scratch<block_2d_vectors, 0>(team.team_rank()));
       ScratchView<Real[NP][NP]> p_ilev;
 
       {
         p_ilev = subview(pressure, 0, Kokkos::ALL(), Kokkos::ALL());
         gradient_sphere<ScratchSpace, ExecSpace, ScratchSpace, FastMemManager,
                         block_2d_vectors, 1>(
-            team, fast_mem, loop_idx,
+            team, fast_mem,
             static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
             m_region.DINV(ie), grad_p);
         const Real vgrad_p =
@@ -275,7 +276,7 @@ struct update_state {
         p_ilev = subview(pressure, ilev, Kokkos::ALL(), Kokkos::ALL());
         gradient_sphere<ScratchSpace, ExecSpace, ScratchSpace, FastMemManager,
                         block_2d_vectors, 1>(
-            team, fast_mem, loop_idx,
+            team, fast_mem,
             static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
             m_region.DINV(ie), grad_p);
         const Real vgrad_p =
@@ -295,7 +296,7 @@ struct update_state {
         p_ilev = subview(pressure, NUM_LEV - 1, Kokkos::ALL(), Kokkos::ALL());
         gradient_sphere<ScratchSpace, ExecSpace, ScratchSpace, FastMemManager,
                         block_2d_vectors, 1>(
-            team, fast_mem, loop_idx,
+            team, fast_mem,
             static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
             m_region.DINV(ie), grad_p);
         const Real vgrad_p =
@@ -393,6 +394,7 @@ struct update_state {
   // Requires 7 x NP x NP thread memory
   // Depends on UN0, VN0, U, V,
   // Modifies UN0, VN0, PHI, OMEGA_P, T, and DP3D
+  // block_3d_scalars, 2 used at start
   KOKKOS_INLINE_FUNCTION
   void compute_stuff(Kokkos::TeamPolicy<>::member_type team,
                      FastMemManager fast_mem,
@@ -403,7 +405,7 @@ struct update_state {
     // Initialized in divergence_sphere
     // Used 2 times per index, 1 of which is in preq_omega_ps
     ScratchView<Real[NUM_LEV][NP][NP]> div_vdp(
-        fast_mem.get_team_scratch<block_3d_scalars, 0>());
+        fast_mem.get_team_scratch<block_3d_scalars, 2>());
 
     // For each thread, requires 2 x NP x NP Scratch Memory
     // Depends on UN0, VN0, METDET, DINV
@@ -414,7 +416,7 @@ struct update_state {
 
       // Create subviews to explicitly have static dimensions
       ScratchView<Real[2][NP][NP]> vdp_ilev(
-          fast_mem.get_thread_scratch<block_2d_vectors, 0>(ilev));
+          fast_mem.get_thread_scratch<block_2d_vectors, 0>(team.team_rank()));
 
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                            [&](const int idx) {
@@ -439,8 +441,8 @@ struct update_state {
       ScratchView<Real[NP][NP]> div_vdp_ilev =
           Kokkos::subview(div_vdp, ilev, Kokkos::ALL(), Kokkos::ALL());
       divergence_sphere<ScratchSpace, ScratchSpace, FastMemManager,
-                        block_2d_vectors, 0>(
-          team, fast_mem, ilev,
+                        block_2d_vectors, 1>(
+          team, fast_mem,
           static_cast<ScratchView<const Real[2][NP][NP]> >(vdp_ilev), m_data,
           m_region.METDET(ie), m_region.DINV(ie), div_vdp_ilev);
     });
@@ -458,7 +460,8 @@ struct update_state {
 
     // Initialized in preq_omega_ps
     // Used 2 times per index
-    ScratchView<Real[NUM_LEV][NP][NP]> omega_p();
+    ScratchView<Real[NUM_LEV][NP][NP]> omega_p(
+        fast_mem.get_team_scratch<block_3d_scalars, 3>());
 
     // Maximum memory usage so far: (NUM_LEV + max(NUM_LEV, 2 x Threads_NL)) x
     // NP x NP
@@ -478,10 +481,11 @@ struct update_state {
       ExecViewUnmanaged<const Real[NP][NP]> T_ie_n0_ilev = Kokkos::subview(
           m_region.T(ie, m_data.n0()), ilev, Kokkos::ALL(), Kokkos::ALL());
 
-      ScratchView<Real[2][NP][NP]> grad_tmp(fast_mem.get_thread_scratch<block_2d_vectors, 0>(ilev));
+      ScratchView<Real[2][NP][NP]> grad_tmp(
+          fast_mem.get_thread_scratch<block_2d_vectors, 0>(team.team_rank()));
 
       gradient_sphere<ExecSpace, ExecSpace, ScratchSpace, FastMemManager,
-                      block_2d_vectors, 0>(team, fast_mem, ilev, T_ie_n0_ilev,
+                      block_2d_vectors, 1>(team, fast_mem, T_ie_n0_ilev,
                                            m_data, m_region.DINV(ie), grad_tmp);
 
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
@@ -533,12 +537,15 @@ struct update_state {
         fast_mem.get_team_scratch<block_3d_scalars, 1>());
     compute_T_v(team, T_v);
 
+    // block_3d_scalars, 2 used
     compute_stuff(team, fast_mem, pressure, T_v);
     compute_velocity(team, fast_mem, pressure, T_v);
     compute_eta_dpdn(team);
   }
 
-  size_t shmem_size(const int team_size) const { return total_memory; }
+  size_t shmem_size(const int team_size) const {
+    return FastMemManager::memory_needed(team_size);
+  }
 };
 
 KOKKOS_INLINE_FUNCTION
