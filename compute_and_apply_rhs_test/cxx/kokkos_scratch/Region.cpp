@@ -8,8 +8,15 @@ Region::Region(int num_elems)
     : m_2d_scalars("2d scalars", num_elems),
       m_2d_tensors("2d tensors", num_elems),
       m_3d_scalars("3d scalars", num_elems),
-      m_4d_scalars("4d scalars", num_elems), m_Qdp("qdp", num_elems),
-      m_eta_dot_dpdn("eta_dot_dpdn", num_elems) {
+      m_4d_scalars("4d scalars", num_elems),
+      m_Qdp("qdp", num_elems),
+      m_eta_dot_dpdn("eta_dot_dpdn", num_elems),
+      m_2d_scalars_update("2d scalars_update", num_elems),
+      m_2d_tensors_update("2d tensors_update", num_elems),
+      m_3d_scalars_update("3d scalars_update", num_elems),
+      m_4d_scalars_update("4d scalars_update", num_elems),
+      m_Qdp_update("qdp", num_elems),
+      m_eta_dot_dpdn_update("eta_dot_dpdn", num_elems) {
   ExecViewManaged<Real *[NUM_2D_SCALARS][NP][NP]>::HostMirror h_2d_scalars =
       Kokkos::create_mirror_view(m_2d_scalars);
   ExecViewManaged<Real *[NUM_2D_TENSORS][2][2][NP][NP]>::HostMirror
