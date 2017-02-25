@@ -540,6 +540,7 @@ struct update_state {
     compute_eta_dpdn(team);
   }
 
+  KOKKOS_INLINE_FUNCTION
   size_t shmem_size(const int team_size) const {
     if (team_size > NUM_LEV) {
       return FastMemManager::memory_needed(NUM_LEV);
