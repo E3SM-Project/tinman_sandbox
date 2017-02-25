@@ -3,7 +3,7 @@
 namespace TinMan {
 
 Control::Control(int num_elems)
-    : m_num_elems(num_elems), m_n0(0), m_np1(1), m_nm1(2), m_qn0(0), m_dt2(1.0),
+    : m_num_elems(num_elems), m_qn0(0), m_dt2(1.0),
       m_ps0(1.0),
       m_hybrid_a(
           "Hybrid coordinates; translates between pressure and velocity"),

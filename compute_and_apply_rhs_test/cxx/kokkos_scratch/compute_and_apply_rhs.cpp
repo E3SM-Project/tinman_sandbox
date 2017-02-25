@@ -68,8 +68,8 @@ struct update_state {
                          [&](const int idx) {
       const int igp = idx / NP;
       const int jgp = idx % NP;
-      Real v1 = m_region.U(ie, m_data.n0())(ilev, igp, jgp);
-      Real v2 = m_region.V(ie, m_data.n0())(ilev, igp, jgp);
+      Real v1 = m_region.U_current(ie)(ilev, igp, jgp);
+      Real v2 = m_region.V_current(ie)(ilev, igp, jgp);
       // Kinetic energy + PHI (thermal energy?) + PECND (potential energy?)
       Ephi(igp, jgp) = 0.5 * (v1 * v1 + v2 * v2) +
                        m_region.PHI(ie)(ilev, igp, jgp) +
@@ -123,8 +123,8 @@ struct update_state {
 
         const Real gpterm = T_v(ilev, igp, jgp) / p_ilev(igp, jgp);
 
-        const Real v1 = m_region.U(ie, m_data.n0())(ilev, igp, jgp);
-        const Real v2 = m_region.V(ie, m_data.n0())(ilev, igp, jgp);
+        const Real v1 = m_region.U_current(ie)(ilev, igp, jgp);
+        const Real v2 = m_region.V_current(ie)(ilev, igp, jgp);
 
         const Real fcor_vort_coeff =
             m_region.FCOR(ie)(igp, jgp) + vort(igp, jgp);
@@ -134,11 +134,11 @@ struct update_state {
         const Real vtens1 =
             // v_vadv(igp, jgp, 0)
             0.0 + v2 * fcor_vort_coeff - Ephi_grad(0, igp, jgp) - glnps1;
+        const Real spheremp = m_region.SPHEREMP(ie)(igp, jgp);
 
-        m_region.U_update(ie, m_data.np1())(ilev, igp, jgp) =
-            m_region.SPHEREMP(ie)(igp, jgp) *
-            (m_region.U(ie, m_data.nm1())(ilev, igp, jgp) +
-             m_data.dt2() * vtens1);
+        m_region.U_future(ie)(ilev, igp, jgp) =
+            spheremp * (m_region.U_previous(ie)(ilev, igp, jgp) +
+                        m_data.dt2() * vtens1);
 
         const Real glnps2 =
             PhysicalConstants::Rgas * gpterm * grad_p(1, igp, jgp);
@@ -146,10 +146,9 @@ struct update_state {
             // v_vadv(igp, jgp, 1) -
             0.0 - v1 * fcor_vort_coeff - Ephi_grad(1, igp, jgp) - glnps2;
 
-        m_region.V_update(ie, m_data.np1())(ilev, igp, jgp) =
-            m_region.SPHEREMP(ie)(igp, jgp) *
-            (m_region.V(ie, m_data.nm1())(ilev, igp, jgp) +
-             m_data.dt2() * vtens2);
+        m_region.V_future(ie)(ilev, igp, jgp) =
+            spheremp * (m_region.V_previous(ie)(ilev, igp, jgp) +
+                        m_data.dt2() * vtens2);
       });
     });
     team.team_barrier();
@@ -186,16 +185,13 @@ struct update_state {
     const int ie = team.league_rank();
 
     ExecViewUnmanaged<const Real[NP][NP]> phis = m_region.PHIS(ie);
-    ExecViewUnmanaged<Real[NP][NP]> phis_update = m_region.PHIS_update(ie);
+    ExecViewUnmanaged<const Real[NP][NP]> phis_update = m_region.PHIS_update(ie);
 
     ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> dp =
-        m_region.DP3D(ie, m_data.n0());
-    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> dp_update =
-        m_region.DP3D_update(ie, m_data.n0());
+        m_region.DP3D_current(ie);
 
     ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> phi = m_region.PHI(ie);
-    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> phi_update =
-        m_region.PHI_update(ie);
+    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> phi_update = m_region.PHI_update(ie);
 
     Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
                          KOKKOS_LAMBDA(const int loop_idx) {
@@ -261,8 +257,8 @@ struct update_state {
             static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
             m_region.DINV(ie), grad_p);
         const Real vgrad_p =
-            m_region.U(ie, m_data.n0())(0, igp, jgp) * grad_p(0, igp, jgp) +
-            m_region.V(ie, m_data.n0())(0, igp, jgp) * grad_p(1, igp, jgp);
+            m_region.U_current(ie)(0, igp, jgp) * grad_p(0, igp, jgp) +
+            m_region.V_current(ie)(0, igp, jgp) * grad_p(1, igp, jgp);
 
         const Real ckk = 0.5 / p_ilev(igp, jgp);
         const Real term = div_vdp(0, igp, jgp);
@@ -279,8 +275,8 @@ struct update_state {
             static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
             m_region.DINV(ie), grad_p);
         const Real vgrad_p =
-            m_region.U(ie, m_data.n0())(ilev, igp, jgp) * grad_p(0, igp, jgp) +
-            m_region.V(ie, m_data.n0())(ilev, igp, jgp) * grad_p(1, igp, jgp);
+            m_region.U_current(ie)(ilev, igp, jgp) * grad_p(0, igp, jgp) +
+            m_region.V_current(ie)(ilev, igp, jgp) * grad_p(1, igp, jgp);
 
         const Real ckk = 0.5 / p_ilev(igp, jgp);
         const Real ckl = 2.0 * ckk;
@@ -299,9 +295,9 @@ struct update_state {
             static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
             m_region.DINV(ie), grad_p);
         const Real vgrad_p =
-            m_region.U(ie, m_data.n0())(NUM_LEV - 1, igp, jgp) *
+            m_region.U_current(ie)(NUM_LEV - 1, igp, jgp) *
                 grad_p(0, igp, jgp) +
-            m_region.V(ie, m_data.n0())(NUM_LEV - 1, igp, jgp) *
+            m_region.V_current(ie)(NUM_LEV - 1, igp, jgp) *
                 grad_p(1, igp, jgp);
 
         const Real ckk = 0.5 / p_ilev(igp, jgp);
@@ -324,7 +320,7 @@ struct update_state {
       const int igp = idx / NP;
       const int jgp = idx % NP;
       pressure(0, igp, jgp) = m_data.hybrid_a(0) * m_data.ps0() +
-                              0.5 * m_region.DP3D(ie, m_data.n0())(0, igp, jgp);
+                              0.5 * m_region.DP3D_current(ie)(0, igp, jgp);
     });
 
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
@@ -334,8 +330,8 @@ struct update_state {
         const int jgp = idx % NP;
         pressure(ilev, igp, jgp) =
             pressure(ilev - 1, igp, jgp) +
-            0.5 * m_region.DP3D(ie, m_data.n0())(ilev - 1, igp, jgp) +
-            0.5 * m_region.DP3D(ie, m_data.n0())(ilev, igp, jgp);
+            0.5 * m_region.DP3D_current(ie)(ilev - 1, igp, jgp) +
+            0.5 * m_region.DP3D_current(ie)(ilev, igp, jgp);
       }
     });
   }
@@ -350,7 +346,7 @@ struct update_state {
                          KOKKOS_LAMBDA(const int idx) {
       const int igp = idx / NP;
       const int jgp = idx % NP;
-      T_v(ilev, igp, jgp) = m_region.T(ie, m_data.n0())(ilev, igp, jgp);
+      T_v(ilev, igp, jgp) = m_region.T_current(ie)(ilev, igp, jgp);
     });
   }
 
@@ -364,9 +360,9 @@ struct update_state {
       const int igp = idx / NP;
       const int jgp = idx % NP;
       Real Qt = m_region.QDP(ie, m_data.qn0(), 1)(ilev, igp, jgp) /
-                m_region.DP3D(ie, m_data.n0())(ilev, igp, jgp);
+                m_region.DP3D_current(ie)(ilev, igp, jgp);
       T_v(ilev, igp, jgp) =
-          m_region.T(ie, m_data.n0())(ilev, igp, jgp) *
+          m_region.T_current(ie)(ilev, igp, jgp) *
           (1.0 +
            (PhysicalConstants::Rwater_vapor / PhysicalConstants::Rgas - 1.0) *
                Qt);
@@ -421,13 +417,13 @@ struct update_state {
                            [&](const int idx) {
         const int igp = idx / NP;
         const int jgp = idx % NP;
-        Real v1 = m_region.U(ie, m_data.n0())(ilev, igp, jgp);
-        Real v2 = m_region.V(ie, m_data.n0())(ilev, igp, jgp);
+        Real v1 = m_region.U_current(ie)(ilev, igp, jgp);
+        Real v2 = m_region.V_current(ie)(ilev, igp, jgp);
 
         vdp_ilev(0, igp, jgp) =
-            v1 * m_region.DP3D(ie, m_data.n0())(ilev, igp, jgp);
+            v1 * m_region.DP3D_current(ie)(ilev, igp, jgp);
         vdp_ilev(1, igp, jgp) =
-            v2 * m_region.DP3D(ie, m_data.n0())(ilev, igp, jgp);
+            v2 * m_region.DP3D_current(ie)(ilev, igp, jgp);
 
         m_region.UN0_update(ie, ilev)(igp, jgp) =
             m_region.UN0(ie, ilev)(igp, jgp) +
@@ -478,7 +474,7 @@ struct update_state {
                          [&](const int ilev) {
       // Create subviews to explicitly have static dimensions
       ExecViewUnmanaged<const Real[NP][NP]> T_ie_n0_ilev = Kokkos::subview(
-          m_region.T(ie, m_data.n0()), ilev, Kokkos::ALL(), Kokkos::ALL());
+          m_region.T_current(ie), ilev, Kokkos::ALL(), Kokkos::ALL());
 
       ScratchView<Real[2][NP][NP]> grad_tmp(
           fast_mem.get_thread_scratch<block_2d_vectors, 0>(team.team_rank()));
@@ -498,8 +494,8 @@ struct update_state {
 
         const Real cur_T_v = T_v(ilev, igp, jgp);
 
-        const Real v1 = m_region.U(ie, m_data.n0())(ilev, igp, jgp);
-        const Real v2 = m_region.V(ie, m_data.n0())(ilev, igp, jgp);
+        const Real v1 = m_region.U_current(ie)(ilev, igp, jgp);
+        const Real v2 = m_region.V_current(ie)(ilev, igp, jgp);
 
         const Real ttens =
             // T_vadv(ilev, igp, jgp)
@@ -507,14 +503,14 @@ struct update_state {
             // kappa_star(ilev, igp, jgp)
             PhysicalConstants::kappa * cur_T_v * omega_p(ilev, igp, jgp);
 
-        m_region.T_update(ie, m_data.np1())(ilev, igp, jgp) =
+        m_region.T_future(ie)(ilev, igp, jgp) =
             m_region.SPHEREMP(ie)(igp, jgp) *
-            (m_region.T(ie, m_data.nm1())(ilev, igp, jgp) +
+            (m_region.T_previous(ie)(ilev, igp, jgp) +
              m_data.dt2() * ttens);
 
-        m_region.DP3D_update(ie, m_data.np1())(ilev, igp, jgp) =
+        m_region.DP3D_future(ie)(ilev, igp, jgp) =
             m_region.SPHEREMP(ie)(igp, jgp) *
-            (m_region.DP3D(ie, m_data.nm1())(ilev, igp, jgp) +
+            (m_region.DP3D_previous(ie)(ilev, igp, jgp) +
              m_data.dt2() * div_vdp(ilev, igp, jgp));
       });
     });
@@ -545,44 +541,13 @@ struct update_state {
   }
 
   size_t shmem_size(const int team_size) const {
-    return FastMemManager::memory_needed(team_size);
+    if (team_size > NUM_LEV) {
+      return FastMemManager::memory_needed(NUM_LEV);
+    } else {
+      return FastMemManager::memory_needed(team_size);
+    }
   }
 };
-
-KOKKOS_INLINE_FUNCTION
-void preq_hydrostatic(const ExecViewUnmanaged<Real[NP][NP]> phis,
-                      const ScratchView<Real[NUM_LEV][NP][NP]> T_v,
-                      const ScratchView<Real[NUM_LEV][NP][NP]> p,
-                      const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> dp,
-                      Real Rgas, ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> phi) {
-  Real hkk, hkl;
-  Real phii[NUM_LEV][NP][NP];
-  for (int jgp = 0; jgp < NP; ++jgp) {
-    for (int igp = 0; igp < NP; ++igp) {
-      hkk = 0.5 * dp(NUM_LEV - 1, igp, jgp) / p(NUM_LEV - 1, igp, jgp);
-      hkl = 2.0 * hkk;
-      phii[NUM_LEV - 1][igp][jgp] = Rgas * T_v(NUM_LEV - 1, igp, jgp) * hkl;
-      phi(NUM_LEV - 1, igp, jgp) =
-          phis(igp, jgp) + Rgas * T_v(NUM_LEV - 1, igp, jgp) * hkk;
-    }
-    // Another candidate for parallel scan
-    for (int ilev = NUM_LEV - 2; ilev > 1; --ilev) {
-      for (int igp = 0; igp < NP; ++igp) {
-        hkk = 0.5 * dp(ilev, igp, jgp) / p(ilev, igp, jgp);
-        hkl = 2.0 * hkk;
-        phii[ilev][igp][jgp] =
-            phii[ilev + 1][igp][jgp] + Rgas * T_v(ilev, igp, jgp) * hkl;
-        phi(ilev, igp, jgp) = phis(igp, jgp) + phii[ilev + 1][igp][jgp] +
-                              Rgas * T_v(ilev, igp, jgp) * hkk;
-      }
-    }
-    for (int igp = 0; igp < NP; ++igp) {
-      hkk = 0.5 * dp(0, igp, jgp) / p(0, igp, jgp);
-      phi(0, igp, jgp) =
-          phis(igp, jgp) + phii[1][igp][jgp] + Rgas * T_v(0, igp, jgp) * hkk;
-    }
-  }
-}
 
 void compute_and_apply_rhs(const Control &data, Region &region) {
   update_state f(data, region);
@@ -592,15 +557,13 @@ void compute_and_apply_rhs(const Control &data, Region &region) {
 
 void print_results_2norm(const Control &data, const Region &region) {
   // Input parameters
-  const int np1 = data.np1();
-
   Real unorm(0.), vnorm(0.), tnorm(0.), dpnorm(0.);
   for (int ie = 0; ie < data.num_elems(); ++ie) {
 
-    auto U = Kokkos::create_mirror_view(region.U(ie, data.n0()));
-    auto V = Kokkos::create_mirror_view(region.V(ie, data.n0()));
-    auto T = Kokkos::create_mirror_view(region.T(ie, data.n0()));
-    auto DP3D = Kokkos::create_mirror_view(region.DP3D(ie, data.n0()));
+    auto U = Kokkos::create_mirror_view(region.U_current(ie));
+    auto V = Kokkos::create_mirror_view(region.V_current(ie));
+    auto T = Kokkos::create_mirror_view(region.T_current(ie));
+    auto DP3D = Kokkos::create_mirror_view(region.DP3D_current(ie));
 
     for (int ilev = 0; ilev < NUM_LEV; ++ilev) {
       for (int igp = 0; igp < NP; ++igp) {
@@ -620,87 +583,5 @@ void print_results_2norm(const Control &data, const Region &region) {
             << "          ||T||_2  = " << std::sqrt(tnorm) << "\n"
             << "          ||dp||_2 = " << std::sqrt(dpnorm) << "\n";
 }
-
-// void dump_results_to_file (const Control& data, const Region& region)
-// {
-//   // Input parameters
-//   const int nets = data.control().nets;
-//   const int nete = data.control().nete;
-//   const int np1  = data.control().np1;
-
-//   std::ofstream vxfile, vyfile, tfile, dpfile;
-//   vxfile.open("elem_state_vx.txt");
-//   if (!vxfile.is_open())
-//   {
-//     std::cout << "Error! Cannot open 'elem_state_vx.txt'.\n";
-//     std::abort();
-//   }
-
-//   vyfile.open("elem_state_vy.txt");
-//   if (!vyfile.is_open())
-//   {
-//     vxfile.close();
-//     std::cout << "Error! Cannot open 'elem_state_vy.txt'.\n";
-//     std::abort();
-//   }
-
-//   tfile.open("elem_state_t.txt");
-//   if (!tfile.is_open())
-//   {
-//     std::cout << "Error! Cannot open 'elem_state_t.txt'.\n";
-//     vxfile.close();
-//     vyfile.close();
-//     std::abort();
-//   }
-
-//   dpfile.open("elem_state_dp3d.txt");
-//   if (!dpfile.is_open())
-//   {
-//     std::cout << "Error! Cannot open 'elem_state_dp3d.txt'.\n";
-//     vxfile.close();
-//     vyfile.close();
-//     tfile.close();
-//     std::abort();
-//   }
-
-//   vxfile.precision(6);
-//   vyfile.precision(6);
-//   tfile.precision(6);
-//   dpfile.precision(6);
-
-//   auto scalars_4d = region.get_4d_scalars();
-
-//   for (int ie=nets; ie<nete; ++ie)
-//   {
-//     for (int ilev=0; ilev<NUM_LEV; ++ilev)
-//     {
-//       vxfile << "[" << ie << ", " << ilev << "]\n";
-//       vyfile << "[" << ie << ", " << ilev << "]\n";
-//       tfile  << "[" << ie << ", " << ilev << "]\n";
-//       dpfile << "[" << ie << ", " << ilev << "]\n";
-
-//       for (int igp=0; igp<NP; ++igp)
-//       {
-//         for (int jgp=0; jgp<NP; ++jgp)
-//         {
-//           vxfile << " " << scalars_4d(ie,IDX_U,np1,ilev,igp,jgp)   ;
-//           vyfile << " " << scalars_4d(ie,IDX_V,np1,ilev,igp,jgp)   ;
-//           tfile  << " " << scalars_4d(ie,IDX_T,np1,ilev,igp,jgp)   ;
-//           dpfile << " " << scalars_4d(ie,IDX_DP3D,np1,ilev,igp,jgp);
-//         }
-//         vxfile << "\n";
-//         vyfile << "\n";
-//         tfile  << "\n";
-//         dpfile << "\n";
-//       }
-//     }
-//   }
-
-//   // Closing files
-//   vxfile.close();
-//   vyfile.close();
-//   tfile.close();
-//   dpfile.close();
-// }
 
 } // Namespace TinMan

@@ -26,10 +26,6 @@ public:
   KOKKOS_INLINE_FUNCTION int num_elems() const {
     return m_num_elems;
   }
-  /* Timelevels 1-3, respectively */
-  KOKKOS_INLINE_FUNCTION int n0() const { return m_n0; }
-  KOKKOS_INLINE_FUNCTION int np1() const { return m_np1; }
-  KOKKOS_INLINE_FUNCTION int nm1() const { return m_nm1; }
   /* Tracer timelevel */
   KOKKOS_INLINE_FUNCTION int qn0() const { return m_qn0; }
   /* dt * 2 */
@@ -52,20 +48,8 @@ public:
 
   KOKKOS_INLINE_FUNCTION Real dvv(int x, int y) const { return m_dvv(x, y); }
 
-  KOKKOS_INLINE_FUNCTION void update_time_levels() {
-    int tmp = m_np1;
-    m_np1 = m_nm1;
-    m_nm1 = m_n0;
-    m_n0 = tmp;
-  }
-
 private:
   const int m_num_elems;
-
-  // timelevels
-  int m_n0;
-  int m_np1;
-  int m_nm1;
 
   // tracer timelevel?
   const int m_qn0;

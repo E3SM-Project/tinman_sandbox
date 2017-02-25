@@ -1,4 +1,5 @@
 #include "Region.hpp"
+#include "TestData.hpp"
 
 namespace TinMan {
 
@@ -8,15 +9,14 @@ Region::Region(int num_elems)
     : m_2d_scalars("2d scalars", num_elems),
       m_2d_tensors("2d tensors", num_elems),
       m_3d_scalars("3d scalars", num_elems),
-      m_4d_scalars("4d scalars", num_elems),
-      m_Qdp("qdp", num_elems),
+      m_4d_scalars("4d scalars", num_elems), m_Qdp("qdp", num_elems),
       m_eta_dot_dpdn("eta_dot_dpdn", num_elems),
       m_2d_scalars_update("2d scalars_update", num_elems),
       m_2d_tensors_update("2d tensors_update", num_elems),
       m_3d_scalars_update("3d scalars_update", num_elems),
-      m_4d_scalars_update("4d scalars_update", num_elems),
       m_Qdp_update("qdp", num_elems),
-      m_eta_dot_dpdn_update("eta_dot_dpdn", num_elems) {
+      m_eta_dot_dpdn_update("eta_dot_dpdn", num_elems),
+      m_timelevels({ 0, 1, 2 }) {
   ExecViewManaged<Real *[NUM_2D_SCALARS][NP][NP]>::HostMirror h_2d_scalars =
       Kokkos::create_mirror_view(m_2d_scalars);
   ExecViewManaged<Real *[NUM_2D_TENSORS][2][2][NP][NP]>::HostMirror
@@ -117,6 +117,53 @@ Region::Region(int num_elems)
   Kokkos::deep_copy(m_4d_scalars, h_4d_scalars);
   Kokkos::deep_copy(m_Qdp, m_Qdp);
   Kokkos::deep_copy(m_eta_dot_dpdn, m_eta_dot_dpdn);
+}
+
+void Region::save_state(const Control &data) const {
+  // Input parameters
+
+  auto file_opener = [&](std::ofstream &file, const char *fname) {
+    file.open(fname);
+    if (!file.is_open()) {
+      std::cout << "Error! Cannot open '" << fname << "'.\n";
+      std::abort();
+    }
+    file.precision(17);
+  };
+
+  std::ofstream vxfile, vyfile, tfile, dpfile;
+  file_opener(vxfile, "elem_state_vx.txt");
+  file_opener(vyfile, "elem_state_vy.txt");
+  file_opener(tfile, "elem_state_t.txt");
+  file_opener(dpfile, "elem_state_dp3d.txt");
+
+  for (int ie = 0; ie < data.num_elems(); ++ie) {
+    for (int ilev = 0; ilev < NUM_LEV; ++ilev) {
+      vxfile << "[" << ie << ", " << ilev << "]\n";
+      vyfile << "[" << ie << ", " << ilev << "]\n";
+      tfile << "[" << ie << ", " << ilev << "]\n";
+      dpfile << "[" << ie << ", " << ilev << "]\n";
+
+      for (int igp = 0; igp < NP; ++igp) {
+        for (int jgp = 0; jgp < NP; ++jgp) {
+          vxfile << " " << U_future(ie)(ilev, igp, jgp);
+          vyfile << " " << V_future(ie)(ilev, igp, jgp);
+          tfile << " " << T_future(ie)(ilev, igp, jgp);
+          dpfile << " " << DP3D_future(ie)(ilev, igp, jgp);
+        }
+        vxfile << "\n";
+        vyfile << "\n";
+        tfile << "\n";
+        dpfile << "\n";
+      }
+    }
+  }
+
+  // Closing files
+  vxfile.close();
+  vyfile.close();
+  tfile.close();
+  dpfile.close();
 }
 
 } // namespace TinMan
