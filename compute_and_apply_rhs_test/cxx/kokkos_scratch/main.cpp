@@ -99,13 +99,9 @@ void run_simulation(int num_elems, int num_exec, bool dump_results) {
   {
     timers[i].startTimer();
     TinMan::compute_and_apply_rhs(data, region);
-    data.update_time_levels();
+    region.next_compute_apply_rhs();
     timers[i].stopTimer();
   }
-
-#ifdef KOKKOS_HAVE_DEFAULT_DEVICE_TYPE_OPENMP
-  Kokkos::OpenMP::fence();
-#endif
 
   for(int i = 0; i < num_exec; ++i) {
     std::cout << timers[i] << std::endl;
@@ -113,10 +109,9 @@ void run_simulation(int num_elems, int num_exec, bool dump_results) {
 
   print_results_2norm (data,region);
 
-  // if (dump_results)
-  // {
-  //   dump_results_to_file (data,region);
-  // }
+ if (dump_results) {
+   region.save_state(data);
+ }
 }
 
 int main (int argc, char** argv)
@@ -133,9 +128,7 @@ int main (int argc, char** argv)
 
   Kokkos::initialize (argc, argv);
 
-#ifdef KOKKOS_HAVE_DEFAULT_DEVICE_TYPE_OPENMP
-  Kokkos::OpenMP::print_configuration(std::cout,true);
-#endif
+  Kokkos::DefaultExecutionSpace::print_configuration(std::cout,true);
 
   run_simulation(num_elems, num_exec, dump_results);
 
