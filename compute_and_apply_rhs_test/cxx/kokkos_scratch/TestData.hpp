@@ -46,7 +46,7 @@ public:
    */
   KOKKOS_INLINE_FUNCTION Real ps0() const { return m_ps0; }
 
-  KOKKOS_INLINE_FUNCTION Real dvv(int x, int y) const { return m_dvv(x, y); }
+  KOKKOS_INLINE_FUNCTION Real dvv(int x, int y) const { return m_dvv(y, x); }
 
 private:
   const int m_num_elems;
