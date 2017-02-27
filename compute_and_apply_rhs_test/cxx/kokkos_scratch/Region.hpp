@@ -27,8 +27,8 @@ constexpr const int IDX_DP3D = 3;
 constexpr const int IDX_OMEGA_P = 0;
 constexpr const int IDX_PECND = 1;
 constexpr const int IDX_PHI = 2;
-constexpr const int IDX_UN0 = 3;
-constexpr const int IDX_VN0 = 4;
+constexpr const int IDX_DERIVED_UN0 = 3;
+constexpr const int IDX_DERIVED_VN0 = 4;
 
 // 2D Scalars
 constexpr const int IDX_FCOR = 0;
@@ -48,7 +48,7 @@ private:
   /* Contains U, V, T, DP3D */
   ExecViewManaged<Real * [NUM_TIME_LEVELS][NUM_4D_SCALARS][NUM_LEV][NP][NP]>
   m_4d_scalars;
-  /* Contains OMEGA_P, PECND, PHI, UN0, VN0, QDP, ETA_DPDN */
+  /* Contains OMEGA_P, PECND, PHI, DERIVED_UN0, DERIVED_VN0, QDP, ETA_DPDN */
   ExecViewManaged<Real * [NUM_3D_SCALARS][NUM_LEV][NP][NP]> m_3d_scalars,
       m_3d_scalars_update;
   /* Contains FCOR, SPHEREMP, METDET, PHIS */
@@ -128,8 +128,20 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
+  ExecViewUnmanaged<const Real[NP][NP]> U_current(int ie, int ilev) const {
+    return Kokkos::subview(m_4d_scalars, ie, m_timelevels.n0, IDX_U, ilev,
+                           Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION
   ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> V_current(int ie) const {
     return Kokkos::subview(m_4d_scalars, ie, m_timelevels.n0, IDX_V, Kokkos::ALL,
+                           Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  ExecViewUnmanaged<const Real[NP][NP]> V_current(int ie, int ilev) const {
+    return Kokkos::subview(m_4d_scalars, ie, m_timelevels.n0, IDX_V, ilev,
                            Kokkos::ALL, Kokkos::ALL);
   }
 
@@ -152,8 +164,20 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
+  ExecViewUnmanaged<const Real[NP][NP]> U_previous(int ie, int ilev) const {
+    return Kokkos::subview(m_4d_scalars, ie, m_timelevels.nm1, IDX_U, ilev,
+                           Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION
   ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> V_previous(int ie) const {
     return Kokkos::subview(m_4d_scalars, ie, m_timelevels.nm1, IDX_V, Kokkos::ALL,
+                           Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  ExecViewUnmanaged<const Real[NP][NP]> V_previous(int ie, int ilev) const {
+    return Kokkos::subview(m_4d_scalars, ie, m_timelevels.nm1, IDX_V, ilev,
                            Kokkos::ALL, Kokkos::ALL);
   }
 
@@ -176,8 +200,20 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
+  ExecViewUnmanaged<Real[NP][NP]> U_future(int ie, int ilev) const {
+    return Kokkos::subview(m_4d_scalars, ie, m_timelevels.np1, IDX_U, ilev,
+                           Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION
   ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> V_future(int ie) const {
     return Kokkos::subview(m_4d_scalars, ie, m_timelevels.np1, IDX_V, Kokkos::ALL,
+                           Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  ExecViewUnmanaged<Real[NP][NP]> V_future(int ie, int ilev) const {
+    return Kokkos::subview(m_4d_scalars, ie, m_timelevels.np1, IDX_V, ilev,
                            Kokkos::ALL, Kokkos::ALL);
   }
 
@@ -213,14 +249,14 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
-  ExecViewUnmanaged<const Real[NP][NP]> UN0(int ie, int level) const {
-    return Kokkos::subview(m_3d_scalars, ie, IDX_UN0, level, Kokkos::ALL,
+  ExecViewUnmanaged<const Real[NP][NP]> DERIVED_UN0(int ie, int level) const {
+    return Kokkos::subview(m_3d_scalars, ie, IDX_DERIVED_UN0, level, Kokkos::ALL,
                            Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION
-  ExecViewUnmanaged<const Real[NP][NP]> VN0(int ie, int level) const {
-    return Kokkos::subview(m_3d_scalars, ie, IDX_VN0, level, Kokkos::ALL,
+  ExecViewUnmanaged<const Real[NP][NP]> DERIVED_VN0(int ie, int level) const {
+    return Kokkos::subview(m_3d_scalars, ie, IDX_DERIVED_VN0, level, Kokkos::ALL,
                            Kokkos::ALL);
   }
 
@@ -243,14 +279,14 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
-  ExecViewUnmanaged<Real[NP][NP]> UN0_update(int ie, int level) const {
-    return Kokkos::subview(m_3d_scalars_update, ie, IDX_UN0, level, Kokkos::ALL,
+  ExecViewUnmanaged<Real[NP][NP]> DERIVED_UN0_update(int ie, int level) const {
+    return Kokkos::subview(m_3d_scalars_update, ie, IDX_DERIVED_UN0, level, Kokkos::ALL,
                            Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION
-  ExecViewUnmanaged<Real[NP][NP]> VN0_update(int ie, int level) const {
-    return Kokkos::subview(m_3d_scalars_update, ie, IDX_VN0, level, Kokkos::ALL,
+  ExecViewUnmanaged<Real[NP][NP]> DERIVED_VN0_update(int ie, int level) const {
+    return Kokkos::subview(m_3d_scalars_update, ie, IDX_DERIVED_VN0, level, Kokkos::ALL,
                            Kokkos::ALL);
   }
 
@@ -294,7 +330,7 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   ExecViewUnmanaged<Real[NP][NP]> FCOR_update(int ie) const {
-    return Kokkos::subview(m_2d_scalars_update, ie, IDX_VN0, Kokkos::ALL,
+    return Kokkos::subview(m_2d_scalars_update, ie, IDX_FCOR, Kokkos::ALL,
                            Kokkos::ALL);
   }
 

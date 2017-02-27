@@ -78,8 +78,9 @@ Region::Region(int num_elems)
           h_3d_scalars(ie, IDX_OMEGA_P, il, igp, jgp) = init_map(x, n++);
           h_3d_scalars(ie, IDX_PECND, il, igp, jgp) = init_map(x, n++);
           h_3d_scalars(ie, IDX_PHI, il, igp, jgp) = init_map(x, n++);
-          h_3d_scalars(ie, IDX_UN0, il, igp, jgp) = init_map(x, n++);
-          h_3d_scalars(ie, IDX_VN0, il, igp, jgp) = init_map(x, n++);
+
+          h_3d_scalars(ie, IDX_DERIVED_UN0, il, igp, jgp) = init_map(x, n++);
+          h_3d_scalars(ie, IDX_DERIVED_VN0, il, igp, jgp) = init_map(x, n++);
 
           // Initializing h_Qdp
           for (int iq = 0; iq < QSIZE_D; ++iq) {
