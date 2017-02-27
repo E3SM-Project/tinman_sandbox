@@ -112,11 +112,16 @@ Region::Region(int num_elems)
   }
 
   Kokkos::deep_copy(m_2d_scalars, h_2d_scalars);
+  Kokkos::deep_copy(m_2d_scalars_update, m_2d_scalars);
   Kokkos::deep_copy(m_2d_tensors, h_2d_tensors);
+  Kokkos::deep_copy(m_2d_tensors_update, m_2d_tensors);
   Kokkos::deep_copy(m_3d_scalars, h_3d_scalars);
+  Kokkos::deep_copy(m_3d_scalars_update, m_3d_scalars);
   Kokkos::deep_copy(m_4d_scalars, h_4d_scalars);
-  Kokkos::deep_copy(m_Qdp, m_Qdp);
-  Kokkos::deep_copy(m_eta_dot_dpdn, m_eta_dot_dpdn);
+  Kokkos::deep_copy(m_Qdp, h_Qdp);
+  Kokkos::deep_copy(m_Qdp_update, m_Qdp);
+  Kokkos::deep_copy(m_eta_dot_dpdn, h_eta_dot_dpdn);
+  Kokkos::deep_copy(m_eta_dot_dpdn_update, m_eta_dot_dpdn);
 }
 
 void Region::save_state(const Control &data) const {
