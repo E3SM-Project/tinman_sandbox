@@ -11,12 +11,16 @@ namespace TinMan {
 #define QSIZE_D 4
 #define NUM_TIME_LEVELS 3
 
+// This is always the case
+#define Q_NUM_TIME_LEVELS 2
+
 // Until whenever CUDA supports constexpr properly
 // static constexpr const int NP = 4;
 // static constexpr const int NUM_LEV = 72;
 // static constexpr const int NUM_LEV_P = NUM_LEV + 1;
 // static constexpr const int QSIZE_D = 4;
 // static constexpr const int NUM_TIME_LEVELS = 3;
+// static constexpr const int Q_NUM_TIME_LEVELS = 2;
 
 } // namespace TinMan
 

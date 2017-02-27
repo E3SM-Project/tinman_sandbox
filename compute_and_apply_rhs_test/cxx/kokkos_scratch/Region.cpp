@@ -29,7 +29,7 @@ Region::Region(int num_elems)
                                          [NP]>::HostMirror h_4d_scalars =
       Kokkos::create_mirror_view(m_4d_scalars);
 
-  ExecViewManaged<Real *[QSIZE_D][2][NUM_LEV][NP][NP]>::HostMirror h_Qdp =
+  ExecViewManaged<Real *[QSIZE_D][Q_NUM_TIME_LEVELS][NUM_LEV][NP][NP]>::HostMirror h_Qdp =
       Kokkos::create_mirror_view(m_Qdp);
 
   ExecViewManaged<Real *[NUM_LEV_P][NP][NP]>::HostMirror h_eta_dot_dpdn =
@@ -89,9 +89,10 @@ Region::Region(int num_elems)
             // 0 <= iq < QSIZE_D
             // 0 <= igp < NP
             // 0 <= jgp < NP
-            // NUM_ELEMS, QSIZE_D, 2, NUM_LEV, NP, NP
-            h_Qdp(ie, iq, 0, il, igp, jgp) = init_map(x, n++);
-            h_Qdp(ie, iq, 1, il, igp, jgp) = init_map(x, n++);
+            // NUM_ELEMS, QSIZE_D, Q_NUM_TIMELEVELS, NUM_LEV, NP, NP
+            for(int qni = 0; qni < Q_NUM_TIME_LEVELS; ++qni) {
+              h_Qdp(ie, iq, qni, il, igp, jgp) = init_map(x, n++);
+            }
           }
 
           // Initializing arrays that contain [NUM_TIME_LEVELS]

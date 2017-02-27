@@ -58,7 +58,8 @@ private:
   ExecViewManaged<Real * [NUM_2D_TENSORS][2][2][NP][NP]> m_2d_tensors,
       m_2d_tensors_update;
 
-  ExecViewManaged<Real * [QSIZE_D][2][NUM_LEV][NP][NP]> m_Qdp, m_Qdp_update;
+  ExecViewManaged<Real * [QSIZE_D][Q_NUM_TIME_LEVELS][NUM_LEV][NP][NP]> m_Qdp,
+      m_Qdp_update;
 
   ExecViewManaged<Real * [NUM_LEV_P][NP][NP]> m_eta_dot_dpdn,
       m_eta_dot_dpdn_update;
@@ -94,17 +95,18 @@ public:
 
   void save_state(const struct Control &data) const;
 
+  // v is the tracer we're working with, 0 <= v < QSIZE_D
+  // qn0 is the timelevel, 0 <= qn0 < Q_NUM_TIME_LEVELS
   KOKKOS_INLINE_FUNCTION
-  ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> QDP(int ie, int qn0,
-                                                     int v) const {
-    return Kokkos::subview(m_Qdp, ie, qn0, v, Kokkos::ALL, Kokkos::ALL,
+  ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> QDP(int ie, int v, int qn0) const {
+    return Kokkos::subview(m_Qdp, ie, v, qn0, Kokkos::ALL, Kokkos::ALL,
                            Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION
-  ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> QDP_update(int ie, int qn0,
-                                                      int v) const {
-    return Kokkos::subview(m_Qdp_update, ie, qn0, v, Kokkos::ALL, Kokkos::ALL,
+  ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> QDP_update(int ie, int v,
+                                                      int qn0) const {
+    return Kokkos::subview(m_Qdp_update, ie, v, qn0, Kokkos::ALL, Kokkos::ALL,
                            Kokkos::ALL);
   }
 
