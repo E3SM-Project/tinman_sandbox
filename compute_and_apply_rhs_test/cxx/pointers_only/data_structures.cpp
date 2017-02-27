@@ -85,8 +85,9 @@ void Arrays::init_data ()
 
           for (int iq=0; iq<qsize_d; ++iq)
           {
-            AT_6D(elem_state_Qdp,ie,il,ip,jp,iq,0,nlev,np,np,qsize_d,2)  = init_map(x,n++);
-            AT_6D(elem_state_Qdp,ie,il,ip,jp,iq,1,nlev,np,np,qsize_d,2)  = init_map(x,n++);
+            for(int qni = 0; qni < 2; ++qni) {
+              AT_6D(elem_state_Qdp, ie, il, iq, qni, ip, jp, nlev, qsize_d, 2, np, np) = init_map(x,n++);
+            }
           }
 
           for (int it=0; it<timelevels; ++it)
@@ -135,6 +136,7 @@ void Constants::init_data ()
   Rwater_vapor = 1.0;
   Rgas         = 10.0;
   eta_ave_w    = 1.0;
+  rrearth      = 1.0;
 }
 
 void Control::init_data ()
