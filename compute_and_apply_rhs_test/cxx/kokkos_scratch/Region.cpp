@@ -29,7 +29,8 @@ Region::Region(int num_elems)
                                          [NP]>::HostMirror h_4d_scalars =
       Kokkos::create_mirror_view(m_4d_scalars);
 
-  ExecViewManaged<Real *[QSIZE_D][Q_NUM_TIME_LEVELS][NUM_LEV][NP][NP]>::HostMirror h_Qdp =
+  ExecViewManaged<
+      Real *[QSIZE_D][Q_NUM_TIME_LEVELS][NUM_LEV][NP][NP]>::HostMirror h_Qdp =
       Kokkos::create_mirror_view(m_Qdp);
 
   ExecViewManaged<Real *[NUM_LEV_P][NP][NP]>::HostMirror h_eta_dot_dpdn =
@@ -48,15 +49,16 @@ Region::Region(int num_elems)
     for (int igp = 0; igp < NP; ++igp) {
       for (int jgp = 0; jgp < NP; ++jgp) {
         // Initializing h_2d_tensors and h_2d_scalars
-        h_2d_tensors(ie, IDX_D, 0, 0, igp, jgp) = init_map(x, n++);
-        h_2d_tensors(ie, IDX_D, 0, 1, igp, jgp) = init_map(x, n++);
-        h_2d_tensors(ie, IDX_D, 1, 0, igp, jgp) = init_map(x, n++);
-        h_2d_tensors(ie, IDX_D, 1, 1, igp, jgp) = init_map(x, n++);
+        for (int k = 0; k < 2; k++) {
+          for (int l = 0; l < 2; l++) {
+            h_2d_tensors(ie, IDX_D, k, l, igp, jgp) = init_map(x, n++);
+          }
+        }
 
         Real detD = h_2d_tensors(ie, IDX_D, 0, 0, igp, jgp) *
-                        h_2d_tensors(ie, IDX_D, 1, 0, igp, jgp) -
+                        h_2d_tensors(ie, IDX_D, 1, 1, igp, jgp) -
                     h_2d_tensors(ie, IDX_D, 0, 1, igp, jgp) *
-                        h_2d_tensors(ie, IDX_D, 1, 1, igp, jgp);
+                        h_2d_tensors(ie, IDX_D, 1, 0, igp, jgp);
 
         h_2d_tensors(ie, IDX_DINV, 0, 0, igp, jgp) =
             h_2d_tensors(ie, IDX_D, 1, 1, igp, jgp) / detD;
@@ -90,7 +92,7 @@ Region::Region(int num_elems)
             // 0 <= igp < NP
             // 0 <= jgp < NP
             // NUM_ELEMS, QSIZE_D, Q_NUM_TIMELEVELS, NUM_LEV, NP, NP
-            for(int qni = 0; qni < Q_NUM_TIME_LEVELS; ++qni) {
+            for (int qni = 0; qni < Q_NUM_TIME_LEVELS; ++qni) {
               h_Qdp(ie, iq, qni, il, igp, jgp) = init_map(x, n++);
             }
           }
