@@ -29,7 +29,7 @@ public:
   /* Tracer timelevel */
   KOKKOS_INLINE_FUNCTION int qn0() const { return m_qn0; }
   /* dt * 2 */
-  KOKKOS_INLINE_FUNCTION int dt2() const { return m_dt2; }
+  KOKKOS_INLINE_FUNCTION Real dt2() const { return m_dt2; }
 
   /* ps0 component of hybrid coordinate-interfaces
    * The A part of the pressure at a level
@@ -51,13 +51,13 @@ public:
 private:
   const int m_num_elems;
 
-  // tracer timelevel?
+  // tracer timelevel, inclusive range of 0-1
   const int m_qn0;
 
-  // dt
-  const int m_dt2;
-
   const int m_ps0;
+
+  // dt
+  const Real m_dt2;
 
   /* Device objects, to reduce the memory transfer required */
   ExecViewManaged<Real[NUM_LEV_P]> m_hybrid_a;
