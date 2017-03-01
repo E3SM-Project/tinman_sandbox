@@ -49,7 +49,7 @@ template <typename MemSpace1, typename MemSpace2, typename MemSpace3,
           typename Scratch, size_t vector_memory, size_t vector_id>
 KOKKOS_INLINE_FUNCTION void gradient_sphere(
     const Kokkos::TeamPolicy<>::member_type &team, const Scratch &fast_mem,
-    const ViewType<const Real[NP][NP], MemSpace1, Kokkos::MemoryUnmanaged> s,
+    const ViewType<const Real[NP][NP], MemSpace1, Kokkos::MemoryUnmanaged> scalar,
     const Control &data, const ViewType<const Real[2][2][NP][NP], MemSpace2,
                                         Kokkos::MemoryUnmanaged> DInv,
     ViewType<Real[2][NP][NP], MemSpace3, Kokkos::MemoryUnmanaged> grad_s) {
@@ -65,8 +65,8 @@ KOKKOS_INLINE_FUNCTION void gradient_sphere(
     Real dsdx, dsdy;
     dsdx = dsdy = 0;
     for (int i = 0; i < NP; ++i) {
-      dsdx += data.dvv(i, l) * s(i, j);
-      dsdy += data.dvv(i, l) * s(j, i);
+      dsdx += data.dvv(i, l) * scalar(i, j);
+      dsdy += data.dvv(i, l) * scalar(j, i);
     }
 
     v(0, l, j) = dsdx * PhysicalConstants::rrearth;
@@ -79,9 +79,9 @@ KOKKOS_INLINE_FUNCTION void gradient_sphere(
     const int j = loop_idx % NP;
     const int i = loop_idx / NP;
     grad_s(0, i, j) = DInv(0, 0, i, j) * v(0, i, j) +
-                      DInv(1, 0, i, j) * v(1, i, j); // Poor performance here
+                      DInv(1, 0, i, j) * v(1, i, j);
     grad_s(1, i, j) = DInv(0, 1, i, j) * v(0, i, j) +
-                      DInv(1, 1, i, j) * v(1, i, j); // Poor performance here
+                      DInv(1, 1, i, j) * v(1, i, j);
   });
 }
 
