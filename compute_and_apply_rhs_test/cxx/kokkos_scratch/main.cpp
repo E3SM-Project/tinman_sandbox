@@ -89,7 +89,7 @@ void run_simulation(int num_elems, int num_exec, bool dump_results) {
   TinMan::Region region(num_elems);
 
   // Print norm of initial states, to check we are using same data in all tests
-  // print_results_2norm(data, region);
+  print_results_2norm(data, region);
 
   // Burn in before timing to reduce cache effect
   TinMan::compute_and_apply_rhs(data, region);
