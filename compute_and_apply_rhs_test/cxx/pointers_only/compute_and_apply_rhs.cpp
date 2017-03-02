@@ -67,6 +67,14 @@ void compute_and_apply_rhs(TestData &data) {
   const int qn0 = data.control.qn0;
   const real dt2 = data.control.dt2;
 
+  // Explicitly initialize T_vadv and v_vadv to 0 as our code is vertically Lagrangian
+  for(int igp = 0; igp < nlev * np * np; ++igp) {
+    for(int jgp = 0; jgp < 2; ++jgp) {
+      v_vadv[igp * 2 + jgp] = 0.0;
+    }
+    T_vadv[igp] = 0.0;
+  }
+
   // Loop over elements
   for (int ie = nets; ie < nete; ++ie) {
     dp3d_n0 = SLICE_5D_IJ(data.arrays.elem_state_dp3d, ie, n0, timelevels, nlev,
