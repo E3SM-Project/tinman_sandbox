@@ -502,6 +502,64 @@ struct update_state {
     });
   }
 
+  // call preq_vertadv(fptr%base(ie)%state%T(:,:,:,n0), &
+  //                   fptr%base(ie)%state%v(:,:,:,:,n0), &
+  //                   eta_dot_dpdn,rdp,T_vadv,v_vadv)
+  // ...
+  // real (kind=real_kind), intent(in) :: T(np,np,nlev)
+  // real (kind=real_kind), intent(in) :: v(np,np,2,nlev)
+  // real (kind=real_kind), intent(in) :: eta_dot_dp_deta(np,np,nlevp)
+  // real (kind=real_kind), intent(in) :: rpdel(np,np,nlev)
+
+  // real (kind=real_kind), intent(out) :: T_vadv(np,np,nlev)
+  // real (kind=real_kind), intent(out) :: v_vadv(np,np,2,nlev)
+
+  // Computes the vertical advection of T and v
+  KOKKOS_INLINE_FUNCTION
+  void preq_vertadv(
+      const Kokkos::TeamPolicy<>::member_type &team, FastMemManager &fast_mem,
+      const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> T,
+      const ExecViewUnmanaged<const Real[NUM_LEV][2][NP][NP]> v,
+      const ExecViewUnmanaged<const Real[NUM_LEV_P][NP][NP]> eta_dp_deta,
+      const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> rpdel,
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_vadv,
+      ExecViewUnmanaged<Real[NUM_LEV][2][NP][NP]> v_vadv) {
+    constexpr const int k_0 = 0;
+    for (int j = 0; j < NP; ++j) {
+      for (int i = 0; i < NP; ++i) {
+        Real facp = 0.5 * rpdel(k_0, j, i) * eta_dp_deta(k_0 + 1, j, i);
+        T_vadv(k_0, j, i) = facp * (T(k_0 + 1, j, i) - T(k_0, j, i));
+        for (int h = 0; h < 2; ++h) {
+          v_vadv(k_0, h, j, i) = facp * (v(k_0 + 1, h, j, i) - v(k_0, h, j, i));
+        }
+      }
+    }
+    constexpr const int k_f = NUM_LEV - 1;
+    for (int k = k_0 + 1; k < k_f; ++k) {
+      for (int j = 0; j < NP; ++j) {
+        for (int i = 0; i < NP; ++i) {
+          Real facp = 0.5 * rpdel(k, j, i) * eta_dp_deta(k + 1, j, i);
+          Real facm = 0.5 * rpdel(k, j, i) * eta_dp_deta(k, j, i);
+          T_vadv(k, j, i) = facp * (T(k + 1, j, i) - T(k, j, i)) +
+                            facm * (T(k, j, i) - T(k - 1, j, i));
+          for (int h = 0; h < 2; ++h) {
+            v_vadv(k, h, j, i) = facp * (v(k + 1, h, j, i) - v(k, h, j, i)) +
+                                 facm * (v(k, h, j, i) - v(k - 1, h, j, i));
+          }
+        }
+      }
+    }
+    for (int j = 0; j < NP; ++j) {
+      for (int i = 0; i < NP; ++i) {
+        Real facm = 0.5 * rpdel(k_f, j, i) * eta_dp_deta(k_f, j, i);
+        T_vadv(k_f, j, i) = facm * (T(k_f, j, i) - T(k_f - 1, j, i));
+        for (int h = 0; h < 2; ++h) {
+          v_vadv(k_f, h, j, i) = facm * (v(k_f, h, j, i) - v(k_f - 1, h, j, i));
+        }
+      }
+    }
+  }
+
   KOKKOS_INLINE_FUNCTION
   void operator()(Kokkos::TeamPolicy<>::member_type team) const {
 
@@ -548,9 +606,16 @@ void print_results_2norm(const Control &data, const Region &region) {
   for (int ie = 0; ie < data.num_elems(); ++ie) {
 
     auto U = Kokkos::create_mirror_view(region.U_current(ie));
+    Kokkos::deep_copy(U, region.U_current(ie));
+
     auto V = Kokkos::create_mirror_view(region.V_current(ie));
+    Kokkos::deep_copy(V, region.V_current(ie));
+
     auto T = Kokkos::create_mirror_view(region.T_current(ie));
+    Kokkos::deep_copy(T, region.T_current(ie));
+
     auto DP3D = Kokkos::create_mirror_view(region.DP3D_current(ie));
+    Kokkos::deep_copy(DP3D, region.DP3D_current(ie));
 
     for (int ilev = 0; ilev < NUM_LEV; ++ilev) {
       for (int igp = 0; igp < NP; ++igp) {
