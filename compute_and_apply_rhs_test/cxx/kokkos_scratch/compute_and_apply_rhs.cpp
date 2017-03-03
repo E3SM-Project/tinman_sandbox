@@ -9,6 +9,7 @@
 #include "ScratchMemoryDefs.hpp"
 
 #include <fstream>
+#include <iomanip>
 
 namespace TinMan {
 
@@ -639,6 +640,7 @@ void print_results_2norm(const Control &data, const Region &region) {
     }
   }
 
+  std::cout << std::setprecision(17);
   std::cout << "   ---> Norms:\n"
             << "          ||u||_2  = " << std::sqrt(unorm) << "\n"
             << "          ||v||_2  = " << std::sqrt(vnorm) << "\n"
