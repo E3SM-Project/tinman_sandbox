@@ -102,6 +102,8 @@ void run_simulation(int num_elems, int num_exec, bool dump_results) {
     region.next_compute_apply_rhs();
     timers[i].stopTimer();
   }
+  // Run this one final time to ensure we're printing the correct results
+  TinMan::compute_and_apply_rhs(data, region);
 
   for(int i = 0; i < num_exec; ++i) {
     std::cout << timers[i] << std::endl;

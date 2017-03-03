@@ -617,16 +617,16 @@ void print_results_2norm(const Control &data, const Region &region) {
   for (int ie = 0; ie < data.num_elems(); ++ie) {
 
     auto U = Kokkos::create_mirror_view(region.U_current(ie));
-    Kokkos::deep_copy(U, region.U_current(ie));
+    Kokkos::deep_copy(U, region.U_future(ie));
 
     auto V = Kokkos::create_mirror_view(region.V_current(ie));
-    Kokkos::deep_copy(V, region.V_current(ie));
+    Kokkos::deep_copy(V, region.V_future(ie));
 
     auto T = Kokkos::create_mirror_view(region.T_current(ie));
-    Kokkos::deep_copy(T, region.T_current(ie));
+    Kokkos::deep_copy(T, region.T_future(ie));
 
     auto DP3D = Kokkos::create_mirror_view(region.DP3D_current(ie));
-    Kokkos::deep_copy(DP3D, region.DP3D_current(ie));
+    Kokkos::deep_copy(DP3D, region.DP3D_future(ie));
 
     for (int ilev = 0; ilev < NUM_LEV; ++ilev) {
       for (int igp = 0; igp < NP; ++igp) {
