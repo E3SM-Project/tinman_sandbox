@@ -193,6 +193,7 @@ struct update_state {
     ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> phi_update =
         m_region.PHI_update(ie);
 
+    // Need to test if false sharing causes Kokkos::single to be faster
     Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
                          KOKKOS_LAMBDA(const int loop_idx) {
       const int jgp = loop_idx / NP;
@@ -237,6 +238,7 @@ struct update_state {
                      const ScratchView<Real[NUM_LEV][NP][NP]> div_vdp,
                      const ScratchView<Real[NUM_LEV][NP][NP]> omega_p) const {
     const int ie = team.league_rank();
+    // Need to test if false sharing causes Kokkos::single to be faster
     Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
                          KOKKOS_LAMBDA(const int loop_idx) {
       ScratchView<Real[NP][NP]> suml(
@@ -307,10 +309,10 @@ struct update_state {
     team.team_barrier();
   }
 
-  // Depends on DP3D
   KOKKOS_INLINE_FUNCTION
-  void compute_pressure(Kokkos::TeamPolicy<>::member_type team,
-                        ScratchView<Real[NUM_LEV][NP][NP]> pressure) const {
+  void
+  compute_pressure_helper(Kokkos::TeamPolicy<>::member_type team,
+                          ScratchView<Real[NUM_LEV][NP][NP]> pressure) const {
     const int ie = team.league_rank();
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                          KOKKOS_LAMBDA(const int idx) {
@@ -319,17 +321,25 @@ struct update_state {
       pressure(0, igp, jgp) = m_data.hybrid_a(0) * m_data.ps0() +
                               0.5 * m_region.DP3D_current(ie)(0, igp, jgp);
     });
-
-    Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                         [&](const int idx) {
-      for (int ilev = 1; ilev < NUM_LEV; ilev++) {
-        const int igp = idx / NP;
-        const int jgp = idx % NP;
+    for (int ilev = 1; ilev < NUM_LEV; ilev++) {
+      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
+                           KOKKOS_LAMBDA(const int idx) {
+        int igp = idx / NP;
+        int jgp = idx % NP;
         pressure(ilev, igp, jgp) =
             pressure(ilev - 1, igp, jgp) +
-            0.5 * m_region.DP3D_current(ie)(ilev - 1, igp, jgp) +
-            0.5 * m_region.DP3D_current(ie)(ilev, igp, jgp);
-      }
+            0.5 * (m_region.DP3D_current(ie)(ilev - 1, igp, jgp) +
+                   m_region.DP3D_current(ie)(ilev, igp, jgp));
+      });
+    }
+  }
+
+  // Depends on DP3D
+  KOKKOS_INLINE_FUNCTION
+  void compute_pressure(Kokkos::TeamPolicy<>::member_type team,
+                        ScratchView<Real[NUM_LEV][NP][NP]> pressure) const {
+    Kokkos::single(Kokkos::PerTeam(team), KOKKOS_LAMBDA() {
+      compute_pressure_helper(team, pressure);
     });
   }
 
