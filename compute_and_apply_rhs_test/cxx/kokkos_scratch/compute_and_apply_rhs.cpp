@@ -9,6 +9,7 @@
 #include "ScratchMemoryDefs.hpp"
 
 #include <fstream>
+#include <iomanip>
 
 namespace TinMan {
 
@@ -320,8 +321,8 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void
-  compute_init_pressure(Kokkos::TeamPolicy<>::member_type team,
-                        ScratchView<Real[NUM_LEV][NP][NP]> pressure) const {
+  compute_pressure_helper(Kokkos::TeamPolicy<>::member_type team,
+                          ScratchView<Real[NUM_LEV][NP][NP]> pressure) const {
     const int ie = team.league_rank();
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                          KOKKOS_LAMBDA(const int idx) {
@@ -330,28 +331,25 @@ struct update_state {
       pressure(0, igp, jgp) = m_data.hybrid_a(0) * m_data.ps0() +
                               0.5 * m_region.DP3D_current(ie)(0, igp, jgp);
     });
+    for (int ilev = 1; ilev < NUM_LEV; ilev++) {
+      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
+                           KOKKOS_LAMBDA(const int idx) {
+        int igp = idx / NP;
+        int jgp = idx % NP;
+        pressure(ilev, igp, jgp) =
+            pressure(ilev - 1, igp, jgp) +
+            0.5 * (m_region.DP3D_current(ie)(ilev - 1, igp, jgp) +
+                   m_region.DP3D_current(ie)(ilev, igp, jgp));
+      });
+    }
   }
 
   // Depends on DP3D
   KOKKOS_INLINE_FUNCTION
   void compute_pressure(Kokkos::TeamPolicy<>::member_type team,
                         ScratchView<Real[NUM_LEV][NP][NP]> pressure) const {
-    Kokkos::single(Kokkos::PerTeam(team),
-                   KOKKOS_LAMBDA() { compute_init_pressure(team, pressure); });
-
-    const int ie = team.league_rank();
-    // Need to test if false sharing causes Kokkos::single to be faster
-    // If so, rename compute_init_pressure to compute_pressure_helper and move this there
-    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
-                         [&](const int idx) {
-      for (int ilev = 1; ilev < NUM_LEV; ilev++) {
-        const int igp = idx / NP;
-        const int jgp = idx % NP;
-        pressure(ilev, igp, jgp) =
-            pressure(ilev - 1, igp, jgp) +
-            0.5 * m_region.DP3D_current(ie)(ilev - 1, igp, jgp) +
-            0.5 * m_region.DP3D_current(ie)(ilev, igp, jgp);
-      }
+    Kokkos::single(Kokkos::PerTeam(team), KOKKOS_LAMBDA() {
+      compute_pressure_helper(team, pressure);
     });
   }
 
@@ -665,16 +663,16 @@ void print_results_2norm(const Control &data, const Region &region) {
   for (int ie = 0; ie < data.num_elems(); ++ie) {
 
     auto U = Kokkos::create_mirror_view(region.U_current(ie));
-    Kokkos::deep_copy(U, region.U_current(ie));
+    Kokkos::deep_copy(U, region.U_future(ie));
 
     auto V = Kokkos::create_mirror_view(region.V_current(ie));
-    Kokkos::deep_copy(V, region.V_current(ie));
+    Kokkos::deep_copy(V, region.V_future(ie));
 
     auto T = Kokkos::create_mirror_view(region.T_current(ie));
-    Kokkos::deep_copy(T, region.T_current(ie));
+    Kokkos::deep_copy(T, region.T_future(ie));
 
     auto DP3D = Kokkos::create_mirror_view(region.DP3D_current(ie));
-    Kokkos::deep_copy(DP3D, region.DP3D_current(ie));
+    Kokkos::deep_copy(DP3D, region.DP3D_future(ie));
 
     for (int ilev = 0; ilev < NUM_LEV; ++ilev) {
       for (int igp = 0; igp < NP; ++igp) {
@@ -688,6 +686,7 @@ void print_results_2norm(const Control &data, const Region &region) {
     }
   }
 
+  std::cout << std::setprecision(17);
   std::cout << "   ---> Norms:\n"
             << "          ||u||_2  = " << std::sqrt(unorm) << "\n"
             << "          ||v||_2  = " << std::sqrt(vnorm) << "\n"

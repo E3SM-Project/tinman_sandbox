@@ -7,6 +7,7 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 
 namespace Homme {
 
@@ -67,9 +68,10 @@ void compute_and_apply_rhs(TestData &data) {
   const int qn0 = data.control.qn0;
   const real dt2 = data.control.dt2;
 
-  // Explicitly initialize T_vadv and v_vadv to 0 as our code is vertically Lagrangian
-  for(int igp = 0; igp < nlev * np * np; ++igp) {
-    for(int jgp = 0; jgp < 2; ++jgp) {
+  // Explicitly initialize T_vadv and v_vadv to 0 as our code is vertically
+  // Lagrangian
+  for (int igp = 0; igp < nlev * np * np; ++igp) {
+    for (int jgp = 0; jgp < 2; ++jgp) {
       v_vadv[igp * 2 + jgp] = 0.0;
     }
     T_vadv[igp] = 0.0;
@@ -93,8 +95,8 @@ void compute_and_apply_rhs(TestData &data) {
         for (int jgp = 0; jgp < np; ++jgp) {
           AT_3D(p, ilev, igp, jgp, np, np) =
               AT_3D(p, (ilev - 1), igp, jgp, np, np) +
-              0.5 * AT_3D(dp3d_n0, (ilev - 1), igp, jgp, np, np) +
-              0.5 * AT_3D(dp3d_n0, ilev, igp, jgp, np, np);
+              0.5 * (AT_3D(dp3d_n0, (ilev - 1), igp, jgp, np, np) +
+                     AT_3D(dp3d_n0, ilev, igp, jgp, np, np));
         }
       }
     }
@@ -403,32 +405,32 @@ void print_results_2norm(const TestData &data) {
   const int nete = data.control.nete;
   const int np1 = data.control.np1;
 
-  real *v_np1;
-  real *T_np1;
-  real *dp3d_np1;
-
-  real vnorm(0.), tnorm(0.), dpnorm(0.);
+  real unorm(0.), vnorm(0.), tnorm(0.), dpnorm(0.);
   for (int ie = nets; ie < nete; ++ie) {
-    v_np1 = SLICE_6D_IJ(data.arrays.elem_state_v, ie, np1, timelevels, nlev, np,
-                        np, 2);
-    T_np1 = SLICE_5D_IJ(data.arrays.elem_state_T, ie, np1, timelevels, nlev, np,
-                        np);
-    dp3d_np1 = SLICE_5D_IJ(data.arrays.elem_state_dp3d, ie, np1, timelevels,
-                           nlev, np, np);
 
     for (int ilev = 0; ilev < nlev; ++ilev) {
       for (int igp = 0; igp < np; ++igp) {
         for (int jgp = 0; jgp < np; ++jgp) {
-          vnorm += std::pow(AT_4D(v_np1, ilev, igp, jgp, 0, np, np, 2), 2);
-          vnorm += std::pow(AT_4D(v_np1, ilev, igp, jgp, 1, np, np, 2), 2);
-          tnorm += std::pow(AT_3D(T_np1, ilev, igp, jgp, np, np), 2);
-          dpnorm += std::pow(AT_3D(dp3d_np1, ilev, igp, jgp, np, np), 2);
+          real u_np1 = AT_6D(data.arrays.elem_state_v, ie, np1, ilev, igp, jgp,
+                             0, timelevels, nlev, np, np, 2);
+          real v_np1 = AT_6D(data.arrays.elem_state_v, ie, np1, ilev, igp, jgp,
+                             1, timelevels, nlev, np, np, 2);
+          real T_np1 = AT_5D(data.arrays.elem_state_T, ie, np1, ilev, igp, jgp,
+                             timelevels, nlev, np, np);
+          real dp3d_np1 = AT_5D(data.arrays.elem_state_dp3d, ie, np1, ilev, igp,
+                                jgp, timelevels, nlev, np, np);
+          unorm += u_np1 * u_np1;
+          vnorm += v_np1 * v_np1;
+          tnorm += T_np1 * T_np1;
+          dpnorm += dp3d_np1 * dp3d_np1;
         }
       }
     }
   }
 
+  std::cout << std::setprecision(17);
   std::cout << "   ---> Norms:\n"
+            << "          ||u||_2  = " << std::sqrt(unorm) << "\n"
             << "          ||v||_2  = " << std::sqrt(vnorm) << "\n"
             << "          ||T||_2  = " << std::sqrt(tnorm) << "\n"
             << "          ||dp||_2 = " << std::sqrt(dpnorm) << "\n";
