@@ -93,8 +93,8 @@ void compute_and_apply_rhs(TestData &data) {
         for (int jgp = 0; jgp < np; ++jgp) {
           AT_3D(p, ilev, igp, jgp, np, np) =
               AT_3D(p, (ilev - 1), igp, jgp, np, np) +
-              0.5 * AT_3D(dp3d_n0, (ilev - 1), igp, jgp, np, np) +
-              0.5 * AT_3D(dp3d_n0, ilev, igp, jgp, np, np);
+              0.5 * (AT_3D(dp3d_n0, (ilev - 1), igp, jgp, np, np) +
+                     AT_3D(dp3d_n0, ilev, igp, jgp, np, np));
         }
       }
     }
