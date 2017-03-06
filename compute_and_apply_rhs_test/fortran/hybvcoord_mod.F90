@@ -1,7 +1,7 @@
 
 module hybvcoord_mod
 use kinds,              only: r8 => real_kind, iulog
-use dimensions_mod,     only: plev => nlev, plevp => nlevp
+use kinds,              only: plev => nlev, plevp => nlevp
 use physical_constants, only: p0
 
 implicit none

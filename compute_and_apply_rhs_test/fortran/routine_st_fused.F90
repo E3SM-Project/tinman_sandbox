@@ -27,7 +27,7 @@ implicit none
   type (element_t), intent(inout), target :: elem(:)
 !  real (kind=real_kind), intent(inout) :: ST(np,np,nlev,nelemd,numst,timelevels)
 
-!------------------ repeated block from main
+!---------------- repeated block
 #if STVER1
 ! I J K IE ST TL
 real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
@@ -48,7 +48,7 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,timelevels,nelemd)
 ! I J K TL ST IE
 real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 #endif
-!----------------- end of repeated block
+!---------------- end of repeated block
 
   type (derivative_t)  , intent(in) :: deriv
   type (hvcoord_t)     , intent(in) :: hvcoord
@@ -58,6 +58,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 
   integer :: ie
 
+!insert omp here
 
   do ie  =  nets, nete
     call caar(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,ie,eta_ave_w,ST)
@@ -83,9 +84,8 @@ subroutine caar(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,ie,eta_ave_w,ST)
 implicit none
 
   type (element_t), intent(inout), target :: elem(:)
-!  real (kind=real_kind), intent(inout) :: ST(np,np,nlev,nelemd,numst,timelevels)
 
-!------------------ repeated block from main
+!---------------- repeated block
 #if STVER1
 ! I J K IE ST TL
 real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
@@ -106,8 +106,7 @@ real (kind=real_kind) :: ST(np,np,nlev,numst,timelevels,nelemd)
 ! I J K TL ST IE
 real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 #endif
-!----------------- end of repeated block
-
+!---------------- end of repeated block
   type (derivative_t)  , intent(in) :: deriv
   type (hvcoord_t)     , intent(in) :: hvcoord
   integer, intent(in) :: ie,np1,nm1,n0,qn0
@@ -122,10 +121,10 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
   real (kind=real_kind), dimension(np,np,nlev)   :: divdp
   real (kind=real_kind), dimension(np,np,nlev+1)   :: eta_dot_dpdn  ! half level vertical velocity on p-grid
   real (kind=real_kind), dimension(np,np)      :: sdot_sum   ! temporary field
-  real (kind=real_kind), dimension(np,np,2)    :: vtemp     ! generic gradient storage
+  real (kind=real_kind), dimension(np,np,2,nlev)    :: vtemp1, vtemp2     ! generic gradient storage
   real (kind=real_kind), dimension(np,np,2,nlev):: vdp       !                            
   real (kind=real_kind), dimension(np,np,2     ):: v         !                            
-  real (kind=real_kind), dimension(np,np)      :: vgrad_T    ! v.grad(T)
+  real (kind=real_kind), dimension(np,np,nlev)      :: vgrad_T    ! v.grad(T)
   real (kind=real_kind), dimension(np,np)      :: Ephi       ! kinetic energy + PHI term
   real (kind=real_kind), dimension(np,np,2,nlev) :: grad_p
   real (kind=real_kind), dimension(np,np,2,nlev) :: grad_p_m_pmet  ! gradient(p - p_met)
@@ -146,7 +145,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
   real (kind=real_kind) ::  tempdp3d  (np,np)
   real (kind=real_kind) ::  cp2,cp_ratio,E,de,Qt,v1,v2
   real (kind=real_kind) ::  glnps1,glnps2,gpterm
-  integer :: i,j,k,kptr
+  integer :: i,j,k,kptr,q
   real (kind=real_kind) ::  u_m_umet, v_m_vmet, t_m_tmet 
   
   integer :: tid, OMP_GET_MAX_THREADS, OMP_GET_THREAD_NUM
@@ -157,16 +156,62 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 !  tid = OMP_GET_THREAD_NUM()     
 !  print *, 'My tid is ', tid
 
+! a dummy loop
+!!!$omp parallel do private(k,q)
+#if 0
+  do k=1,nlev
+  do q=2,35
+#if STVER1
+  ST( :,:,k,ie,6+q,np1) = 1.0d0
+  ST( :,:,k,ie,6+q,np1) = ST( :,:,k,ie,6+q,n0)+ST( :,:,k,ie,6+q,nm1)
+  ST( :,:,k,ie,6+q,np1) = sin(2.0)
+
+  ST( :,:,k,ie,6+q,np1) = 1.0d0
+  ST( :,:,k,ie,6+q,np1) = ST( :,:,k,ie,6+q,n0)+ST( :,:,k,ie,6+q,nm1)
+  ST( :,:,k,ie,6+q,np1) = sin(2.0)
+
+  ST( :,:,k,ie,6+q,np1) = 1.0d0
+  ST( :,:,k,ie,6+q,np1) = ST( :,:,k,ie,6+q,n0)+ST( :,:,k,ie,6+q,nm1)
+  ST( :,:,k,ie,6+q,np1) = sin(2.0)
+
+  ST( :,:,k,ie,6+q,np1) = 1.0d0
+  ST( :,:,k,ie,6+q,np1) = ST( :,:,k,ie,6+q,n0)+ST( :,:,k,ie,6+q,nm1)
+  ST( :,:,k,ie,6+q,np1) = sin(2.0)
+#endif
+#if STVER2
+  ST( :,:,k,6+q,ie,np1) = 1.0d0
+  ST( :,:,k,6+q,ie,np1) = ST( :,:,k,6+q,ie,n0)+ST( :,:,k,6+q,ie,nm1)
+  ST( :,:,k,6+q,ie,np1) = sin(2.0)
+
+  ST( :,:,k,6+q,ie,np1) = 1.0d0
+  ST( :,:,k,6+q,ie,np1) = ST( :,:,k,6+q,ie,n0)+ST( :,:,k,6+q,ie,nm1)
+  ST( :,:,k,6+q,ie,np1) = sin(2.0)
+
+  ST( :,:,k,6+q,ie,np1) = 1.0d0
+  ST( :,:,k,6+q,ie,np1) = ST( :,:,k,6+q,ie,n0)+ST( :,:,k,6+q,ie,nm1)
+  ST( :,:,k,6+q,ie,np1) = sin(2.0)
+
+  ST( :,:,k,6+q,ie,np1) = 1.0d0
+  ST( :,:,k,6+q,ie,np1) = ST( :,:,k,6+q,ie,n0)+ST( :,:,k,6+q,ie,nm1)
+  ST( :,:,k,6+q,ie,np1) = sin(2.0)
+#endif
+  enddo
+  enddo
+#endif
+! end of the dummy
+
+
      phi => elem(ie)%derived%phi(:,:,:)
 
      p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + ST( dXdX1XdpXn0Xie  ) /2
 
+! this can be rewritten
      do k=2,nlev
         p(:,:,k)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkXdpXn0Xie )/2
      enddo
 
 #if HOMP
-!$omp parallel do private(k,i,j,v1,v2,vtemp)
+!$omp parallel do private(k,i,j,v1,v2,Qt,eta_ave_w,E,Ephi)
 #endif
      do k=1,nlev
 
@@ -174,7 +219,10 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 !        print *, 'next loop: My tid is ', tid
 
         grad_p(:,:,:,k) = gradient_sphere(p(:,:,k),deriv,elem(ie)%Dinv)
+
         rdp(:,:,k) = 1.0D0/ST( dXdXkXdpXn0Xie )
+
+        vtemp1(:,:,:,k)   = gradient_sphere( ST( dXdXkXtXn0Xie ), deriv,elem(ie)%Dinv)
         do j=1,np
            do i=1,np
               v1 = ST( iXjXkXuXn0Xie )
@@ -182,80 +230,42 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
               vgrad_p(i,j,k) = (v1*grad_p(i,j,1,k) + v2*grad_p(i,j,2,k))
               vdp(i,j,1,k) = v1*ST( iXjXkXdpXn0Xie )
               vdp(i,j,2,k) = v2*ST( iXjXkXdpXn0Xie )
+
+              Qt = ST( iXjXkXqXqn0Xie )/ ST( iXjXkXdpXn0Xie )
+              T_v(i,j,k) = Virtual_Temperature1d( ST( iXjXkXtXn0Xie ),Qt)
+              kappa_star(i,j,k) = kappa
+
+              E = 0.5D0*( v1*v1 + v2*v2 )
+              Ephi(i,j)=E+phi(i,j,k)+elem(ie)%derived%pecnd(i,j,k)
+              vgrad_T(i,j,k) =  v1*vtemp1(i,j,1,k) + v2*vtemp1(i,j,2,k)
+
            end do
         end do
+
+        vtemp2(:,:,:,k) = gradient_sphere(Ephi(:,:),deriv,elem(ie)%Dinv)
+
         elem(ie)%derived%vn0(:,:,:,k)=elem(ie)%derived%vn0(:,:,:,k)+eta_ave_w*vdp(:,:,:,k)
         divdp(:,:,k)=divergence_sphere(vdp(:,:,:,k),deriv,elem(ie))
         vort(:,:,k)=vorticity_v2( ST( dXdXkXuXn0Xie ) , ST( dXdXkXvXn0Xie ) ,deriv,elem(ie))
-     enddo
 
-
-     if (qn0 == -1 ) then
-
-        do k=1,nlev
-           do j=1,np
-              do i=1,np
-                 T_v(i,j,k) = ST( iXjXkXtXn0Xie )
-                 kappa_star(i,j,k) = kappa
-              end do
-           end do
-        end do
-     else
-!this loop, moisture
-#if HOMP
-!$omp parallel do private(k,i,j,Qt)
-#endif
-        do k=1,nlev
-           do j=1,np
-              do i=1,np
-                 Qt = ST( iXjXkXqXqn0Xie )/ ST( iXjXkXdpXn0Xie )
-                 T_v(i,j,k) = Virtual_Temperature1d( ST( iXjXkXtXn0Xie ),Qt)
-                 kappa_star(i,j,k) = kappa
-              end do
-           end do
-        end do
-     end if
-     call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) ,T_v,p, ST( dXdXdXdpXn0Xie ) )
-     call preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
-     sdot_sum=0
-     ! VERTICALLY LAGRANGIAN:   no vertical motion
-     eta_dot_dpdn=0
-     T_vadv=0
-     v_vadv=0
-#if HOMP
-!$omp parallel do private(k)
-#endif
-     do k=1,nlev  !  Loop index added (AAM)
-        elem(ie)%derived%eta_dot_dpdn(:,:,k) = &
-             elem(ie)%derived%eta_dot_dpdn(:,:,k) + eta_ave_w*eta_dot_dpdn(:,:,k)
         elem(ie)%derived%omega_p(:,:,k) = &
              elem(ie)%derived%omega_p(:,:,k) + eta_ave_w*omega_p(:,:,k)
+
      enddo
-     elem(ie)%derived%eta_dot_dpdn(:,:,nlev+1) = &
-          elem(ie)%derived%eta_dot_dpdn(:,:,nlev+1) + eta_ave_w*eta_dot_dpdn(:,:,nlev+1)
+
+     call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) ,T_v,p, ST( dXdXdXdpXn0Xie ) )
+     call preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
+
+     !sdot_sum=0
+     ! VERTICALLY LAGRANGIAN:   no vertical motion
+     !eta_dot_dpdn=0
+     T_vadv=0
+     v_vadv=0
+
 #if HOMP
-!$omp parallel do private(k,i,j,v1,v2,gpterm,glnps1,glnps2,E,Ephi,vgrad_T,vtemp)
+!$omp parallel do private(k,v1,v2,gpterm,glnps1,glnps2)
 #endif
      vertloop: do k=1,nlev
-        do j=1,np
-           do i=1,np
-              v1 = ST( iXjXkXuXn0Xie )
-              v2 = ST( iXjXkXvXn0Xie )
-              E = 0.5D0*( v1*v1 + v2*v2 )
-              Ephi(i,j)=E+phi(i,j,k)+elem(ie)%derived%pecnd(i,j,k)
-           end do
-        end do
-        vtemp(:,:,:)   = gradient_sphere( ST( dXdXkXtXn0Xie ), deriv,elem(ie)%Dinv)
-        do j=1,np
-           do i=1,np
-              v1 = ST( iXjXkXuXn0Xie )
-              v2 = ST( iXjXkXvXn0Xie )
-              vgrad_T(i,j) =  v1*vtemp(i,j,1) + v2*vtemp(i,j,2)
-           end do
-        end do
-
-        vtemp = gradient_sphere(Ephi(:,:),deriv,elem(ie)%Dinv)
-
         do j=1,np
            do i=1,np
               gpterm = T_v(i,j,k)/p(i,j,k)
@@ -266,32 +276,25 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
               v2 = ST( iXjXkXvXn0Xie )
               vtens1(i,j,k) =   - v_vadv(i,j,1,k)                           &
                    + v2*(elem(ie)%fcor(i,j) + vort(i,j,k))        &
-                   - vtemp(i,j,1) - glnps1
+                   - vtemp2(i,j,1,k) - glnps1
               vtens2(i,j,k) =   - v_vadv(i,j,2,k)                            &
                    - v1*(elem(ie)%fcor(i,j) + vort(i,j,k))        &
-                   - vtemp(i,j,2) - glnps2
-              ttens(i,j,k)  = - T_vadv(i,j,k) - vgrad_T(i,j) + kappa_star(i,j,k)*T_v(i,j,k)*omega_p(i,j,k)
+                   - vtemp2(i,j,2,k) - glnps2
+              ttens(i,j,k)  = - T_vadv(i,j,k) - vgrad_T(i,j,k) + kappa_star(i,j,k)*T_v(i,j,k)*omega_p(i,j,k)
            end do
         end do
-     end do vertloop
 
-#if HOMP
-!$omp parallel do private(k)
-#endif
-     do k=1,nlev
         ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXuXnm1Xie ) + dt2*vtens1(:,:,k) )
         ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXvXnm1Xie ) + dt2*vtens2(:,:,k) )
         ST( dXdXkXtXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXtXnm1Xie ) + dt2*ttens(:,:,k)  )
         ST( dXdXkXdpXnp1Xie ) = &
              elem(ie)%spheremp(:,:) * ( ST( dXdXkXdpXnm1Xie ) - &
              dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
-     enddo ! k loop
+
+     end do vertloop
 
 
 end subroutine caar
-
-
-
 
 
 

@@ -9,9 +9,10 @@ subroutine compute_and_apply_rhs(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,nets,ne
 !       deriv,nets,nete,compute_diagnostics,eta_ave_w)
   ! ===================================
 
-  use kinds, only : real_kind
-  use element_mod, only : element_t, np, nlev, ntrac, nelemd, numst, timelevels,&
-                          indu, indv, indT, inddp,  indps, indphis
+  use kinds, only : real_kind, np, nlev, ntrac, nelemd, timelevels
+  use element_mod, only : element_t
+  use element_state_mod, only : elem_state_t
+                          !indu, indv, indT, inddp,  indps, indphis
   use derivative_mod_base, only : derivative_t, divergence_sphere, gradient_sphere, vorticity_sphere, &
                                   vorticity_v2
   use hybvcoord_mod, only : hvcoord_t
@@ -64,7 +65,7 @@ implicit none
   real (kind=real_kind) ::  u_m_umet, v_m_vmet, t_m_tmet 
 
 
-  print *, 'Hello Routine'
+!  print *, 'Hello Original Routine'
   do ie=nets,nete
      phi => elem(ie)%derived%phi(:,:,:)
      dp  => elem(ie)%state%dp3d(:,:,:,n0)
@@ -72,8 +73,9 @@ implicit none
      do k=2,nlev
         p(:,:,k)=p(:,:,k-1) + dp(:,:,k-1)/2 + dp(:,:,k)/2
      enddo
-
-!#omp parallel do
+#if HOMP
+!$omp parallel do private(k,i,j,v1,v2,vtemp)
+#endif
      do k=1,nlev
         grad_p(:,:,:,k) = gradient_sphere(p(:,:,k),deriv,elem(ie)%Dinv)
         rdp(:,:,k) = 1.0D0/dp(:,:,k)
@@ -101,6 +103,9 @@ implicit none
         end do
      else
 !this loop, moisture
+#if HOMP
+!$omp parallel do private(k,i,j,Qt)
+#endif
         do k=1,nlev
            do j=1,np
               do i=1,np
@@ -118,6 +123,9 @@ implicit none
      eta_dot_dpdn=0
      T_vadv=0
      v_vadv=0
+#if HOMP
+     !$omp parallel do private(k)
+#endif
      do k=1,nlev  !  Loop index added (AAM)
         elem(ie)%derived%eta_dot_dpdn(:,:,k) = &
              elem(ie)%derived%eta_dot_dpdn(:,:,k) + eta_ave_w*eta_dot_dpdn(:,:,k)
@@ -126,6 +134,9 @@ implicit none
      enddo
      elem(ie)%derived%eta_dot_dpdn(:,:,nlev+1) = &
           elem(ie)%derived%eta_dot_dpdn(:,:,nlev+1) + eta_ave_w*eta_dot_dpdn(:,:,nlev+1)
+#if HOMP
+!$omp parallel do private(k,i,j,v1,v2,E,Ephi,vtemp,vgrad_T,gpterm,glnps1,glnps2)
+#endif
      vertloop: do k=1,nlev
         do j=1,np
            do i=1,np
@@ -165,6 +176,9 @@ implicit none
         end do
      end do vertloop
 
+#if HOMP
+!$omp parallel do private(k)
+#endif
      do k=1,nlev
         elem(ie)%state%v(:,:,1,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,1,k,nm1) + dt2*vtens1(:,:,k) )
         elem(ie)%state%v(:,:,2,k,np1) = elem(ie)%spheremp(:,:)*( elem(ie)%state%v(:,:,2,k,nm1) + dt2*vtens2(:,:,k) )
@@ -188,9 +202,10 @@ end subroutine compute_and_apply_rhs
     Tv = Tin*(1_real_kind + (Rwater_vapor/Rgas - 1.0_real_kind)*rin)
   end function Virtual_Temperature1d
 
+
+
   subroutine preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
-    use kinds, only : real_kind
-    use element_mod, only : np, nlev
+    use kinds, only : real_kind, np, nlev
     use hybvcoord_mod, only : hvcoord_t
 
     implicit none
@@ -204,7 +219,9 @@ end subroutine compute_and_apply_rhs
     real(kind=real_kind) term             ! one half of basic term in omega/p summation 
     real(kind=real_kind) Ckk,Ckl          ! diagonal term of energy conversion matrix
     real(kind=real_kind) suml(np,np)      ! partial sum over l = (1, k-1)
-
+#if HOMP
+!$omp parallel do private(k,j,i,ckk,term,ckl)
+#endif
        do j=1,np   !   Loop inversion (AAM)
           do i=1,np
              ckk = 0.5d0/p(i,j,1)
@@ -236,8 +253,7 @@ end subroutine compute_and_apply_rhs
 
 
   subroutine preq_hydrostatic(phi,phis,T_v,p,dp)
-    use kinds, only : real_kind
-    use element_mod, only : np, nlev
+    use kinds, only : real_kind, np, nlev
     use physical_constants, only : rgas
     implicit none
     real(kind=real_kind), intent(out) :: phi(np,np,nlev)     
@@ -248,6 +264,9 @@ end subroutine compute_and_apply_rhs
     integer i,j,k                         ! longitude, level indices
     real(kind=real_kind) Hkk,Hkl          ! diagonal term of energy conversion matrix
     real(kind=real_kind), dimension(np,np,nlev) :: phii       ! Geopotential at interfaces
+#if HOMP
+!$omp parallel do private(k,j,i,hkk,hkl)
+#endif
        do j=1,np   !   Loop inversion (AAM)
           do i=1,np
              hkk = dp(i,j,nlev)*0.5d0/p(i,j,nlev)

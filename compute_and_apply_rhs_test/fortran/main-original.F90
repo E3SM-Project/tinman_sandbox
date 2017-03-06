@@ -1,72 +1,40 @@
-#include "config1.h"
-#include "config2.h"
-#include "config3.h"
-#include "config4.h"
 
 program main
 
 use kinds
 use element_state_mod
 use element_mod
-use routine_mod_st, only : compute_and_apply_rhs_st
+use routine_mod, only : compute_and_apply_rhs
 use derivative_mod_base
 use hybvcoord_mod
 use test_mod
 
 implicit none
 
-type (element_t), allocatable  :: elem(:)
-
-!----------------- repeated block
-#if STVER1
-! I J K IE ST TL
-real (kind=real_kind) :: ST(np,np,nlev,nelemd,numst,timelevels)
-#endif
-
-#if STVER2
-! I J K ST IE TL
-real (kind=real_kind) :: ST(np,np,nlev,numst,nelemd,timelevels)
-#endif
-
-#if STVER3
-! I J K ST TL IE
-real (kind=real_kind) :: ST(np,np,nlev,numst,timelevels,nelemd)
-#endif
-
-! this is the original layout!
-#if STVER4
-! I J K TL ST IE
-real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
-#endif
-!----------------- end of repeated block
-
-type (derivative_t) :: deriv
+  type (element_t), allocatable  :: elem(:)
+  type (derivative_t) :: deriv
 
 ! init params
 
-real (kind=real_kind) :: Dvv_init(np*np)
-type (hvcoord_t)   :: hvcoord
-integer :: nets, nete
-real*8 :: dt2, finish
-integer :: start
-real (kind=real_kind) :: eta_ave_w 
-real (kind=real_kind) :: ii, jj, kk, iee
+  real (kind=real_kind) :: Dvv_init(np*np)
+  type (hvcoord_t)   :: hvcoord
+  integer :: nets, nete
+  real*8 :: dt2, finish
+  integer :: start
+  real (kind=real_kind) :: eta_ave_w 
+  real (kind=real_kind) :: ii, jj, kk, iee
 
 ! local
-integer :: i,j,k,ie,tl,ind
+  integer :: i,j,k,ie,tl, ind
 
-
-real (kind=real_kind) :: Tt(np,np,nlev)
-
-!call flush(6)
-!stop
+  real (kind=real_kind) :: Tt(np,np,nlev)
 
   dt2 = 1.0
   eta_ave_w = 1.0
   nets = 1
   nete = nelemd
-!----------------- INIT
 
+!----------------- INIT
   Dvv_init(1:16) = (/ -3.0,  -0.80901699437494745,   0.30901699437494745, &     
  -0.50000000000000000 ,4.0450849718747373, 0.0, -1.1180339887498949, &     
    1.5450849718747370, -1.5450849718747370, 1.1180339887498949, &     
@@ -79,7 +47,6 @@ real (kind=real_kind) :: Tt(np,np,nlev)
   enddo 
 
   allocate(elem(nelemd))
-  ST = 0.0d0
 
   do ie = nets,nete
   do k = 1,nlev
@@ -101,11 +68,13 @@ real (kind=real_kind) :: Tt(np,np,nlev)
       elem(ie)%derived%pecnd(i,j,k) = 1.0
       elem(ie)%derived%omega_p(i,j,k) = jj*jj
 
-      ST( iXjXkXdpXdXie ) = 10*kk+iee+ii+jj + (/1,2,3/)
-      ST( iXjXkXuXdXie ) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*2.0
-      ST( iXjXkXvXdXie ) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*3.0
-      ST( iXjXkXtXdXie ) = 1000-kk-ii-jj+iee/10 + (/1,2,3/)
-      ST( iXjXkXqXdXie )= 1.0+SIN(ii*jj*kk)
+      elem(ie)%state%dp3d(i,j,k,1:timelevels) = 10*kk+iee+ii+jj + (/1,2,3/)
+      elem(ie)%state%v(i,j,1,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*2.0
+      elem(ie)%state%v(i,j,2,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*3.0
+      elem(ie)%state%T(i,j,k,1:timelevels) = 1000-kk-ii-jj+iee/10 + (/1,2,3/)
+
+!only vapor
+      elem(ie)%state%Qdp(i,j,k,1,qn0) = 1.0+SIN(ii*jj*kk)
 
       elem(ie)%Dinv(i,j,1,1) = 1.0
       elem(ie)%Dinv(i,j,1,2) = 0.0
@@ -138,13 +107,30 @@ real (kind=real_kind) :: Tt(np,np,nlev)
 !----------------- END OF INIT
 
 
-print *, 'Main ST routine', np
+print *, 'Main original, np=', np
+
+!np1 fields will be changed
+
+call tick(start)
+do ind = 1, loopmax
+call compute_and_apply_rhs(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w)
+enddo
+finish = tock(start)
+print *, 'Raw time = ', finish
 
 ! ---------------- DO NOT MODIFY ------------------------
 ie = 1
-!do k = 1,nlev; do j = 1,np; do i = 1,np
-!print *, elem(ie)%state%T(i,j,k,np1)
-!enddo; enddo; enddo
+
+!do k = 1,nlev
+!print *, elem(ie)%state%T(1,1,k,np1),'d0,', elem(ie)%state%T(2,1,k,np1),'d0,', & 
+!elem(ie)%state%T(3,1,k,np1),'d0,',elem(ie)%state%T(4,1,k,np1),'d0,&'
+!print *, elem(ie)%state%T(1,2,k,np1),'d0,', elem(ie)%state%T(2,2,k,np1),'d0,', &
+!elem(ie)%state%T(3,2,k,np1),'d0,', elem(ie)%state%T(4,2,k,np1),'d0,&'
+!print *, elem(ie)%state%T(1,3,k,np1),'d0,', elem(ie)%state%T(2,3,k,np1),'d0,', &
+!elem(ie)%state%T(3,3,k,np1),'d0,', elem(ie)%state%T(4,3,k,np1),'d0,&'
+!print *, elem(ie)%state%T(1,4,k,np1),'d0,', elem(ie)%state%T(2,4,k,np1),'d0,', &
+!elem(ie)%state%T(3,4,k,np1),'d0,', elem(ie)%state%T(4,4,k,np1),'d0,&'
+!enddo
 
 ind = 1
 do k = 1,nlev; do j = 1,np; do i = 1,np
@@ -152,26 +138,8 @@ Tt(i,j,k) = Ttest(ind)
 ind = ind+1
 enddo; enddo; enddo
 
+print *, 'ORIGINAL diff', maxval(abs(Tt - elem(ie)%state%T(:,:,:,np1)))
 
-call tick(start)
-do ind = 1, loopmax
-call compute_and_apply_rhs_st(np1,nm1,n0,qn0, dt2,elem, hvcoord, deriv, nets,nete, eta_ave_w, ST)
-enddo
-finish = tock(start)
-print *, 'Raw time = ', finish
-
-#if STVER1
-print *, 'STVER1 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
-#endif
-#if STVER2
-print *, 'STVER2 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
-#endif
-#if STVER3
-print *, 'STVER3 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
-#endif
-#if STVER4
-print *, 'STVER4 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
-#endif
 
 end program main
 
