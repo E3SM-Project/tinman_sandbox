@@ -20,6 +20,7 @@ struct Constants
 {
   Real  rrearth;
   Real  eta_ave_w;
+  Real  cp;
   Real  Rwater_vapor;
   Real  Rgas;
   Real  kappa;

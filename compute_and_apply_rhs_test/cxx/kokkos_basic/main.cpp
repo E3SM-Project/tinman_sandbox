@@ -107,7 +107,7 @@ int main (int argc, char** argv)
   print_results_2norm (data, *region);
 
   // Burn in before timing to reduce cache effect
-  TinMan::compute_and_apply_rhs(data,*region);
+  //TinMan::compute_and_apply_rhs(data,*region);
 
   std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
 
@@ -118,7 +118,7 @@ int main (int argc, char** argv)
   {
     //timers[i].startTimer();
     TinMan::compute_and_apply_rhs(data,*region);
-    data.update_time_levels();
+    //data.update_time_levels();
     //timers[i].stopTimer();
   }
 #ifdef KOKKOS_HAVE_DEFAULT_DEVICE_TYPE_OPENMP

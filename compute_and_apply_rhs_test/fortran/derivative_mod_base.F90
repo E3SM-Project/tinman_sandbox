@@ -1,8 +1,8 @@
 module derivative_mod_base
 
-  use kinds,          only : real_kind, longdouble_kind
-  use dimensions_mod, only : np, nelemd, nlev
-  use element_mod, only : element_t
+  use kinds
+  use element_state_mod
+  use element_mod
   use physical_constants, only : rrearth
 
 implicit none
@@ -138,7 +138,7 @@ contains
     integer i
     integer j
     integer l
-    
+
     real(kind=real_kind) ::  dvdx00,dudy00
     real(kind=real_kind) ::  vco(np,np,2)
     real(kind=real_kind) ::  vtemp(np,np)
@@ -146,8 +146,8 @@ contains
     ! convert to covariant form
     do j=1,np
        do i=1,np
-          vco(i,j,1)=(elem%D(i,j,1,1)*v(i,j) + elem%D(i,j,2,1)*u(i,j))
-          vco(i,j,2)=(elem%D(i,j,1,2)*v(i,j) + elem%D(i,j,2,2)*u(i,j))
+          vco(i,j,1)=(elem%D(i,j,1,1)*u(i,j) + elem%D(i,j,2,1)*v(i,j))
+          vco(i,j,2)=(elem%D(i,j,1,2)*u(i,j) + elem%D(i,j,2,2)*v(i,j))
        enddo
     enddo
 
@@ -162,7 +162,7 @@ contains
              dvdx00 = dvdx00 + deriv%Dvv(i,l  )*vco(i,j  ,2)
              dudy00 = dudy00 + deriv%Dvv(i,l  )*vco(j  ,i,1)
           enddo
- 
+
           vort(l  ,j  ) = dvdx00
           vtemp(j  ,l  ) = dudy00
        enddo

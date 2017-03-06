@@ -9,8 +9,9 @@ namespace TinMan {
 typedef double Real;
 
 // The memory spaces
-using ExecSpace    = Kokkos::DefaultExecutionSpace::memory_space;
-using ScratchSpace = Kokkos::DefaultExecutionSpace::scratch_memory_space;
+using ExecSpace       = Kokkos::DefaultExecutionSpace::execution_space;
+using ExecMemSpace    = ExecSpace::memory_space;
+using ScratchMemSpace = ExecSpace::scratch_memory_space;
 
 // Short name for views with layout right
 template<typename DataType, typename MemorySpace, typename MemoryManagement>
@@ -18,13 +19,13 @@ using ViewType = Kokkos::View<DataType,Kokkos::LayoutRight,MemorySpace,MemoryMan
 
 // Further specializations for execution space and managed/unmanaged memory
 template<typename DataType>
-using ExecViewManaged = ViewType<DataType,ExecSpace,Kokkos::MemoryManaged>;
+using ExecViewManaged = ViewType<DataType,ExecMemSpace,Kokkos::MemoryManaged>;
 template<typename DataType>
-using ExecViewUnmanaged = ViewType<DataType,ExecSpace,Kokkos::MemoryUnmanaged>;
+using ExecViewUnmanaged = ViewType<DataType,ExecMemSpace,Kokkos::MemoryUnmanaged>;
 
 // The scratch view type (always unmanaged)
 template<typename DataType>
-using ScratchView = ViewType<DataType,ScratchSpace,Kokkos::MemoryUnmanaged>;
+using ScratchView = ViewType<DataType,ScratchMemSpace,Kokkos::MemoryUnmanaged>;
 
 // To view the fully expanded name of a complicated template type T,
 // just try to access some non-existent field of MyDebug<T>. E.g.:

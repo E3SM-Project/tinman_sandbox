@@ -94,26 +94,30 @@ void run_simulation(int num_elems, int num_exec, bool dump_results) {
   // Burn in before timing to reduce cache effect
   TinMan::compute_and_apply_rhs(data, region);
 
-  std::unique_ptr<Timer::Timer[]> timers(new Timer::Timer[num_exec]);
+  std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
+  Timer::Timer global_timer;
+  global_timer.startTimer();
   for (int i=0; i<num_exec; ++i)
   {
-    timers[i].startTimer();
     TinMan::compute_and_apply_rhs(data, region);
     region.next_compute_apply_rhs();
-    timers[i].stopTimer();
   }
+  global_timer.stopTimer();
   // Run this one final time to ensure we're printing the correct results
-  TinMan::compute_and_apply_rhs(data, region);
+//  TinMan::compute_and_apply_rhs(data, region);
 
-  for(int i = 0; i < num_exec; ++i) {
-    std::cout << timers[i] << std::endl;
-  }
+  std::cout << "   ---> compute_and_apply_rhs execution total time: " << global_timer << "\n";
+
+//  for(int i = 0; i < num_exec; ++i) {
+//    std::cout << timers[i] << std::endl;
+//  }
 
   print_results_2norm (data,region);
 
- if (dump_results) {
-   region.save_state(data);
- }
+  if (dump_results)
+  {
+    region.save_state(data);
+  }
 }
 
 int main (int argc, char** argv)

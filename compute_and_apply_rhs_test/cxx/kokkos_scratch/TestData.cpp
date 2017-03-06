@@ -4,7 +4,7 @@ namespace TinMan {
 
 Control::Control(int num_elems)
     : m_num_elems(num_elems), m_qn0(0), m_dt2(1.0),
-      m_ps0(1.0),
+      m_ps0(10.0),
       m_hybrid_a(
           "Hybrid coordinates; translates between pressure and velocity"),
       m_dvv("Laplacian") {
@@ -22,7 +22,7 @@ Control::Control(int num_elems)
         { 0.5000000000000000,  -0.30901699437494745,
           0.80901699437494745, 3.000000000000000000 }
       };
-      dvv_host(i, j) = values[i][j];
+      dvv_host(i, j) = values[j][i];
     }
   }
 
@@ -31,7 +31,7 @@ Control::Control(int num_elems)
   ExecViewManaged<Real[NUM_LEV_P]>::HostMirror host_hybrid_a =
       Kokkos::create_mirror_view(m_hybrid_a);
   for (int i = 0; i < NUM_LEV_P; ++i) {
-    host_hybrid_a(i) = 1.0;
+    host_hybrid_a(i) = NUM_LEV + 1.0 - i;
   }
   Kokkos::deep_copy(m_hybrid_a, host_hybrid_a);
 }

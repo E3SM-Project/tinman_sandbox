@@ -4,16 +4,6 @@
 #include "test_macros.hpp"
 #include <random>
 
-namespace
-{
-
-double init_map(double x, int n)
-{
-  return std::pow(sin(n*x),2);
-}
-
-} // Anonymous namespace
-
 namespace Homme
 {
 
@@ -32,7 +22,7 @@ void Arrays::init_data ()
   elem_state_v              = new real[num_elems*timelevels*nlev*np*np*2] {};
   elem_state_T              = new real[num_elems*timelevels*nlev*np*np]   {};
   elem_state_phis           = new real[num_elems*np*np]                   {};
-  elem_state_Qdp            = new real[num_elems*nlev*qsize_d*2*np*np]    {};
+  elem_state_Qdp            = new real[num_elems*qsize_d*2*nlev*np*np]    {};
 
   elem_derived_eta_dot_dpdn = new real[num_elems*nlevp*np*np]  {};
   elem_derived_omega_p      = new real[num_elems*nlev*np*np]   {};
@@ -48,59 +38,54 @@ void Arrays::init_data ()
   constexpr double x = 0.123456789;
 
   int n = 1;
-  // Now fill all the arrays
+  // Now fiil all the arrays
   for (int ie=0; ie<num_elems; ++ie)
   {
     for (int ip=0; ip<np; ++ip)
     {
       for (int jp=0; jp<np; ++jp)
       {
-        AT_5D(elem_D,ie,ip,jp,0,0,np,np,2,2)  = init_map(x,n++);
-        AT_5D(elem_D,ie,ip,jp,0,1,np,np,2,2)  = init_map(x,n++);
-        AT_5D(elem_D,ie,ip,jp,1,0,np,np,2,2)  = init_map(x,n++);
-        AT_5D(elem_D,ie,ip,jp,1,1,np,np,2,2)  = init_map(x,n++);
+        double iie = ie + 1;
+        double iip = ip + 1;
+        double jjp = jp + 1;
 
-        double detD = AT_5D(elem_D,ie,ip,jp,0,0,np,np,2,2)*AT_5D(elem_D,ie,ip,jp,1,1,np,np,2,2)
-                    - AT_5D(elem_D,ie,ip,jp,0,1,np,np,2,2)*AT_5D(elem_D,ie,ip,jp,1,0,np,np,2,2);
+        AT_3D(elem_fcor,      ie,ip,jp,np,np)  = sin(iip + jjp);
+        AT_3D(elem_metdet,    ie,ip,jp,np,np)  = iip*jjp;
+        AT_3D(elem_rmetdet,   ie,ip,jp,np,np)  = 1./ AT_3D(elem_metdet,ie,ip,jp,np,np);
+        AT_3D(elem_spheremp,  ie,ip,jp,np,np)  = 2*iip;
+        AT_3D(elem_state_phis,ie,ip,jp,np,np)  = iip + jjp;
 
-        AT_5D(elem_Dinv,ie,ip,jp,0,0,np,np,2,2) =  AT_5D(elem_D,ie,ip,jp,1,1,np,np,2,2) / detD;
-        AT_5D(elem_Dinv,ie,ip,jp,0,1,np,np,2,2) = -AT_5D(elem_D,ie,ip,jp,0,1,np,np,2,2) / detD;
-        AT_5D(elem_Dinv,ie,ip,jp,1,0,np,np,2,2) = -AT_5D(elem_D,ie,ip,jp,1,0,np,np,2,2) / detD;
-        AT_5D(elem_Dinv,ie,ip,jp,1,1,np,np,2,2) =  AT_5D(elem_D,ie,ip,jp,0,0,np,np,2,2) / detD;
+        AT_5D(elem_D,ie,ip,jp,0,0,np,np,2,2)  = 1.0;
+        AT_5D(elem_D,ie,ip,jp,0,1,np,np,2,2)  = 0.0;
+        AT_5D(elem_D,ie,ip,jp,1,0,np,np,2,2)  = 0.0;
+        AT_5D(elem_D,ie,ip,jp,1,1,np,np,2,2)  = 2.0;
 
-        AT_3D(elem_fcor,      ie,ip,jp,np,np)  = init_map(x,n++);
-        AT_3D(elem_spheremp,  ie,ip,jp,np,np)  = init_map(x,n++);
-        AT_3D(elem_metdet,    ie,ip,jp,np,np)  = init_map(x,n++);
-        AT_3D(elem_state_phis,ie,ip,jp,np,np)  = init_map(x,n++);
-
-        AT_3D(elem_rmetdet,   ie,ip,jp,np,np) = 1./ AT_3D(elem_metdet,ie,ip,jp,np,np);
+        AT_5D(elem_Dinv,ie,ip,jp,0,0,np,np,2,2) = 1.0;
+        AT_5D(elem_Dinv,ie,ip,jp,0,1,np,np,2,2) = 0.0;
+        AT_5D(elem_Dinv,ie,ip,jp,1,0,np,np,2,2) = 0.0;
+        AT_5D(elem_Dinv,ie,ip,jp,1,1,np,np,2,2) = 0.5;
 
         for (int il=0; il<nlev; ++il)
         {
-          AT_4D (elem_derived_omega_p,ie,il,ip,jp,  nlev,np,np  )  = init_map(x,n++);
-          AT_4D (elem_derived_pecnd,  ie,il,ip,jp,  nlev,np,np  )  = init_map(x,n++);
-          AT_4D (elem_derived_phi,    ie,il,ip,jp,  nlev,np,np  )  = init_map(x,n++);
-          AT_5D (elem_derived_vn0,    ie,il,ip,jp,0,nlev,np,np,2)  = init_map(x,n++);
-          AT_5D (elem_derived_vn0,    ie,il,ip,jp,1,nlev,np,np,2)  = init_map(x,n++);
+          double iil = il + 1;
 
-          for (int iq=0; iq<qsize_d; ++iq)
-          {
-            AT_6D(elem_state_Qdp,ie,il,ip,jp,iq,0,nlev,np,np,qsize_d,2)  = init_map(x,n++);
-            AT_6D(elem_state_Qdp,ie,il,ip,jp,iq,1,nlev,np,np,qsize_d,2)  = init_map(x,n++);
-          }
+          AT_4D (elem_derived_phi,    ie,il,ip,jp,  nlev,np,np  ) = cos(iip + 3*jjp) + iil;
+          AT_5D (elem_derived_vn0,    ie,il,ip,jp,0,nlev,np,np,2) = 1.0;
+          AT_5D (elem_derived_vn0,    ie,il,ip,jp,1,nlev,np,np,2) = 1.0;
+          AT_4D (elem_derived_pecnd,  ie,il,ip,jp,  nlev,np,np  ) = 1.0;
+          AT_4D (elem_derived_omega_p,ie,il,ip,jp,  nlev,np,np  ) = jjp*jjp;
+
+          AT_6D(elem_state_Qdp,ie,0,0,il,ip,jp,qsize_d,2,nlev,np,np) = 1.0 + sin(iip*jjp*iil);
 
           for (int it=0; it<timelevels; ++it)
           {
-            AT_6D(elem_state_v,   ie,it,il,ip,jp,0,timelevels,nlev,np,np,2)  = init_map(x,n++);
-            AT_6D(elem_state_v,   ie,it,il,ip,jp,1,timelevels,nlev,np,np,2)  = init_map(x,n++);
-            AT_5D(elem_state_T,   ie,it,il,ip,jp,  timelevels,nlev,np,np)    = init_map(x,n++);
-            AT_5D(elem_state_dp3d,ie,it,il,ip,jp,  timelevels,nlev,np,np)    = init_map(x,n++);
-          }
-        }
+            double iit = it + 1;
 
-        for (int il=0; il<nlevp; ++il)
-        {
-          AT_4D (elem_derived_eta_dot_dpdn,ie,il,ip,jp,nlevp,np,np)  = init_map(x,n++);
+            AT_5D(elem_state_dp3d,ie,it,il,ip,jp,  timelevels,nlev,np,np)   = 10.0*iil + iie + iip + jjp + iit;
+            AT_6D(elem_state_v,   ie,it,il,ip,jp,0,timelevels,nlev,np,np,2) = 1.0 + 0.5*iil + iip + jjp + 0.2*iie + 2.0*iit;
+            AT_6D(elem_state_v,   ie,it,il,ip,jp,1,timelevels,nlev,np,np,2) = 1.0 + 0.5*iil + iip + jjp + 0.2*iie + 3.0*iit;
+            AT_5D(elem_state_T,   ie,it,il,ip,jp,  timelevels,nlev,np,np)   = 1000.0 - iil - iip - jjp + 0.1*iie + iit;
+          }
         }
       }
     }
@@ -131,9 +116,12 @@ void Arrays::cleanup_data ()
 
 void Constants::init_data ()
 {
-  kappa        = 1.0;
-  Rwater_vapor = 1.0;
-  Rgas         = 10.0;
+  Rwater_vapor = 461.5;
+  Rgas         = 287.04;
+  cp           = 1005.0;
+  kappa        = Rgas/cp;
+  rrearth      = 1.0/6.376e6;
+
   eta_ave_w    = 1.0;
 }
 
@@ -141,21 +129,21 @@ void Control::init_data ()
 {
   nets = 0;
   nete = num_elems;
-  n0 = 0;
-  np1 = 1;
-  nm1 = 2;
-  qn0 = 0;
+  n0   = 0;
+  np1  = 1;
+  nm1  = 2;
+  qn0  = 0;
 
-  real dt2 = 1.0;
+  dt2  = 1.0;
 }
 
 void HVCoord::init_data ()
 {
-  ps0 = 1.0;
+  ps0 = 10.0;
 
   for (int i=0; i<nlevp; ++i)
   {
-    hyai[i] = 1.0;
+    hyai[i] = nlev + 1 - i;
   }
 }
 

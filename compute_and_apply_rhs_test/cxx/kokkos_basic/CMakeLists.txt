@@ -15,7 +15,12 @@ IF(${CUDA_BUILD})
   TARGET_COMPILE_OPTIONS(kokkos-basic PUBLIC -expt-extended-lambda)
 ENDIF()
 
-SET(Kokkos_LIBRARIES "kokkos")
+IF (KOKKOS_CMAKE_BUILD)
+  SET(Kokkos_LIBRARIES "kokkoscore")
+ELSE()
+  SET(Kokkos_LIBRARIES "kokkos")
+ENDIF()
+
 TARGET_LINK_LIBRARIES(kokkos-basic ${Kokkos_LIBRARIES} -L${KOKKOS_PATH}/lib)
 
 IF(${USE_HWLOC})

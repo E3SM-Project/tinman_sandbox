@@ -5,22 +5,26 @@
 
 namespace TinMan {
 
-#define NP 4
-#define NUM_LEV 72
-#define NUM_LEV_P (NUM_LEV + 1)
-#define QSIZE_D 4
-#define NUM_TIME_LEVELS 3
+// Until whenever CUDA supports constexpr properly
+#ifdef CUDA_BUILD
 
-// This is always the case
+#define NP                4
+#define NUM_LEV           72
+#define NUM_LEV_P         (NUM_LEV + 1)
+#define QSIZE_D           1
+#define NUM_TIME_LEVELS   3
 #define Q_NUM_TIME_LEVELS 2
 
-// Until whenever CUDA supports constexpr properly
-// static constexpr const int NP = 4;
-// static constexpr const int NUM_LEV = 72;
-// static constexpr const int NUM_LEV_P = NUM_LEV + 1;
-// static constexpr const int QSIZE_D = 4;
-// static constexpr const int NUM_TIME_LEVELS = 3;
-// static constexpr const int Q_NUM_TIME_LEVELS = 2;
+#else
+
+static constexpr int NP                = 4;
+static constexpr int NUM_LEV           = 72;
+static constexpr int NUM_LEV_P         = NUM_LEV + 1;
+static constexpr int QSIZE_D           = 1;
+static constexpr int NUM_TIME_LEVELS   = 3;
+static constexpr int Q_NUM_TIME_LEVELS = 2;
+
+#endif
 
 } // namespace TinMan
 

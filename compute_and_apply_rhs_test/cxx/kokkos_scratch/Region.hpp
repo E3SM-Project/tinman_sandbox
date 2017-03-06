@@ -11,34 +11,34 @@ namespace TinMan {
 
 namespace {
 // The number of fields for each dimension
-constexpr const int NUM_4D_SCALARS = 4;
-constexpr const int NUM_3D_SCALARS = 5;
-constexpr const int NUM_2D_SCALARS = 4;
-constexpr const int NUM_2D_TENSORS = 2;
+constexpr int NUM_4D_SCALARS = 4;
+constexpr int NUM_3D_SCALARS = 5;
+constexpr int NUM_2D_SCALARS = 4;
+constexpr int NUM_2D_TENSORS = 2;
 
 // Some constexpr for the index of different variables in the views
 // 4D Scalars
-constexpr const int IDX_U = 0;
-constexpr const int IDX_V = 1;
-constexpr const int IDX_T = 2;
-constexpr const int IDX_DP3D = 3;
+constexpr int IDX_U    = 0;
+constexpr int IDX_V    = 1;
+constexpr int IDX_T    = 2;
+constexpr int IDX_DP3D = 3;
 
 // 3D Scalars
-constexpr const int IDX_OMEGA_P = 0;
-constexpr const int IDX_PECND = 1;
-constexpr const int IDX_PHI = 2;
-constexpr const int IDX_DERIVED_UN0 = 3;
-constexpr const int IDX_DERIVED_VN0 = 4;
+constexpr int IDX_OMEGA_P     = 0;
+constexpr int IDX_PECND       = 1;
+constexpr int IDX_PHI         = 2;
+constexpr int IDX_DERIVED_UN0 = 3;
+constexpr int IDX_DERIVED_VN0 = 4;
 
 // 2D Scalars
-constexpr const int IDX_FCOR = 0;
-constexpr const int IDX_SPHEREMP = 1;
-constexpr const int IDX_METDET = 2;
-constexpr const int IDX_PHIS = 3;
+constexpr int IDX_FCOR     = 0;
+constexpr int IDX_SPHEREMP = 1;
+constexpr int IDX_METDET   = 2;
+constexpr int IDX_PHIS     = 3;
 
 // 2D Tensors
-constexpr const int IDX_D = 0;
-constexpr const int IDX_DINV = 1;
+constexpr int IDX_D    = 0;
+constexpr int IDX_DINV = 1;
 }
 
 /* Per element data - specific velocity, temperature, pressure, etc. */

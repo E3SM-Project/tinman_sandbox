@@ -15,10 +15,11 @@ IF(${CUDA_BUILD})
 ENDIF()
 
 IF (KOKKOS_CMAKE_BUILD)
-  SET(Kokkos_LIBRARIES "kokkoscore;kokkoscontainers")
+  SET(Kokkos_LIBRARIES "kokkoscore")
 ELSE()
   SET(Kokkos_LIBRARIES "kokkos")
 ENDIF()
+
 TARGET_LINK_LIBRARIES(kokkos-scratch ${Kokkos_LIBRARIES} -L${KOKKOS_PATH}/lib)
 
 IF(${USE_HWLOC})

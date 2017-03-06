@@ -8,11 +8,13 @@
 namespace TinMan {
 
 struct PhysicalConstants {
-  static constexpr const Real rrearth = 1.0;
-  static constexpr const Real eta_ave_w = 1.0;
-  static constexpr const Real Rwater_vapor = 1.0;
-  static constexpr const Real Rgas = 10.0;
-  static constexpr const Real kappa = 1.0;
+  static constexpr Real Rwater_vapor = 461.5;
+  static constexpr Real Rgas         = 287.04;
+  static constexpr Real cp           = 1005.0;
+  static constexpr Real kappa        = Rgas/cp;
+  static constexpr Real rrearth      = 1.0/6.376e6;
+
+  static constexpr Real eta_ave_w    = 1.0;
 };
 
 class Control {
@@ -46,7 +48,7 @@ public:
    */
   KOKKOS_INLINE_FUNCTION Real ps0() const { return m_ps0; }
 
-  KOKKOS_INLINE_FUNCTION Real dvv(int x, int y) const { return m_dvv(y, x); }
+  KOKKOS_INLINE_FUNCTION Real dvv(int x, int y) const { return m_dvv(x, y); }
 
 private:
   const int m_num_elems;

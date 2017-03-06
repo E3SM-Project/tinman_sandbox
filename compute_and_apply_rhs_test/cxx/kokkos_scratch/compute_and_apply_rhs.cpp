@@ -83,7 +83,7 @@ struct update_state {
                        m_region.PHI_update(ie)(ilev, igp, jgp) +
                        m_region.PECND(ie, ilev)(igp, jgp);
     });
-    gradient_sphere<ScratchSpace, ScratchSpace, FastMemManager,
+    gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
                     block_2d_vectors, vector_mem>(
         team, fast_mem, static_cast<ScratchView<const Real[NP][NP]> >(Ephi),
         m_data, c_dinv, Ephi_grad);
@@ -111,14 +111,14 @@ struct update_state {
 
       ScratchView<Real[NP][NP]> vort(
           fast_mem.get_thread_scratch<block_2d_scalars, 0>(team.team_rank()));
-      vorticity_sphere<ExecSpace, ScratchSpace, FastMemManager,
+      vorticity_sphere<ExecMemSpace, ScratchMemSpace, FastMemManager,
                        block_2d_vectors, 0>(
           team, fast_mem, m_region.U_current(ie, ilev),
           m_region.V_current(ie, ilev), m_data, m_region.METDET(ie), c_d, vort);
 
       ScratchView<Real[2][NP][NP]> grad_p(
           fast_mem.get_thread_scratch<block_2d_vectors, 0>(team.team_rank()));
-      gradient_sphere<ScratchSpace, ScratchSpace, FastMemManager,
+      gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
                       block_2d_vectors, 1>(team, fast_mem, p_ilev, m_data,
                                            c_dinv, grad_p);
 
@@ -261,7 +261,7 @@ struct update_state {
 
       {
         p_ilev = subview(pressure, 0, Kokkos::ALL(), Kokkos::ALL());
-        gradient_sphere<ScratchSpace, ScratchSpace, FastMemManager,
+        gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
                         block_2d_vectors, 1>(
             team, fast_mem,
             static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
@@ -279,7 +279,7 @@ struct update_state {
       // Another candidate for parallel scan
       for (int ilev = 1; ilev < NUM_LEV - 1; ++ilev) {
         p_ilev = subview(pressure, ilev, Kokkos::ALL(), Kokkos::ALL());
-        gradient_sphere<ScratchSpace, ScratchSpace, FastMemManager,
+        gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
                         block_2d_vectors, 1>(
             team, fast_mem,
             static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
@@ -299,7 +299,7 @@ struct update_state {
 
       {
         p_ilev = subview(pressure, NUM_LEV - 1, Kokkos::ALL(), Kokkos::ALL());
-        gradient_sphere<ScratchSpace, ScratchSpace, FastMemManager,
+        gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
                         block_2d_vectors, 1>(
             team, fast_mem,
             static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
@@ -452,7 +452,7 @@ struct update_state {
 
       ScratchView<Real[NP][NP]> div_vdp_ilev =
           Kokkos::subview(div_vdp, ilev, Kokkos::ALL(), Kokkos::ALL());
-      divergence_sphere<ScratchSpace, ScratchSpace, FastMemManager,
+      divergence_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
                         block_2d_vectors, 1>(
           team, fast_mem,
           static_cast<ScratchView<const Real[2][NP][NP]> >(vdp_ilev), m_data,
@@ -487,7 +487,7 @@ struct update_state {
       ScratchView<Real[2][NP][NP]> grad_tmp(
           fast_mem.get_thread_scratch<block_2d_vectors, 0>(team.team_rank()));
 
-      gradient_sphere<ExecSpace, ScratchSpace, FastMemManager, block_2d_vectors,
+      gradient_sphere<ExecMemSpace, ScratchMemSpace, FastMemManager, block_2d_vectors,
                       1>(team, fast_mem, T_ie_n0_ilev, m_data, c_dinv,
                          grad_tmp);
 
@@ -657,11 +657,11 @@ void compute_and_apply_rhs(const Control &data, Region &region) {
   region.next_compute_apply_rhs();
 }
 
-void print_results_2norm(const Control &data, const Region &region) {
-  // Input parameters
-  Real unorm(0.), vnorm(0.), tnorm(0.), dpnorm(0.);
-  for (int ie = 0; ie < data.num_elems(); ++ie) {
-
+void print_results_2norm(const Control &data, const Region &region)
+{
+  Real vnorm(0.), tnorm(0.), dpnorm(0.);
+  for (int ie = 0; ie < data.num_elems(); ++ie)
+  {
     auto U = Kokkos::create_mirror_view(region.U_current(ie));
     Kokkos::deep_copy(U, region.U_future(ie));
 
@@ -674,21 +674,14 @@ void print_results_2norm(const Control &data, const Region &region) {
     auto DP3D = Kokkos::create_mirror_view(region.DP3D_current(ie));
     Kokkos::deep_copy(DP3D, region.DP3D_future(ie));
 
-    for (int ilev = 0; ilev < NUM_LEV; ++ilev) {
-      for (int igp = 0; igp < NP; ++igp) {
-        for (int jgp = 0; jgp < NP; ++jgp) {
-          unorm += U(ilev, igp, jgp) * U(ilev, igp, jgp);
-          vnorm += V(ilev, igp, jgp) * V(ilev, igp, jgp);
-          tnorm += T(ilev, igp, jgp) * T(ilev, igp, jgp);
-          dpnorm += DP3D(ilev, igp, jgp) * DP3D(ilev, igp, jgp);
-        }
-      }
-    }
+    vnorm  += std::pow( compute_norm (U), 2 );
+    vnorm  += std::pow( compute_norm (V), 2 );
+    tnorm  += std::pow( compute_norm (T), 2 );
+    dpnorm += std::pow( compute_norm (DP3D), 2 );
   }
 
   std::cout << std::setprecision(17);
   std::cout << "   ---> Norms:\n"
-            << "          ||u||_2  = " << std::sqrt(unorm) << "\n"
             << "          ||v||_2  = " << std::sqrt(vnorm) << "\n"
             << "          ||T||_2  = " << std::sqrt(tnorm) << "\n"
             << "          ||dp||_2 = " << std::sqrt(dpnorm) << "\n";

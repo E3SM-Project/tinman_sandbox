@@ -5,9 +5,12 @@ namespace TinMan
 
 void Constants::init_data ()
 {
-  kappa        = 1.0;
-  Rwater_vapor = 1.0;
-  Rgas         = 10.0;
+  Rwater_vapor = 461.5;
+  Rgas         = 287.04;
+  cp           = 1005.0;
+  kappa        = Rgas/cp;
+  rrearth      = 1.0/6.376e6;
+
   eta_ave_w    = 1.0;
 }
 
@@ -20,16 +23,16 @@ void Control::init_data (const int num_elems)
   nm1 = 2;
   qn0 = 0;
 
-  Real dt2 = 1.0;
+  dt2 = 1.0;
 }
 
 void HVCoord::init_data ()
 {
-  ps0 = 1.0;
+  ps0 = 10.0;
 
   for (int i=0; i<NUM_LEV_P; ++i)
   {
-    hyai[i] = 1.0;
+    hyai[i] = NUM_LEV + 1 - i;
   }
 }
 

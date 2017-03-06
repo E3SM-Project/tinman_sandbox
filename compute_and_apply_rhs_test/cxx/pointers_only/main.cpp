@@ -107,20 +107,26 @@ int main (int argc, char** argv)
   // Burn in to avoid cache effects
   compute_and_apply_rhs(data);
 
-  std::unique_ptr<Timer::Timer[]> timers(new Timer::Timer[num_exec]);
+  std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
+  //std::vector<Timer::Timer> timers(num_exec);
+  Timer::Timer global_timer;
+  global_timer.startTimer();
   for (int i=0; i<num_exec; ++i)
   {
-    timers[i].startTimer();
+    //timers[i].startTimer();
     compute_and_apply_rhs(data);
-    data.update_time_levels();
-    timers[i].stopTimer();
+    //data.update_time_levels();
+    //timers[i].stopTimer();
   }
-  // Run this one final time to ensure we're printing the correct results
-  compute_and_apply_rhs(data);
+  global_timer.stopTimer();
 
+/*
+  std::cout << "   ---> individual executions times:\n";
   for(int i = 0; i < num_exec; ++i) {
     std::cout << timers[i] << std::endl;
   }
+*/
+  std::cout << "   ---> compute_and_apply_rhs execution total time: " << global_timer << "\n";
 
   print_results_2norm (data);
 
