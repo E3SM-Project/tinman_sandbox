@@ -203,35 +203,35 @@ struct update_state {
         m_region.PHI_update(ie);
 
     // Need to test if false sharing causes Kokkos::single to be faster
-    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
-                         KOKKOS_LAMBDA(const int loop_idx) {
-      const int jgp = loop_idx / NP;
-      const int igp = loop_idx % NP;
-      Real phii;
+    Kokkos::single(Kokkos::PerTeam(team),
+		   KOKKOS_LAMBDA() {
+      for(int igp = 0; igp < NP; ++igp) {
+        for(int jgp = 0; jgp < NP; ++jgp) {
 
-      {
-        const Real hk =
-            dp(NUM_LEV - 1, igp, jgp) / pressure(NUM_LEV - 1, igp, jgp);
-        phii = PhysicalConstants::Rgas * T_v(NUM_LEV - 1, igp, jgp) * hk;
-        phi_update(NUM_LEV - 1, igp, jgp) =
-            phis(igp, jgp) +
-            PhysicalConstants::Rgas * T_v(NUM_LEV - 1, igp, jgp) * hk * 0.5;
-      }
+          Real phii;
+          {
+            const Real hk =
+                dp(NUM_LEV - 1, igp, jgp) / pressure(NUM_LEV - 1, igp, jgp);
+            phii = PhysicalConstants::Rgas * T_v(NUM_LEV - 1, igp, jgp) * hk;
+            phi_update(NUM_LEV - 1, igp, jgp) =
+                phis(igp, jgp) + phii * 0.5;
+          }
 
-      for (int ilev = NUM_LEV - 2; ilev > 0; --ilev) {
-        const Real hk = dp(ilev, igp, jgp) / pressure(ilev, igp, jgp);
-        phi_update(ilev, igp, jgp) =
-            phis(igp, jgp) + phii +
-            PhysicalConstants::Rgas * T_v(ilev, igp, jgp) * hk * 0.5;
+          for (int ilev = NUM_LEV - 2; ilev > 0; --ilev) {
+            const Real hk = dp(ilev, igp, jgp) / pressure(ilev, igp, jgp);
+            const Real lev_term = PhysicalConstants::Rgas * T_v(ilev, igp, jgp) * hk;
+            phi_update(ilev, igp, jgp) = phis(igp, jgp) + phii + lev_term * 0.5;
 
-        phii += PhysicalConstants::Rgas * T_v(ilev, igp, jgp) * hk;
-      }
+            phii += lev_term;
+          }
 
-      {
-        const Real hk = 0.5 * dp(0, igp, jgp) / pressure(0, igp, jgp);
-        phi_update(0, igp, jgp) =
-            phis(igp, jgp) + phii +
-            PhysicalConstants::Rgas * T_v(0, igp, jgp) * hk;
+          {
+            const Real hk = 0.5 * dp(0, igp, jgp) / pressure(0, igp, jgp);
+            phi_update(0, igp, jgp) =
+                phis(igp, jgp) + phii +
+                PhysicalConstants::Rgas * T_v(0, igp, jgp) * hk;
+          }
+	}
       }
     });
     team.team_barrier();
