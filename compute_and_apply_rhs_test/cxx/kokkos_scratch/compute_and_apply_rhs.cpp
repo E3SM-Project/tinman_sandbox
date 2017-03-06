@@ -377,7 +377,7 @@ struct update_state {
       const int igp = idx / NP;
       const int jgp = idx % NP;
 
-      Real Qt = m_region.QDP(ie, 1, m_data.qn0())(ilev, igp, jgp) /
+      Real Qt = m_region.QDP(ie, 0, m_data.qn0())(ilev, igp, jgp) /
                 m_region.DP3D_current(ie)(ilev, igp, jgp);
       T_v(ilev, igp, jgp) =
           m_region.T_current(ie)(ilev, igp, jgp) *
@@ -458,6 +458,7 @@ struct update_state {
           static_cast<ScratchView<const Real[2][NP][NP]> >(vdp_ilev), m_data,
           m_region.METDET(ie), c_dinv, div_vdp_ilev);
     });
+
     // Threads_NL = min(NUM_LEV, Max_Threads)
     // Maximum memory usage so far: (NUM_LEV + 2 x Threads_NL) x NP x NP
 
@@ -517,7 +518,7 @@ struct update_state {
 
         m_region.DP3D_future(ie)(ilev, igp, jgp) =
             m_region.SPHEREMP(ie)(igp, jgp) *
-            (m_region.DP3D_previous(ie)(ilev, igp, jgp) +
+            (m_region.DP3D_previous(ie)(ilev, igp, jgp) -
              m_data.dt2() * div_vdp(ilev, igp, jgp));
       });
     });
@@ -594,8 +595,8 @@ struct update_state {
       c_dvv(hgp, igp) = m_data.dvv(hgp, igp);
       for (int jgp = 0; jgp < 2; ++jgp) {
         for (int kgp = 0; kgp < 2; ++kgp) {
-          c_d(jgp, kgp, igp, jgp) = m_region.D(ie)(jgp, kgp, igp, jgp);
-          c_dinv(jgp, kgp, igp, jgp) = m_region.DINV(ie)(jgp, kgp, igp, jgp);
+          c_d(jgp, kgp, hgp, igp) = m_region.D(ie)(jgp, kgp, hgp, igp);
+          c_dinv(jgp, kgp, hgp, igp) = m_region.DINV(ie)(jgp, kgp, hgp, igp);
         }
       }
     });
@@ -654,7 +655,6 @@ struct update_state {
 void compute_and_apply_rhs(const Control &data, Region &region) {
   update_state f(data, region);
   Kokkos::parallel_for(Kokkos::TeamPolicy<>(data.num_elems(), Kokkos::AUTO), f);
-  region.next_compute_apply_rhs();
 }
 
 void print_results_2norm(const Control &data, const Region &region)
