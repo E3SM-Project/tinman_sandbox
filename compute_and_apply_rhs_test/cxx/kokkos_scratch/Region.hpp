@@ -1,7 +1,7 @@
 #ifndef TINMAN_REGION_HPP
 #define TINMAN_REGION_HPP
 
-#include "config.h"
+#include "Dimensions.hpp"
 
 #include "Types.hpp"
 

@@ -1,7 +1,7 @@
 #ifndef SPHERE_OPERATORS_HPP
 #define SPHERE_OPERATORS_HPP
 
-#include "config.h"
+#include "Dimensions.hpp"
 #include "Types.hpp"
 
 #include "ScratchManager.hpp"

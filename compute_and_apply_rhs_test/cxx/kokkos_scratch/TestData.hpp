@@ -1,7 +1,7 @@
 #ifndef DATA_STRUCTURES_HPP
 #define DATA_STRUCTURES_HPP
 
-#include "config.h"
+#include "Dimensions.hpp"
 
 #include "Types.hpp"
 

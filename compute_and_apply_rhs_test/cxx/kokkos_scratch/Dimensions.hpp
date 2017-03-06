@@ -1,5 +1,5 @@
-#ifndef TINMAN_CONFIG_H
-#define TINMAN_CONFIG_H
+#ifndef TINMAN_DIMENSIONS_HPP
+#define TINMAN_DIMENSIONS_HPP
 
 #include <Kokkos_Core.hpp>
 
@@ -28,4 +28,4 @@ static constexpr int Q_NUM_TIME_LEVELS = 2;
 
 } // namespace TinMan
 
-#endif // TINMAN_CONFIG_H
+#endif // TINMAN_DIMENSIONS_HPP

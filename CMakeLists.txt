@@ -22,10 +22,13 @@ IF(${CUDA_BUILD})
   MESSAGE("Building for CUDA")
 ENDIF()
 
-OPTION(USE_HWLOC "Whether hwloc is being used or not. May be required by Kokkos")
+OPTION(HWLOC_BASE_DIR     "Root directory where hwloc is installed")
+OPTION(HWLOC_INCLUDE_DIRS "Directory where hwloc headers are installed")
+OPTION(HWLOC_LIBRARY_DIRS "Directory where hwloc libraries are installed")
 
-IF(${USE_HWLOC})
-  MESSAGE("Linking to hwloc")
+IF(HWLOC_BASE_DIR)
+  SET (HWLOC_INCLUDE_DIRS "${HWLOC_BASE_DIR}/include")
+  SET (HWLOC_LIBRARY_DIRS "${HWLOC_BASE_DIR}/lib")
 ENDIF()
 
 INCLUDE (SetCompilerFlags)

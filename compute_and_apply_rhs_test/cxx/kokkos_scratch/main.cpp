@@ -3,6 +3,7 @@
 #include "TestData.hpp"
 #include "timer.hpp"
 #include "Kokkos_Core.hpp"
+#include "Types.hpp"
 
 #include <iostream>
 #include <cstring>
@@ -134,7 +135,7 @@ int main (int argc, char** argv)
 
   Kokkos::initialize (argc, argv);
 
-  Kokkos::DefaultExecutionSpace::print_configuration(std::cout,true);
+  TinMan::ExecSpace::print_configuration(std::cout,true);
 
   run_simulation(num_elems, num_exec, dump_results);
 

@@ -1,8 +1,6 @@
 #ifndef COMPUTE_AND_APPLY_RHS_HPP
 #define COMPUTE_AND_APPLY_RHS_HPP
 
-#include "config.h"
-
 #include "Types.hpp"
 
 namespace TinMan
