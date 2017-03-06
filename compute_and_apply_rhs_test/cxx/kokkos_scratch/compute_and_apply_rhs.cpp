@@ -85,7 +85,7 @@ struct update_state {
     });
     gradient_sphere<ScratchSpace, ScratchSpace, FastMemManager,
                     block_2d_vectors, vector_mem>(
-        team, fast_mem, static_cast<ScratchView<const Real[NP][NP]> >(Ephi),
+        team, fast_mem, Ephi,
         m_data, c_dinv, Ephi_grad);
     // We shouldn't need a block here, as the parallel loops were vector level,
     // not thread level
@@ -264,7 +264,7 @@ struct update_state {
         gradient_sphere<ScratchSpace, ScratchSpace, FastMemManager,
                         block_2d_vectors, 1>(
             team, fast_mem,
-            static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
+            p_ilev, m_data,
             c_dinv, grad_p);
         const Real vgrad_p =
             m_region.U_current(ie)(0, igp, jgp) * grad_p(0, igp, jgp) +
@@ -282,7 +282,7 @@ struct update_state {
         gradient_sphere<ScratchSpace, ScratchSpace, FastMemManager,
                         block_2d_vectors, 1>(
             team, fast_mem,
-            static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
+            p_ilev, m_data,
             c_dinv, grad_p);
         const Real vgrad_p =
             m_region.U_current(ie)(ilev, igp, jgp) * grad_p(0, igp, jgp) +
@@ -302,7 +302,7 @@ struct update_state {
         gradient_sphere<ScratchSpace, ScratchSpace, FastMemManager,
                         block_2d_vectors, 1>(
             team, fast_mem,
-            static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
+            p_ilev, m_data,
             c_dinv, grad_p);
         const Real vgrad_p =
             m_region.U_current(ie)(NUM_LEV - 1, igp, jgp) *
@@ -455,7 +455,7 @@ struct update_state {
       divergence_sphere<ScratchSpace, ScratchSpace, FastMemManager,
                         block_2d_vectors, 1>(
           team, fast_mem,
-          static_cast<ScratchView<const Real[2][NP][NP]> >(vdp_ilev), m_data,
+          vdp_ilev, m_data,
           m_region.METDET(ie), c_dinv, div_vdp_ilev);
     });
     // Threads_NL = min(NUM_LEV, Max_Threads)
@@ -632,12 +632,12 @@ struct update_state {
 
     preq_hydrostatic(team, pressure, T_v);
     compute_stuff(team, fast_mem, pressure,
-                  static_cast<ScratchView<const Real[2][2][NP][NP]> >(c_dinv),
+                  c_dinv,
                   T_v);
     compute_velocity(
         team, fast_mem, pressure,
-        static_cast<ScratchView<const Real[2][2][NP][NP]> >(c_d),
-        static_cast<ScratchView<const Real[2][2][NP][NP]> >(c_dinv), T_v);
+        c_d,
+        c_dinv, T_v);
     compute_eta_dpdn(team);
   }
 
