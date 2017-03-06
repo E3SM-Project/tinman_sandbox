@@ -1,6 +1,8 @@
 #include "Region.hpp"
 #include "TestData.hpp"
 
+#include <fstream>
+
 namespace TinMan {
 
 Region::Region(int num_elems)
@@ -50,10 +52,10 @@ Region::Region(int num_elems)
         h_2d_tensors(ie, IDX_D, 1, 0, igp, jgp) = 0.0;
         h_2d_tensors(ie, IDX_D, 1, 1, igp, jgp) = 2.0;
 
-        h_2d_tensors(ie, IDX_D, 0, 0, igp, jgp) = 1.0;
-        h_2d_tensors(ie, IDX_D, 0, 1, igp, jgp) = 0.0;
-        h_2d_tensors(ie, IDX_D, 1, 0, igp, jgp) = 0.0;
-        h_2d_tensors(ie, IDX_D, 1, 1, igp, jgp) = 0.5;
+        h_2d_tensors(ie, IDX_DINV, 0, 0, igp, jgp) = 1.0;
+        h_2d_tensors(ie, IDX_DINV, 0, 1, igp, jgp) = 0.0;
+        h_2d_tensors(ie, IDX_DINV, 1, 0, igp, jgp) = 0.0;
+        h_2d_tensors(ie, IDX_DINV, 1, 1, igp, jgp) = 0.5;
 
         h_2d_scalars(ie, IDX_FCOR, igp, jgp)     = sin(iip + jjp);
         h_2d_scalars(ie, IDX_METDET, igp, jgp)   = iip*jjp;
@@ -117,23 +119,41 @@ Region::Region(int num_elems)
   Kokkos::deep_copy(m_eta_dot_dpdn_update, m_eta_dot_dpdn);
 }
 
-void Region::save_state(const Control &data) const {
-  // Input parameters
+void Region::save_state(const Control &data) const
+{
+  struct Closer
+  {
+    Closer (std::ofstream& file, Closer* dep) :
+        m_file(file), m_dep(dep) {}
 
-  auto file_opener = [&](std::ofstream &file, const char *fname) {
+    void close () {
+      m_file.close();
+      if (m_dep) m_dep->close();
+    }
+
+    std::ofstream&  m_file;
+    Closer*         m_dep;
+  };
+
+  // The closer is to close open files (abort MAY not close them)
+  auto file_opener = [&](std::ofstream &file, const char *fname, Closer* closer) {
     file.open(fname);
     if (!file.is_open()) {
       std::cout << "Error! Cannot open '" << fname << "'.\n";
+      if (closer) closer->close();
       std::abort();
     }
     file.precision(17);
   };
 
   std::ofstream vxfile, vyfile, tfile, dpfile;
-  file_opener(vxfile, "elem_state_vx.txt");
-  file_opener(vyfile, "elem_state_vy.txt");
-  file_opener(tfile, "elem_state_t.txt");
-  file_opener(dpfile, "elem_state_dp3d.txt");
+  Closer vxcloser(vxfile,nullptr);
+  Closer vycloser(vyfile,&vxcloser);
+  Closer tcloser(tfile,&vycloser);
+  file_opener(vxfile, "elem_state_vx.txt",nullptr);
+  file_opener(vyfile, "elem_state_vy.txt",&vxcloser);
+  file_opener(tfile, "elem_state_t.txt",&vycloser);
+  file_opener(dpfile, "elem_state_dp3d.txt",&tcloser);
 
   for (int ie = 0; ie < data.num_elems(); ++ie) {
     for (int ilev = 0; ilev < NUM_LEV; ++ilev) {
