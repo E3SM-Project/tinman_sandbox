@@ -85,7 +85,7 @@ struct update_state {
     });
     gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
                     block_2d_vectors, vector_mem>(
-        team, fast_mem, static_cast<ScratchView<const Real[NP][NP]> >(Ephi),
+        team, fast_mem, Ephi,
         m_data, c_dinv, Ephi_grad);
     // We shouldn't need a block here, as the parallel loops were vector level,
     // not thread level
@@ -203,35 +203,35 @@ struct update_state {
         m_region.PHI_update(ie);
 
     // Need to test if false sharing causes Kokkos::single to be faster
-    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
-                         KOKKOS_LAMBDA(const int loop_idx) {
-      const int jgp = loop_idx / NP;
-      const int igp = loop_idx % NP;
-      Real phii;
+    Kokkos::single(Kokkos::PerTeam(team),
+		   KOKKOS_LAMBDA() {
+      for(int igp = 0; igp < NP; ++igp) {
+        for(int jgp = 0; jgp < NP; ++jgp) {
 
-      {
-        const Real hk =
-            dp(NUM_LEV - 1, igp, jgp) / pressure(NUM_LEV - 1, igp, jgp);
-        phii = PhysicalConstants::Rgas * T_v(NUM_LEV - 1, igp, jgp) * hk;
-        phi_update(NUM_LEV - 1, igp, jgp) =
-            phis(igp, jgp) +
-            PhysicalConstants::Rgas * T_v(NUM_LEV - 1, igp, jgp) * hk * 0.5;
-      }
+          Real phii;
+          {
+            const Real hk =
+                dp(NUM_LEV - 1, igp, jgp) / pressure(NUM_LEV - 1, igp, jgp);
+            phii = PhysicalConstants::Rgas * T_v(NUM_LEV - 1, igp, jgp) * hk;
+            phi_update(NUM_LEV - 1, igp, jgp) =
+                phis(igp, jgp) + phii * 0.5;
+          }
 
-      for (int ilev = NUM_LEV - 2; ilev > 0; --ilev) {
-        const Real hk = dp(ilev, igp, jgp) / pressure(ilev, igp, jgp);
-        phi_update(ilev, igp, jgp) =
-            phis(igp, jgp) + phii +
-            PhysicalConstants::Rgas * T_v(ilev, igp, jgp) * hk * 0.5;
+          for (int ilev = NUM_LEV - 2; ilev > 0; --ilev) {
+            const Real hk = dp(ilev, igp, jgp) / pressure(ilev, igp, jgp);
+            const Real lev_term = PhysicalConstants::Rgas * T_v(ilev, igp, jgp) * hk;
+            phi_update(ilev, igp, jgp) = phis(igp, jgp) + phii + lev_term * 0.5;
 
-        phii += PhysicalConstants::Rgas * T_v(ilev, igp, jgp) * hk;
-      }
+            phii += lev_term;
+          }
 
-      {
-        const Real hk = 0.5 * dp(0, igp, jgp) / pressure(0, igp, jgp);
-        phi_update(0, igp, jgp) =
-            phis(igp, jgp) + phii +
-            PhysicalConstants::Rgas * T_v(0, igp, jgp) * hk;
+          {
+            const Real hk = 0.5 * dp(0, igp, jgp) / pressure(0, igp, jgp);
+            phi_update(0, igp, jgp) =
+                phis(igp, jgp) + phii +
+                PhysicalConstants::Rgas * T_v(0, igp, jgp) * hk;
+          }
+	}
       }
     });
     team.team_barrier();
@@ -264,7 +264,7 @@ struct update_state {
         gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
                         block_2d_vectors, 1>(
             team, fast_mem,
-            static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
+            p_ilev, m_data,
             c_dinv, grad_p);
         const Real vgrad_p =
             m_region.U_current(ie)(0, igp, jgp) * grad_p(0, igp, jgp) +
@@ -282,7 +282,7 @@ struct update_state {
         gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
                         block_2d_vectors, 1>(
             team, fast_mem,
-            static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
+            p_ilev, m_data,
             c_dinv, grad_p);
         const Real vgrad_p =
             m_region.U_current(ie)(ilev, igp, jgp) * grad_p(0, igp, jgp) +
@@ -302,7 +302,7 @@ struct update_state {
         gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
                         block_2d_vectors, 1>(
             team, fast_mem,
-            static_cast<ScratchView<const Real[NP][NP]> >(p_ilev), m_data,
+            p_ilev, m_data,
             c_dinv, grad_p);
         const Real vgrad_p =
             m_region.U_current(ie)(NUM_LEV - 1, igp, jgp) *
@@ -455,7 +455,7 @@ struct update_state {
       divergence_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
                         block_2d_vectors, 1>(
           team, fast_mem,
-          static_cast<ScratchView<const Real[2][NP][NP]> >(vdp_ilev), m_data,
+          vdp_ilev, m_data,
           m_region.METDET(ie), c_dinv, div_vdp_ilev);
     });
 
@@ -633,12 +633,12 @@ struct update_state {
 
     preq_hydrostatic(team, pressure, T_v);
     compute_stuff(team, fast_mem, pressure,
-                  static_cast<ScratchView<const Real[2][2][NP][NP]> >(c_dinv),
+                  c_dinv,
                   T_v);
     compute_velocity(
         team, fast_mem, pressure,
-        static_cast<ScratchView<const Real[2][2][NP][NP]> >(c_d),
-        static_cast<ScratchView<const Real[2][2][NP][NP]> >(c_dinv), T_v);
+        c_d,
+        c_dinv, T_v);
     compute_eta_dpdn(team);
   }
 
