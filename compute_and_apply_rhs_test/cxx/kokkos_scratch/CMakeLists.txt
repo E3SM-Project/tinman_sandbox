@@ -31,7 +31,7 @@ CONFIGURE_FILE (${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_D
 ADD_EXECUTABLE(kokkos-scratch ${TEST_SRCS})
 
 IF(${CUDA_BUILD})
-  TARGET_COMPILE_OPTIONS(kokkos-scratch PUBLIC -expt-extended-lambda)
+  TARGET_COMPILE_OPTIONS(kokkos-scratch PUBLIC -expt-extended-lambda -lineinfo)
 ENDIF()
 
 IF (KOKKOS_CMAKE_BUILD)
