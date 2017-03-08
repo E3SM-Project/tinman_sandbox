@@ -92,20 +92,20 @@ void run_simulation(int num_elems, int num_exec, bool dump_results) {
   // Print norm of initial states, to check we are using same data in all tests
   print_results_2norm(data, region);
 
+  std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
+
   // Burn in before timing to reduce cache effect
   TinMan::compute_and_apply_rhs(data, region);
+  TinMan::ExecSpace::fence();
 
-  std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
   Timer::Timer global_timer;
   global_timer.startTimer();
   for (int i=0; i<num_exec; ++i)
   {
-    TinMan::compute_and_apply_rhs(data, region);
     region.next_compute_apply_rhs();
+    TinMan::compute_and_apply_rhs(data, region);
   }
   global_timer.stopTimer();
-  // Run this one final time to ensure we're printing the correct results
-//  TinMan::compute_and_apply_rhs(data, region);
 
   std::cout << "   ---> compute_and_apply_rhs execution total time: " << global_timer << "\n";
 
