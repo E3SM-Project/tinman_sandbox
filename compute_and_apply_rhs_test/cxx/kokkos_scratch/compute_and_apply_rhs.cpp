@@ -21,7 +21,7 @@ struct update_state {
 
   static constexpr const size_t num_2d_scalars = 1;
   static constexpr const size_t num_2d_vectors = 2;
-  static constexpr const size_t num_2d_tensors = 2;
+  static constexpr const size_t num_2d_tensors = 1;
   static constexpr const size_t num_3d_scalars = 3;
   static constexpr const size_t num_3d_vectors = 0;
   static constexpr const size_t num_3d_p_scalars = 0;
@@ -98,7 +98,6 @@ struct update_state {
   void compute_velocity(Kokkos::TeamPolicy<>::member_type &team,
                         FastMemManager &fast_mem,
                         ScratchView<Real[NUM_LEV][NP][NP]> pressure,
-                        ScratchView<const Real[2][2][NP][NP]> c_d,
                         ScratchView<const Real[2][2][NP][NP]> c_dinv,
                         ScratchView<Real[NUM_LEV][NP][NP]> T_v) const {
     const int ie = team.league_rank();
@@ -132,7 +131,7 @@ struct update_state {
       vorticity_sphere<ExecMemSpace, ScratchMemSpace, FastMemManager,
                        block_2d_vectors, 1>(
           team, fast_mem, m_region.U_current(ie, ilev),
-          m_region.V_current(ie, ilev), m_data, m_region.METDET(ie), c_d, vort);
+          m_region.V_current(ie, ilev), m_data, m_region.METDET(ie), m_region.D(ie), vort);
 
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                            [&](const int idx) {
@@ -573,7 +572,6 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void init_const_cache(const Kokkos::TeamPolicy<>::member_type &team,
-                        ScratchView<Real[2][2][NP][NP]> c_d,
                         ScratchView<Real[2][2][NP][NP]> c_dinv,
                         ScratchView<Real[NP][NP]> c_dvv) const {
     const int ie = team.league_rank();
@@ -584,7 +582,6 @@ struct update_state {
       c_dvv(hgp, igp) = m_data.dvv(hgp, igp);
       for (int jgp = 0; jgp < 2; ++jgp) {
         for (int kgp = 0; kgp < 2; ++kgp) {
-          c_d(jgp, kgp, hgp, igp) = m_region.D(ie)(jgp, kgp, hgp, igp);
           c_dinv(jgp, kgp, hgp, igp) = m_region.DINV(ie)(jgp, kgp, hgp, igp);
         }
       }
@@ -593,28 +590,24 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void operator()(Kokkos::TeamPolicy<>::member_type team) const {
-    printf("Running CUDA kernel\n");
     Real *memory = ScratchView<Real *>(team.team_scratch(0),
                                        shmem_size(team.team_size()) /
                                            sizeof(Real)).ptr_on_device();
     FastMemManager fast_mem(memory);
-    printf("Fastmem pointer 0x%x\n", memory);
 
     // Used 5 times per index - basically the most important variable
     ScratchView<Real[NUM_LEV][NP][NP]> pressure(
         fast_mem.get_team_scratch<block_3d_scalars, 0>());
     compute_pressure(team, pressure);
 
-    // Cache d, dinv, and dvv
-    ScratchView<Real[2][2][NP][NP]> c_d(
-        fast_mem.get_team_scratch<block_2d_tensors, 1>());
+    // Cache dinv, and dvv
     ScratchView<Real[2][2][NP][NP]> c_dinv(
         fast_mem.get_team_scratch<block_2d_tensors, 0>());
     ScratchView<Real[NP][NP]> c_dvv(
         fast_mem.get_team_scratch<block_team_2d_scalars, 0>());
 
     Kokkos::single(Kokkos::PerTeam(team), KOKKOS_LAMBDA() {
-      init_const_cache(team, c_d, c_dinv, c_dvv);
+      init_const_cache(team, c_dinv, c_dvv);
     });
 
     // Used 3 times per index
@@ -625,7 +618,6 @@ struct update_state {
     preq_hydrostatic(team, pressure, T_v);
     compute_velocity(
         team, fast_mem, pressure,
-        c_d,
         c_dinv, T_v);
     compute_eta_dpdn(team);
     // Breaks pressure
@@ -646,8 +638,6 @@ struct update_state {
 
 void compute_and_apply_rhs(const Control &data, Region &region) {
   update_state f(data, region);
-  printf("Calling kernel with %d elements, max of %d memory\n",
-	 data.num_elems(), static_cast<int>(f.shmem_size(NUM_LEV)));
   Kokkos::parallel_for(Kokkos::TeamPolicy<Kokkos::Cuda>(data.num_elems(), Kokkos::AUTO), f);
   ExecSpace::fence();
 }

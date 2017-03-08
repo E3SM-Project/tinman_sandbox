@@ -173,7 +173,7 @@ KOKKOS_INLINE_FUNCTION void vorticity_sphere(
     const ViewType<const Real[NP][NP], MemSpaceIn, Kokkos::MemoryUnmanaged> u,
     const ViewType<const Real[NP][NP], MemSpaceIn, Kokkos::MemoryUnmanaged> v,
     const Control &data, const ExecViewUnmanaged<const Real[NP][NP]> metDet,
-    const ScratchView<const Real[2][2][NP][NP]> D,
+    const ExecViewUnmanaged<const Real[2][2][NP][NP]> D,
     ViewType<Real[NP][NP], MemSpaceOut, Kokkos::MemoryUnmanaged> vort)
 {
   ScratchView<Real[2][NP][NP]> vcov(
