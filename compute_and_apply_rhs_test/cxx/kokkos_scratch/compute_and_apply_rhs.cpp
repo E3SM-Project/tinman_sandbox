@@ -155,8 +155,8 @@ struct update_state {
         const Real v1 = m_region.U_current(ie)(ilev, igp, jgp);
 
         const Real vtens2 =
-	  // v_vadv(igp, jgp, 1) -
-          v1 * fcor_vort_coeff - grad_buf(1, igp, jgp);
+            // v_vadv(igp, jgp, 1) -
+            -v1 * fcor_vort_coeff - grad_buf(1, igp, jgp);
 
         m_region.V_future(ie)(ilev, igp, jgp) =
             spheremp *
