@@ -11,16 +11,18 @@
 #include <fstream>
 #include <iomanip>
 
+#include <stdio.h>
+
 namespace TinMan {
 
 struct update_state {
   const Control m_data;
   const Region m_region;
 
-  static constexpr const size_t num_2d_scalars = 2;
-  static constexpr const size_t num_2d_vectors = 3;
+  static constexpr const size_t num_2d_scalars = 1;
+  static constexpr const size_t num_2d_vectors = 2;
   static constexpr const size_t num_2d_tensors = 2;
-  static constexpr const size_t num_3d_scalars = 4;
+  static constexpr const size_t num_3d_scalars = 3;
   static constexpr const size_t num_3d_vectors = 0;
   static constexpr const size_t num_3d_p_scalars = 0;
   static constexpr const size_t num_team_2d_scalars = 1;
@@ -49,9 +51,6 @@ struct update_state {
       num_team_2d_scalars, size_2d_scalars>;
 
   using FastMemManager = ScratchManager<TeamMemory, ThreadMemory>;
-
-  static constexpr const size_t total_memory =
-      TeamMemory::total_size + ThreadMemory::total_size * NUM_LEV;
 
   KOKKOS_INLINE_FUNCTION
   update_state(const Control &data, const Region &region)
@@ -83,7 +82,7 @@ struct update_state {
                        m_region.PHI_update(ie)(ilev, igp, jgp) +
                        m_region.PECND(ie, ilev)(igp, jgp);
     });
-    gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
+    gradient_sphere_update<ScratchMemSpace, ScratchMemSpace, FastMemManager,
                     block_2d_vectors, vector_mem>(
         team, fast_mem, Ephi,
         m_data, c_dinv, Ephi_grad);
@@ -109,52 +108,56 @@ struct update_state {
       ScratchView<const Real[NP][NP]> p_ilev =
           subview(pressure, ilev, Kokkos::ALL(), Kokkos::ALL());
 
-      ScratchView<Real[NP][NP]> vort(
-          fast_mem.get_thread_scratch<block_2d_scalars, 0>(team.team_rank()));
-      vorticity_sphere<ExecMemSpace, ScratchMemSpace, FastMemManager,
-                       block_2d_vectors, 0>(
-          team, fast_mem, m_region.U_current(ie, ilev),
-          m_region.V_current(ie, ilev), m_data, m_region.METDET(ie), c_d, vort);
-
-      ScratchView<Real[2][NP][NP]> grad_p(
+      ScratchView<Real[2][NP][NP]> grad_buf(
           fast_mem.get_thread_scratch<block_2d_vectors, 0>(team.team_rank()));
       gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
                       block_2d_vectors, 1>(team, fast_mem, p_ilev, m_data,
-                                           c_dinv, grad_p);
+                                           c_dinv, grad_buf);
+      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, 2 * NP * NP),
+                           [&](const int idx) {
+        const int hgp = (idx / NP) / NP;
+        const int igp = (idx / NP) % NP;
+        const int jgp = idx % NP;
 
-      ScratchView<Real[2][NP][NP]> Ephi_grad(
-          fast_mem.get_thread_scratch<block_2d_vectors, 1>(team.team_rank()));
-      compute_energy_grad<ScratchView<Real[2][NP][NP]>, 1, 2>(
-          team, fast_mem, ilev, c_dinv, Ephi_grad);
+        const Real gpterm = T_v(ilev, igp, jgp) / p_ilev(igp, jgp);
+	grad_buf(hgp, igp, jgp) *= PhysicalConstants::Rgas * gpterm;
+      });
+
+      // grad_buf -> Ephi_grad + glnpsi
+      compute_energy_grad<ScratchView<Real[2][NP][NP]>, 0, 1>(
+          team, fast_mem, ilev, c_dinv, grad_buf);
+
+      ScratchView<Real[NP][NP]> vort(
+          fast_mem.get_thread_scratch<block_2d_scalars, 0>(team.team_rank()));
+      vorticity_sphere<ExecMemSpace, ScratchMemSpace, FastMemManager,
+                       block_2d_vectors, 1>(
+          team, fast_mem, m_region.U_current(ie, ilev),
+          m_region.V_current(ie, ilev), m_data, m_region.METDET(ie), c_d, vort);
+
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                            [&](const int idx) {
         const int igp = idx / NP;
         const int jgp = idx % NP;
 
-        const Real gpterm = T_v(ilev, igp, jgp) / p_ilev(igp, jgp);
         const Real fcor_vort_coeff =
-            m_region.FCOR(ie)(igp, jgp) + vort(igp, jgp);
+	  m_region.FCOR(ie)(igp, jgp) + vort(igp, jgp);
         const Real spheremp = m_region.SPHEREMP(ie)(igp, jgp);
 
-        const Real glnps1 =
-            PhysicalConstants::Rgas * gpterm * grad_p(0, igp, jgp);
         const Real v2 = m_region.V_current(ie)(ilev, igp, jgp);
 
         const Real vtens1 =
-            // v_vadv(igp, jgp, 0)
-            0.0 + v2 * fcor_vort_coeff - Ephi_grad(0, igp, jgp) - glnps1;
+          // v_vadv(igp, jgp, 0)
+	  v2 * fcor_vort_coeff - grad_buf(0, igp, jgp);
 
         m_region.U_future(ie)(ilev, igp, jgp) =
             spheremp *
             (m_region.U_previous(ie)(ilev, igp, jgp) + m_data.dt2() * vtens1);
 
-        const Real glnps2 =
-            PhysicalConstants::Rgas * gpterm * grad_p(1, igp, jgp);
         const Real v1 = m_region.U_current(ie)(ilev, igp, jgp);
 
         const Real vtens2 =
-            // v_vadv(igp, jgp, 1) -
-            0.0 - v1 * fcor_vort_coeff - Ephi_grad(1, igp, jgp) - glnps2;
+	  // v_vadv(igp, jgp, 1) -
+          v1 * fcor_vort_coeff - grad_buf(1, igp, jgp);
 
         m_region.V_future(ie)(ilev, igp, jgp) =
             spheremp *
@@ -239,14 +242,13 @@ struct update_state {
 
   // For each thread, requires 3 x NP x NP Scratch Memory
   // Depends on pressure, div_vdp, omega_p
-  // Initializes omega_p
+  // Sets pressure equal to omega_p
   KOKKOS_INLINE_FUNCTION
   void preq_omega_ps(const Kokkos::TeamPolicy<>::member_type &team,
                      FastMemManager &fast_mem,
-                     const ScratchView<Real[NUM_LEV][NP][NP]> pressure,
                      const ScratchView<const Real[2][2][NP][NP]> c_dinv,
-                     const ScratchView<Real[NUM_LEV][NP][NP]> div_vdp,
-                     const ScratchView<Real[NUM_LEV][NP][NP]> omega_p) const {
+                     const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp,
+                     const ScratchView<Real[NUM_LEV][NP][NP]> pressure) const {
     const int ie = team.league_rank();
     // Need to test if false sharing causes Kokkos::single to be faster
     Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
@@ -272,7 +274,7 @@ struct update_state {
 
         const Real ckk = 0.5 / p_ilev(igp, jgp);
         const Real term = div_vdp(0, igp, jgp);
-        omega_p(0, igp, jgp) = vgrad_p / p_ilev(igp, jgp) - ckk * term;
+        p_ilev(igp, jgp) = vgrad_p / p_ilev(igp, jgp) - ckk * term;
         suml(igp, jgp) = term;
       }
 
@@ -291,7 +293,7 @@ struct update_state {
         const Real ckk = 0.5 / p_ilev(igp, jgp);
         const Real ckl = 2.0 * ckk;
         const Real term = div_vdp(ilev, igp, jgp);
-        omega_p(ilev, igp, jgp) =
+        p_ilev(igp, jgp) =
             vgrad_p / p_ilev(igp, jgp) - ckl * suml(igp, jgp) - ckk * term;
 
         suml(igp, jgp) += term;
@@ -312,7 +314,7 @@ struct update_state {
         const Real ckk = 0.5 / p_ilev(igp, jgp);
         const Real ckl = 2.0 * ckk;
         const Real term = div_vdp(NUM_LEV - 1, igp, jgp);
-        omega_p(NUM_LEV - 1, igp, jgp) =
+        p_ilev(igp, jgp) =
             vgrad_p / p_ilev(igp, jgp) - ckl * suml(igp, jgp) - ckk * term;
       }
     });
@@ -418,13 +420,13 @@ struct update_state {
 
     // Initialized in divergence_sphere
     // Used 2 times per index, 1 of which is in preq_omega_ps
-    ScratchView<Real[NUM_LEV][NP][NP]> div_vdp(
+    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp(
         fast_mem.get_team_scratch<block_3d_scalars, 2>());
 
-    // For each thread, requires 2 x NP x NP Scratch Memory
     // Depends on DERIVED_UN0, DERIVED_VN0, METDET, DINV
     // Initializes div_vdp
     // Modifies DERIVED_UN0, DERIVED_VN0
+    // Requires NUM_LEV * 5 * NP * NP
     Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV),
                          [&](const int ilev) {
 
@@ -450,35 +452,22 @@ struct update_state {
             PhysicalConstants::eta_ave_w * vdp_ilev(1, igp, jgp);
       });
 
-      ScratchView<Real[NP][NP]> div_vdp_ilev =
+      ExecViewUnmanaged<Real[NP][NP]> div_vdp_ilev =
           Kokkos::subview(div_vdp, ilev, Kokkos::ALL(), Kokkos::ALL());
-      divergence_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
+      divergence_sphere<ScratchMemSpace, ExecMemSpace, FastMemManager,
                         block_2d_vectors, 1>(
-          team, fast_mem,
-          vdp_ilev, m_data,
-          m_region.METDET(ie), c_dinv, div_vdp_ilev);
+          team, fast_mem, vdp_ilev, m_data, m_region.METDET(ie), c_dinv, div_vdp_ilev);
     });
-
-    // Threads_NL = min(NUM_LEV, Max_Threads)
-    // Maximum memory usage so far: (NUM_LEV + 2 x Threads_NL) x NP x NP
 
     team.team_barrier();
 
-    // Initialized in preq_omega_ps
-    // Used 2 times per index
-    ScratchView<Real[NUM_LEV][NP][NP]> omega_p(
-        fast_mem.get_team_scratch<block_3d_scalars, 3>());
-
-    // Maximum memory usage so far: (NUM_LEV + max(NUM_LEV, 2 x Threads_NL)) x
-    // NP x NP
-
-    preq_omega_ps(team, fast_mem, pressure, c_dinv, div_vdp, omega_p);
-    // Threads_NP = min(NP x NP, Max_Threads)
-    // Maximum memory usage so far: (NUM_LEV + max(NUM_LEV + 3 x NP x NP x
-    // Threads_NP, 2 x Threads_NL)) x NP x NP
+    // TODO: Rename pressure after here to omega_p
+    preq_omega_ps(team, fast_mem, c_dinv, div_vdp, pressure);
 
     // Updates OMEGA_P, T, and DP3D
-    // Depends on T, OMEGA_P, T_v, U, V, SPHEREMP, and omega_p
+    // Depends on T (global), OMEGA_P (global), U (global), V (global),
+    // SPHEREMP (global), T_v, and omega_p
+    // Requires 2 * NUM_LEV * NP * NP scratch memory
     Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV),
                          [&](const int ilev) {
       // Create subviews to explicitly have static dimensions
@@ -499,7 +488,7 @@ struct update_state {
 
         m_region.OMEGA_P_update(ie, ilev)(igp, jgp) =
             m_region.OMEGA_P(ie, ilev)(igp, jgp) +
-            PhysicalConstants::eta_ave_w * omega_p(ilev, igp, jgp);
+            PhysicalConstants::eta_ave_w * pressure(ilev, igp, jgp);
 
         const Real cur_T_v = T_v(ilev, igp, jgp);
 
@@ -510,7 +499,7 @@ struct update_state {
             // T_vadv(ilev, igp, jgp)
             0.0 - (v1 * grad_tmp(0, igp, jgp) + v2 * grad_tmp(1, igp, jgp)) +
             // kappa_star(ilev, igp, jgp)
-            PhysicalConstants::kappa * cur_T_v * omega_p(ilev, igp, jgp);
+            PhysicalConstants::kappa * cur_T_v * pressure(ilev, igp, jgp);
 
         m_region.T_future(ie)(ilev, igp, jgp) =
             m_region.SPHEREMP(ie)(igp, jgp) *
@@ -604,10 +593,12 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void operator()(Kokkos::TeamPolicy<>::member_type team) const {
+    printf("Running CUDA kernel\n");
     Real *memory = ScratchView<Real *>(team.team_scratch(0),
                                        shmem_size(team.team_size()) /
                                            sizeof(Real)).ptr_on_device();
     FastMemManager fast_mem(memory);
+    printf("Fastmem pointer 0x%x\n", memory);
 
     // Used 5 times per index - basically the most important variable
     ScratchView<Real[NUM_LEV][NP][NP]> pressure(
@@ -632,29 +623,32 @@ struct update_state {
     compute_T_v(team, T_v);
 
     preq_hydrostatic(team, pressure, T_v);
-    compute_stuff(team, fast_mem, pressure,
-                  c_dinv,
-                  T_v);
     compute_velocity(
         team, fast_mem, pressure,
         c_d,
         c_dinv, T_v);
     compute_eta_dpdn(team);
+    // Breaks pressure
+    compute_stuff(team, fast_mem, pressure,
+                  c_dinv,
+                  T_v);
   }
 
   KOKKOS_INLINE_FUNCTION
   size_t shmem_size(const int team_size) const {
-    if (team_size > NUM_LEV) {
-      return FastMemManager::memory_needed(NUM_LEV);
-    } else {
-      return FastMemManager::memory_needed(team_size);
+    size_t tmp = FastMemManager::memory_needed(NUM_LEV);
+    if(team_size < NUM_LEV) {
+      tmp = FastMemManager::memory_needed(team_size);
     }
+    return tmp;
   }
 };
 
 void compute_and_apply_rhs(const Control &data, Region &region) {
   update_state f(data, region);
-  Kokkos::parallel_for(Kokkos::TeamPolicy<>(data.num_elems(), Kokkos::AUTO), f);
+  printf("Calling kernel with %d elements, max of %d memory\n",
+	 data.num_elems(), static_cast<int>(f.shmem_size(NUM_LEV)));
+  Kokkos::parallel_for(Kokkos::TeamPolicy<Kokkos::Cuda>(data.num_elems(), Kokkos::AUTO), f);
   ExecSpace::fence();
 }
 
