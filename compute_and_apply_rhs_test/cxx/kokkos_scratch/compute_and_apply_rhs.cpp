@@ -249,42 +249,48 @@ struct update_state {
                      const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp,
                      const ScratchView<Real[NUM_LEV][NP][NP]> pressure) const {
     const int ie = team.league_rank();
+    // NOTE: we can't use a single TeamThreadRange loop, since
+    //       gradient_sphere requires a 'consistent' pressure,
+    //       meaning that we cannot update the different pressure
+    //       points within a level before the gradient is complete!
+
     // Need to test if false sharing causes Kokkos::single to be faster
+    ScratchView<Real[NP][NP]> suml(fast_mem.get_thread_scratch<block_2d_scalars, 0>(team.team_rank()));
+    ScratchView<Real[2][NP][NP]> grad_p(fast_mem.get_thread_scratch<block_2d_vectors, 0>(team.team_rank()));
+    ScratchView<Real[NP][NP]> p_ilev;
+
+    p_ilev = subview(pressure, 0, Kokkos::ALL(), Kokkos::ALL());
+    gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
+                    block_2d_vectors, 1> (team, fast_mem,
+                                          p_ilev, m_data,
+                                          c_dinv, grad_p);
+
     Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
                          KOKKOS_LAMBDA(const int loop_idx) {
-      ScratchView<Real[NP][NP]> suml(
-          fast_mem.get_thread_scratch<block_2d_scalars, 0>(team.team_rank()));
       const int jgp = loop_idx / NP;
       const int igp = loop_idx % NP;
-      ScratchView<Real[2][NP][NP]> grad_p(
-          fast_mem.get_thread_scratch<block_2d_vectors, 0>(team.team_rank()));
-      ScratchView<Real[NP][NP]> p_ilev;
+      const Real vgrad_p =
+           m_region.U_current(ie)(0, igp, jgp) * grad_p(0, igp, jgp) +
+           m_region.V_current(ie)(0, igp, jgp) * grad_p(1, igp, jgp);
 
-      {
-        p_ilev = subview(pressure, 0, Kokkos::ALL(), Kokkos::ALL());
-        gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
-                        block_2d_vectors, 1>(
-            team, fast_mem,
-            p_ilev, m_data,
-            c_dinv, grad_p);
-        const Real vgrad_p =
-            m_region.U_current(ie)(0, igp, jgp) * grad_p(0, igp, jgp) +
-            m_region.V_current(ie)(0, igp, jgp) * grad_p(1, igp, jgp);
+      const Real ckk = 0.5 / p_ilev(igp, jgp);
+      const Real term = div_vdp(0, igp, jgp);
+      p_ilev(igp, jgp) = vgrad_p / p_ilev(igp, jgp) - ckk * term;
+      suml(igp, jgp) = term;
+    });
 
-        const Real ckk = 0.5 / p_ilev(igp, jgp);
-        const Real term = div_vdp(0, igp, jgp);
-        p_ilev(igp, jgp) = vgrad_p / p_ilev(igp, jgp) - ckk * term;
-        suml(igp, jgp) = term;
-      }
+    // Another candidate for parallel scan
+    for (int ilev = 1; ilev < NUM_LEV - 1; ++ilev) {
+      p_ilev = subview(pressure, ilev, Kokkos::ALL(), Kokkos::ALL());
+      gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
+                      block_2d_vectors, 1>(team, fast_mem,
+                                           p_ilev, m_data,
+                                           c_dinv, grad_p);
 
-      // Another candidate for parallel scan
-      for (int ilev = 1; ilev < NUM_LEV - 1; ++ilev) {
-        p_ilev = subview(pressure, ilev, Kokkos::ALL(), Kokkos::ALL());
-        gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
-                        block_2d_vectors, 1>(
-            team, fast_mem,
-            p_ilev, m_data,
-            c_dinv, grad_p);
+      Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
+                           KOKKOS_LAMBDA(const int loop_idx) {
+        const int jgp = loop_idx / NP;
+        const int igp = loop_idx % NP;
         const Real vgrad_p =
             m_region.U_current(ie)(ilev, igp, jgp) * grad_p(0, igp, jgp) +
             m_region.V_current(ie)(ilev, igp, jgp) * grad_p(1, igp, jgp);
@@ -296,26 +302,27 @@ struct update_state {
             vgrad_p / p_ilev(igp, jgp) - ckl * suml(igp, jgp) - ckk * term;
 
         suml(igp, jgp) += term;
-      }
+      });
+    }
 
-      {
-        p_ilev = subview(pressure, NUM_LEV - 1, Kokkos::ALL(), Kokkos::ALL());
-        gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
-                        block_2d_vectors, 1>(
-            team, fast_mem,
-            p_ilev, m_data,
-            c_dinv, grad_p);
-        const Real vgrad_p =
-            m_region.U_current(ie)(NUM_LEV - 1, igp, jgp) *
-                grad_p(0, igp, jgp) +
-            m_region.V_current(ie)(NUM_LEV - 1, igp, jgp) * grad_p(1, igp, jgp);
+    p_ilev = subview(pressure, NUM_LEV - 1, Kokkos::ALL(), Kokkos::ALL());
+    gradient_sphere<ScratchMemSpace, ScratchMemSpace, FastMemManager,
+                    block_2d_vectors, 1>(team, fast_mem,
+                                         p_ilev, m_data,
+                                         c_dinv, grad_p);
+    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
+                         KOKKOS_LAMBDA(const int loop_idx) {
+      const int jgp = loop_idx / NP;
+      const int igp = loop_idx % NP;
+      const Real vgrad_p =
+          m_region.U_current(ie)(NUM_LEV - 1, igp, jgp) * grad_p(0, igp, jgp) +
+          m_region.V_current(ie)(NUM_LEV - 1, igp, jgp) * grad_p(1, igp, jgp);
 
-        const Real ckk = 0.5 / p_ilev(igp, jgp);
-        const Real ckl = 2.0 * ckk;
-        const Real term = div_vdp(NUM_LEV - 1, igp, jgp);
-        p_ilev(igp, jgp) =
-            vgrad_p / p_ilev(igp, jgp) - ckl * suml(igp, jgp) - ckk * term;
-      }
+      const Real ckk = 0.5 / p_ilev(igp, jgp);
+      const Real ckl = 2.0 * ckk;
+      const Real term = div_vdp(NUM_LEV - 1, igp, jgp);
+      p_ilev(igp, jgp) =
+          vgrad_p / p_ilev(igp, jgp) - ckl * suml(igp, jgp) - ckk * term;
     });
     team.team_barrier();
   }
@@ -462,7 +469,6 @@ struct update_state {
 
     // TODO: Rename pressure after here to omega_p
     preq_omega_ps(team, fast_mem, c_dinv, div_vdp, pressure);
-
     // Updates OMEGA_P, T, and DP3D
     // Depends on T (global), OMEGA_P (global), U (global), V (global),
     // SPHEREMP (global), T_v, and omega_p
@@ -665,7 +671,7 @@ void print_results_2norm(const Control &data, const Region &region)
     dpnorm += std::pow( compute_norm (DP3D), 2 );
   }
 
-  std::cout << std::setprecision(17);
+  std::cout << std::setprecision(15);
   std::cout << "   ---> Norms:\n"
             << "          ||v||_2  = " << std::sqrt(vnorm) << "\n"
             << "          ||T||_2  = " << std::sqrt(tnorm) << "\n"

@@ -102,7 +102,7 @@ void run_simulation(int num_elems, int num_exec, bool dump_results) {
   global_timer.startTimer();
   for (int i=0; i<num_exec; ++i)
   {
-    region.next_compute_apply_rhs();
+    //region.next_compute_apply_rhs();
     TinMan::compute_and_apply_rhs(data, region);
   }
   global_timer.stopTimer();
