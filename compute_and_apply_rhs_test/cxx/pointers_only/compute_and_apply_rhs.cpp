@@ -282,7 +282,7 @@ void preq_hydrostatic (const real* const phis, const real* const T_v,
                        real Rgas, real* const phi)
 {
   real hkk, hkl;
-  real phii[nlev][np][np];
+  real* phii = new real[nlev*np*np];
 
   for (int jgp=0; jgp<np; ++jgp)
   {
@@ -290,7 +290,7 @@ void preq_hydrostatic (const real* const phis, const real* const T_v,
     {
       hkk = 0.5*AT_3D(dp,(nlev-1),igp,jgp,np,np) / AT_3D(p,(nlev-1),igp,jgp,np,np);
       hkl = 2.0*hkk;
-      phii[nlev-1][igp][jgp] = Rgas*AT_3D(T_v, (nlev-1),igp,jgp,np,np)*hkl;
+      AT_3D(phii,(nlev-1),igp,jgp,np,np) = Rgas*AT_3D(T_v, (nlev-1),igp,jgp,np,np)*hkl;
       AT_3D(phi,(nlev-1),igp,jgp,np,np) = AT_2D(phis,igp,jgp,np) + Rgas*AT_3D(T_v, (nlev-1),igp,jgp,np,np)*hkk;
     }
     for (int ilev=nlev-2; ilev>0; --ilev)
@@ -299,14 +299,14 @@ void preq_hydrostatic (const real* const phis, const real* const T_v,
       {
         hkk = 0.5*AT_3D(dp,ilev,igp,jgp,np,np) / AT_3D(p,ilev,igp,jgp,np,np);
         hkl = 2.0*hkk;
-        phii[ilev][igp][jgp] = phii[ilev+1][igp][jgp] + Rgas*AT_3D(T_v, ilev,igp,jgp,np,np)*hkl;
-        AT_3D(phi,ilev,igp,jgp,np,np) = AT_2D(phis,igp,jgp,np) + phii[ilev+1][igp][jgp] + Rgas*AT_3D(T_v, ilev,igp,jgp,np,np)*hkk;
+        AT_3D(phii,ilev,igp,jgp,np,np) = AT_3D(phii,(ilev+1),igp,jgp,np,np) + Rgas*AT_3D(T_v, ilev,igp,jgp,np,np)*hkl;
+        AT_3D(phi,ilev,igp,jgp,np,np) = AT_2D(phis,igp,jgp,np) + AT_3D(phii,(ilev+1),igp,jgp,np,np) + Rgas*AT_3D(T_v, ilev,igp,jgp,np,np)*hkk;
       }
     }
     for (int igp=0; igp<np; ++igp)
     {
       hkk = 0.5*AT_3D(dp,0,igp,jgp,np,np) / AT_3D(p,0,igp,jgp,np,np);
-      AT_3D(phi,0,igp,jgp,np,np) = AT_2D(phis,igp,jgp,np) + phii[1][igp][jgp] + Rgas*AT_3D(T_v,0,igp,jgp,np,np)*hkk;
+      AT_3D(phi,0,igp,jgp,np,np) = AT_2D(phis,igp,jgp,np) + AT_3D(phii,1,igp,jgp,np,np) + Rgas*AT_3D(T_v,0,igp,jgp,np,np)*hkk;
     }
   }
 }
@@ -315,7 +315,7 @@ void preq_omega_ps (const real* const p, const real* const vgrad_p,
                     const real* const divdp, real* const omega_p)
 {
   real ckk, ckl, term;
-  real suml[np][np];
+  real* suml = new real[np*np];
   for (int jgp=0; jgp<np; ++jgp)
   {
     for (int igp=0; igp<np; ++igp)
@@ -323,7 +323,7 @@ void preq_omega_ps (const real* const p, const real* const vgrad_p,
       ckk = 0.5 / AT_3D(p,0,igp,jgp,np,np);
       term  = AT_3D(divdp,0,igp,jgp,np,np);
       AT_3D (omega_p,0,igp,jgp,np,np) = AT_3D (vgrad_p,0,igp,jgp,np,np)/AT_3D(p,0,igp,jgp,np,np) - ckk*term;
-      suml[igp][jgp] = term;
+      AT_2D(suml,igp,jgp,np) = term;
     }
 
     for (int ilev=1; ilev<nlev-1; ++ilev)
@@ -334,9 +334,9 @@ void preq_omega_ps (const real* const p, const real* const vgrad_p,
         ckl = 2.0 * ckk;
         term  = AT_3D(divdp,ilev,igp,jgp,np,np);
         AT_3D (omega_p,ilev,igp,jgp,np,np) = AT_3D (vgrad_p,ilev,igp,jgp,np,np)/AT_3D(p,ilev,igp,jgp,np,np)
-                                           - ckl*suml[igp][jgp] - ckk*term;
+                                           - ckl*AT_2D(suml,igp,jgp,np) - ckk*term;
 
-        suml[igp][jgp] += term;
+        AT_2D(suml,igp,jgp,np) += term;
       }
     }
 
@@ -346,9 +346,10 @@ void preq_omega_ps (const real* const p, const real* const vgrad_p,
       ckl = 2.0 * ckk;
       term  = AT_3D(divdp,(nlev-1),igp,jgp,np,np);
       AT_3D (omega_p,(nlev-1),igp,jgp,np,np) = AT_3D (vgrad_p,(nlev-1),igp,jgp,np,np)/AT_3D(p,(nlev-1),igp,jgp,np,np)
-                                             - ckl*suml[igp][jgp] - ckk*term;
+                                             - ckl*AT_2D(suml,igp,jgp,np) - ckk*term;
     }
   }
+  delete[] suml;
 }
 
 real compute_norm (const real* const field, int length)
