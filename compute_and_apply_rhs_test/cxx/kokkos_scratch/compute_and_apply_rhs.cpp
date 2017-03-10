@@ -119,7 +119,7 @@ struct update_state {
         const int jgp = idx % NP;
 
         const Real gpterm = T_v(ilev, igp, jgp) / p_ilev(igp, jgp);
-	grad_buf(hgp, igp, jgp) *= PhysicalConstants::Rgas * gpterm;
+  grad_buf(hgp, igp, jgp) *= PhysicalConstants::Rgas * gpterm;
       });
 
       // grad_buf -> Ephi_grad + glnpsi
@@ -139,14 +139,14 @@ struct update_state {
         const int jgp = idx % NP;
 
         const Real fcor_vort_coeff =
-	  m_region.FCOR(ie)(igp, jgp) + vort(igp, jgp);
+    m_region.FCOR(ie)(igp, jgp) + vort(igp, jgp);
         const Real spheremp = m_region.SPHEREMP(ie)(igp, jgp);
 
         const Real v2 = m_region.V_current(ie)(ilev, igp, jgp);
 
         const Real vtens1 =
           // v_vadv(igp, jgp, 0)
-	  v2 * fcor_vort_coeff - grad_buf(0, igp, jgp);
+    v2 * fcor_vort_coeff - grad_buf(0, igp, jgp);
 
         m_region.U_future(ie)(ilev, igp, jgp) =
             spheremp *
@@ -206,7 +206,7 @@ struct update_state {
 
     // Need to test if false sharing causes Kokkos::single to be faster
     Kokkos::single(Kokkos::PerTeam(team),
-		   KOKKOS_LAMBDA() {
+       KOKKOS_LAMBDA() {
       for(int igp = 0; igp < NP; ++igp) {
         for(int jgp = 0; jgp < NP; ++jgp) {
 
@@ -233,7 +233,7 @@ struct update_state {
                 phis(igp, jgp) + phii +
                 PhysicalConstants::Rgas * T_v(0, igp, jgp) * hk;
           }
-	}
+  }
       }
     });
     team.team_barrier();
@@ -638,7 +638,7 @@ struct update_state {
 
 void compute_and_apply_rhs(const Control &data, Region &region) {
   update_state f(data, region);
-  Kokkos::parallel_for(Kokkos::TeamPolicy<Kokkos::Cuda>(data.num_elems(), Kokkos::AUTO), f);
+  Kokkos::parallel_for(Kokkos::TeamPolicy<ExecSpace>(data.num_elems(), Kokkos::AUTO), f);
   ExecSpace::fence();
 }
 
