@@ -28,11 +28,21 @@ public:
     return mem;
   }
 
+  KOKKOS_INLINE_FUNCTION void *allocate_team_transient(int mem_size) const {
+    return m_mem_ptr;
+  }
+
   KOKKOS_INLINE_FUNCTION void *allocate_thread(int mem_size) {
     void *mem = static_cast<void *>(static_cast<char *>(m_mem_ptr) +
                                     m_team->team_rank() * mem_size);
     int total_size = m_team->team_size() * mem_size;
     update_mem_usage(total_size);
+    return mem;
+  }
+
+  KOKKOS_INLINE_FUNCTION void *allocate_thread_transient(int mem_size) const {
+    void *mem = static_cast<void *>(static_cast<char *>(m_mem_ptr) +
+                                    m_team->team_rank() * mem_size);
     return mem;
   }
 
