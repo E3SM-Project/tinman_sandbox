@@ -3,6 +3,7 @@
 #define _SCRATCHSTACK_HPP_
 
 #include <Kokkos_Core.hpp>
+#include <assert.h>
 
 // A LIFO memory manager
 // The user must ensure that the memory is no longer in use when freeing!
@@ -13,12 +14,12 @@ public:
   KOKKOS_INLINE_FUNCTION
   ScratchStack(const Kokkos::TeamPolicy<>::member_type *team, void *memory,
                int max_mem)
-      : ScratchStack(team, memory) {}
+      : m_team(team), m_mem_ptr(memory) {}
 #else
   KOKKOS_INLINE_FUNCTION
   ScratchStack(const Kokkos::TeamPolicy<>::member_type *team, void *memory,
                int max_mem)
-      : ScratchStack(team, memory), m_mem_max(mem_max), m_mem_max_used(0),
+      : m_team(team), m_mem_ptr(memory), m_mem_max(max_mem), m_mem_max_used(0),
         m_mem_used(0) {}
 #endif // NDEBUG
 
@@ -59,10 +60,6 @@ private:
   const Kokkos::TeamPolicy<>::member_type *m_team;
   void *m_mem_ptr;
 
-  KOKKOS_INLINE_FUNCTION
-  ScratchStack(const Kokkos::TeamPolicy<>::member_type *team, void *memory)
-      : m_team(team), m_mem_ptr(memory) {}
-
 #ifdef NDEBUG
   KOKKOS_INLINE_FUNCTION void update_mem_usage(int mem_size) {
     Kokkos::single(Kokkos::PerTeam(*m_team), [&]() {
@@ -77,7 +74,7 @@ private:
   const int m_mem_max;
   int m_mem_used;
   // Used for diagnostics - captures the maximum amount of memory used
-  intt m_mem_max_used;
+  int m_mem_max_used;
 
   KOKKOS_INLINE_FUNCTION void update_mem_usage(int mem_size) {
     Kokkos::single(Kokkos::PerTeam(*m_team), [&]() {
