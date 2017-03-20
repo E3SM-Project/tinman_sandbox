@@ -23,14 +23,14 @@ class Control;
 // TinMan::ScratchView<TinMan::Real [2][4][4]>)
 
 KOKKOS_INLINE_FUNCTION void
-gradient_sphere(const Kokkos::TeamPolicy<>::member_type &team,
+gradient_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
                 const ScratchStack &scratch_mem,
                 const ExecViewUnmanaged<const Real[NP][NP]> scalar,
                 const Control &data,
                 const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
                 ExecViewUnmanaged<Real[2][NP][NP]> grad_s) {
   ExecViewUnmanaged<Real[2][NP][NP]> v(static_cast<Real *>(
-      scratch_mem.allocate_thread_transient(sizeof(Real[2][NP][NP]))));
+      scratch_mem.allocate_transient(sizeof(Real[2][NP][NP]))));
   constexpr int contra_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, contra_iters),
                        [&](const int loop_idx) {
@@ -59,14 +59,14 @@ gradient_sphere(const Kokkos::TeamPolicy<>::member_type &team,
 }
 
 KOKKOS_INLINE_FUNCTION void
-gradient_sphere_update(const Kokkos::TeamPolicy<>::member_type &team,
+gradient_sphere_update(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
                        const ScratchStack &scratch_mem,
                        const ExecViewUnmanaged<const Real[NP][NP]> scalar,
                        const Control &data,
                        const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
                        ExecViewUnmanaged<Real[2][NP][NP]> grad_s) {
   ExecViewUnmanaged<Real[2][NP][NP]> v(static_cast<Real *>(
-      scratch_mem.allocate_thread_transient(sizeof(Real[2][NP][NP]))));
+      scratch_mem.allocate_transient(sizeof(Real[2][NP][NP]))));
   constexpr int contra_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, contra_iters),
                        [&](const int loop_idx) {
@@ -97,7 +97,7 @@ gradient_sphere_update(const Kokkos::TeamPolicy<>::member_type &team,
 // Note that divergence_sphere requires scratch space of 2 x NP x NP Reals
 // This must be called from the device space
 KOKKOS_INLINE_FUNCTION void
-divergence_sphere(const Kokkos::TeamPolicy<>::member_type &team,
+divergence_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
                   const ScratchStack &scratch_mem,
                   const ExecViewUnmanaged<const Real[2][NP][NP]> v,
                   const Control &data,
@@ -105,7 +105,7 @@ divergence_sphere(const Kokkos::TeamPolicy<>::member_type &team,
                   const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
                   ExecViewUnmanaged<Real[NP][NP]> div_v) {
   ExecViewUnmanaged<Real[2][NP][NP]> gv(static_cast<Real *>(
-      scratch_mem.allocate_thread_transient(sizeof(Real[2][NP][NP]))));
+      scratch_mem.allocate_transient(sizeof(Real[2][NP][NP]))));
   constexpr int contra_iters = NP * NP * 2;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, contra_iters),
                        [&](const int loop_idx) {
@@ -136,7 +136,7 @@ divergence_sphere(const Kokkos::TeamPolicy<>::member_type &team,
 // Note that divergence_sphere requires scratch space of 3 x NP x NP Reals
 // This must be called from the device space
 KOKKOS_INLINE_FUNCTION void
-vorticity_sphere(const Kokkos::TeamPolicy<>::member_type &team,
+vorticity_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
                  const ScratchStack &scratch_mem,
                  const ExecViewUnmanaged<const Real[NP][NP]> u,
                  const ExecViewUnmanaged<const Real[NP][NP]> v,
@@ -145,7 +145,7 @@ vorticity_sphere(const Kokkos::TeamPolicy<>::member_type &team,
                  const ExecViewUnmanaged<const Real[2][2][NP][NP]> D,
                  ExecViewUnmanaged<Real[NP][NP]> vort) {
   ExecViewUnmanaged<Real[2][NP][NP]> vcov(static_cast<Real *>(
-      scratch_mem.allocate_thread_transient(sizeof(Real[2][NP][NP]))));
+      scratch_mem.allocate_transient(sizeof(Real[2][NP][NP]))));
   constexpr int covar_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, covar_iters),
                        [&](const int loop_idx) {
