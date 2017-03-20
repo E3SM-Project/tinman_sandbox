@@ -85,42 +85,6 @@ void parse_args(int argc, char** argv, int &num_elems, int &num_exec, bool &dump
   }
 }
 
-void run_simulation(int num_elems, int num_exec, bool dump_results) {
-  TinMan::Control data(num_elems);
-  TinMan::Region region(num_elems);
-
-  // Print norm of initial states, to check we are using same data in all tests
-  print_results_2norm(data, region);
-
-  std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
-
-  // Burn in before timing to reduce cache effect
-  TinMan::compute_and_apply_rhs(data, region);
-  TinMan::ExecSpace::fence();
-
-  Timer::Timer global_timer;
-  global_timer.startTimer();
-  for (int i=0; i<num_exec; ++i)
-  {
-    region.next_compute_apply_rhs();
-    TinMan::compute_and_apply_rhs(data, region);
-  }
-  global_timer.stopTimer();
-
-  std::cout << "   ---> compute_and_apply_rhs execution total time: " << global_timer << "\n";
-
-//  for(int i = 0; i < num_exec; ++i) {
-//    std::cout << timers[i] << std::endl;
-//  }
-
-  print_results_2norm (data,region);
-
-  if (dump_results)
-  {
-    region.save_state(data);
-  }
-}
-
 int main (int argc, char** argv)
 {
   int num_elems = 10;
@@ -137,7 +101,7 @@ int main (int argc, char** argv)
 
   TinMan::ExecSpace::print_configuration(std::cout,true);
 
-  run_simulation(num_elems, num_exec, dump_results);
+  TinMan::run_simulation(num_elems, num_exec, dump_results);
 
   Kokkos::finalize ();
   return 0;
