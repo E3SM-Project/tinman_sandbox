@@ -38,10 +38,6 @@ using ExecViewManaged = ViewType<DataType,ExecMemSpace,Kokkos::MemoryManaged>;
 template<typename DataType>
 using ExecViewUnmanaged = ViewType<DataType,ExecMemSpace,Kokkos::MemoryUnmanaged>;
 
-// The scratch view type (always unmanaged)
-template<typename DataType>
-using ScratchView = ViewType<DataType,ScratchMemSpace,Kokkos::MemoryUnmanaged>;
-
 // To view the fully expanded name of a complicated template type T,
 // just try to access some non-existent field of MyDebug<T>. E.g.:
 // MyDebug<T>::type i;
