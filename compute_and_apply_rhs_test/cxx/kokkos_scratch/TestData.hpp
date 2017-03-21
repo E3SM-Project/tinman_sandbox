@@ -9,12 +9,12 @@ namespace TinMan {
 
 struct PhysicalConstants {
   static constexpr Real Rwater_vapor = 461.5;
-  static constexpr Real Rgas         = 287.04;
-  static constexpr Real cp           = 1005.0;
-  static constexpr Real kappa        = Rgas/cp;
-  static constexpr Real rrearth      = 1.0/6.376e6;
+  static constexpr Real Rgas = 287.04;
+  static constexpr Real cp = 1005.0;
+  static constexpr Real kappa = Rgas / cp;
+  static constexpr Real rrearth = 1.0 / 6.376e6;
 
-  static constexpr Real eta_ave_w    = 1.0;
+  static constexpr Real eta_ave_w = 1.0;
 };
 
 class Control {
@@ -25,9 +25,7 @@ public:
   Control(int num_elems);
 
   /* These functions must be called from device code */
-  KOKKOS_INLINE_FUNCTION int num_elems() const {
-    return m_num_elems;
-  }
+  KOKKOS_INLINE_FUNCTION int num_elems() const { return m_num_elems; }
   /* Tracer timelevel */
   KOKKOS_INLINE_FUNCTION int qn0() const { return m_qn0; }
   /* dt * 2 */
@@ -50,6 +48,30 @@ public:
 
   KOKKOS_INLINE_FUNCTION Real dvv(int x, int y) const { return m_dvv(x, y); }
 
+  KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<const Real[NP][NP]> dvv() const {
+    return m_dvv;
+  }
+
+  KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> const
+  pressure() const {
+    return m_pressure;
+  }
+
+  KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> const
+  T_v() const {
+    return m_T_v;
+  }
+
+  KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> const
+  div_vdp() const {
+    return m_div_vdp;
+  }
+
+  KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][2][NP][NP]> const
+  vector_buf() const {
+    return m_vector_buf;
+  }
+
 private:
   const int m_num_elems;
 
@@ -64,6 +86,10 @@ private:
   /* Device objects, to reduce the memory transfer required */
   ExecViewManaged<Real[NUM_LEV_P]> m_hybrid_a;
   ExecViewManaged<Real[NP][NP]> m_dvv; // Laplacian
+  ExecViewManaged<Real[NUM_LEV][NP][NP]> m_pressure;
+  ExecViewManaged<Real[NUM_LEV][NP][NP]> m_T_v;
+  ExecViewManaged<Real[NUM_LEV][NP][NP]> m_div_vdp;
+  ExecViewManaged<Real[NUM_LEV][2][NP][NP]> m_vector_buf;
 };
 
 } // Namespace TinMan

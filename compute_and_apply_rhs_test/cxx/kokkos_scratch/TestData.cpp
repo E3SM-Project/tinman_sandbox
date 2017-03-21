@@ -3,11 +3,10 @@
 namespace TinMan {
 
 Control::Control(int num_elems)
-    : m_num_elems(num_elems), m_qn0(0), m_dt2(1.0),
-      m_ps0(10.0),
+    : m_num_elems(num_elems), m_qn0(0), m_dt2(1.0), m_ps0(10.0),
       m_hybrid_a(
           "Hybrid coordinates; translates between pressure and velocity"),
-      m_dvv("Laplacian") {
+      m_dvv("Laplacian"), m_pressure("Pressure"), m_T_v("Vertical Temperature"), m_div_vdp("Global array scratch"), m_vector_buf("Vector buffer for vectors on each level") {
   ExecViewManaged<Real[NP][NP]>::HostMirror dvv_host =
       Kokkos::create_mirror_view(m_dvv);
   for (int i = 0; i < NP; ++i) {

@@ -15,7 +15,14 @@ class Control;
 template <typename Scratch, size_t vector_memory, size_t vector_id>
 KOKKOS_INLINE_FUNCTION void gradient_sphere(
     const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
-    const Scratch &fast_mem, const ExecViewUnmanaged<const Real[NP][NP]> s,
+    const Scratch &fast_mem, const ExecViewUnmanaged<const Real[NP][NP]> scalar,
+    const Control &data, const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+    ExecViewUnmanaged<Real[2][NP][NP]> grad_s);
+
+template <typename Scratch, size_t vector_memory, size_t vector_id>
+KOKKOS_INLINE_FUNCTION void gradient_sphere_update(
+    const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+    const Scratch &fast_mem, const ExecViewUnmanaged<const Real[NP][NP]> scalar,
     const Control &data, const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
     ExecViewUnmanaged<Real[2][NP][NP]> grad_s);
 
