@@ -91,11 +91,11 @@ public:
   static constexpr size_t sum_team_sizes = team_sizes_pack::total_size;
   static constexpr size_t sum_thread_sizes = thread_sizes_pack::total_size;
 
-  KOKKOS_INLINE_FUNCTION ScratchManager(Real *const scratch) {
-    m_team_scratch = scratch;
-    // The threads offset is the sum of all the sizes of the team blocks
-    m_thread_scratch = scratch + sum_team_sizes;
-  }
+  KOKKOS_INLINE_FUNCTION
+  ScratchManager(TeamPolicy &team)
+    : m_team_scratch(ScratchView(team.team_scratch(0), sum_team_sizes).ptr_on_device()),
+      m_thread_scratch(ScratchView(team.thread_scratch(0), sum_thread_sizes)
+                             .ptr_on_device()) {}
 
   // Get a block of memory for a given block ID
   template <size_t BLOCK_ID, size_t COUNTER_ID>
@@ -112,14 +112,21 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION static constexpr int
+  reals_needed(const int team_size) {
+    return sum_team_sizes + sum_thread_sizes * team_size;
+  }
+
+  KOKKOS_INLINE_FUNCTION static constexpr int
   memory_needed(const int team_size) {
-    return sizeof(Real) * (sum_team_sizes + sum_thread_sizes * team_size);
+    return sizeof(Real) * reals_needed(team_size);
   }
 
 private:
+  using ScratchView =
+      ViewType<Real *, ScratchMemSpace, Kokkos::MemoryUnmanaged>;
   // The memory buffer
-  Real *m_team_scratch;
-  Real *m_thread_scratch;
+  Real *const m_team_scratch;
+  Real *const m_thread_scratch;
 };
 
 } // namespace TinMan

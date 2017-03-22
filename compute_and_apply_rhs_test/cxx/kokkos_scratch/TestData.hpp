@@ -53,25 +53,25 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> const
-  pressure(const Kokkos::TeamPolicy<ExecSpace>::member_type &team) const {
+  pressure(const TeamPolicy &team) const {
     return Kokkos::subview(m_pressure, team.league_rank(), Kokkos::ALL,
                            Kokkos::ALL, Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> const
-  T_v(const Kokkos::TeamPolicy<ExecSpace>::member_type &team) const {
+  T_v(const TeamPolicy &team) const {
     return Kokkos::subview(m_T_v, team.league_rank(), Kokkos::ALL, Kokkos::ALL,
                            Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> const
-  div_vdp(const Kokkos::TeamPolicy<ExecSpace>::member_type &team) const {
+  div_vdp(const TeamPolicy &team) const {
     return Kokkos::subview(m_div_vdp, team.league_rank(), Kokkos::ALL,
                            Kokkos::ALL, Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][2][NP][NP]> const
-  vector_buf(const Kokkos::TeamPolicy<ExecSpace>::member_type &team) const {
+  vector_buf(const TeamPolicy &team) const {
     return Kokkos::subview(m_vector_buf, team.league_rank(), Kokkos::ALL,
                            Kokkos::ALL, Kokkos::ALL, Kokkos::ALL);
   }

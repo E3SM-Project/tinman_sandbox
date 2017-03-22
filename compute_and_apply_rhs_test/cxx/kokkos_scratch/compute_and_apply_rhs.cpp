@@ -64,7 +64,7 @@ struct update_state {
   // Modifies Ephi_grad
   template <typename Grad_View, size_t scalar_mem, size_t vector_mem>
   KOKKOS_INLINE_FUNCTION void
-  compute_energy_grad(Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+  compute_energy_grad(TeamPolicy &team,
                       FastMemManager fast_mem, const int ilev,
                       ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
                       Grad_View Ephi_grad) const {
@@ -96,7 +96,7 @@ struct update_state {
   // D, DINV, U, V, FCOR, SPHEREMP, T_v
   // Modifies U, V
   KOKKOS_INLINE_FUNCTION
-  void compute_velocity(Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+  void compute_velocity(TeamPolicy &team,
                         FastMemManager &fast_mem,
                         ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure,
                         ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
@@ -167,7 +167,7 @@ struct update_state {
   // Modifies ETA_DPDN
   KOKKOS_INLINE_FUNCTION
   void
-  compute_eta_dpdn(Kokkos::TeamPolicy<ExecSpace>::member_type &team) const {
+  compute_eta_dpdn(TeamPolicy &team) const {
     const int ie = team.league_rank();
     Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV_P),
                          [&](const int ilev) {
@@ -191,7 +191,7 @@ struct update_state {
   // Modifies PHI
   KOKKOS_INLINE_FUNCTION
   void
-  preq_hydrostatic(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+  preq_hydrostatic(const TeamPolicy &team,
                    const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure,
                    const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v) const {
     const int ie = team.league_rank();
@@ -244,7 +244,7 @@ struct update_state {
   // Sets pressure equal to omega_p
   KOKKOS_INLINE_FUNCTION
   void
-  preq_omega_ps(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+  preq_omega_ps(const TeamPolicy &team,
                 FastMemManager &fast_mem,
                 const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
                 const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp,
@@ -326,7 +326,7 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void compute_pressure_helper(
-      Kokkos::TeamPolicy<ExecSpace>::member_type team,
+      TeamPolicy team,
       ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure) const {
     const int ie = team.league_rank();
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
@@ -352,7 +352,7 @@ struct update_state {
   // Depends on DP3D
   KOKKOS_INLINE_FUNCTION
   void
-  compute_pressure(Kokkos::TeamPolicy<ExecSpace>::member_type team,
+  compute_pressure(TeamPolicy team,
                    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure) const {
     Kokkos::single(Kokkos::PerTeam(team), KOKKOS_LAMBDA() {
       compute_pressure_helper(team, pressure);
@@ -361,7 +361,7 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void compute_temperature_no_tracers_helper(
-      Kokkos::TeamPolicy<ExecSpace>::member_type team, int ilev,
+      TeamPolicy team, int ilev,
       ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v) const {
     const int ie = team.league_rank();
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
@@ -374,7 +374,7 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void compute_temperature_tracers_helper(
-      Kokkos::TeamPolicy<ExecSpace>::member_type team, int ilev,
+      TeamPolicy team, int ilev,
       ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v) const {
     const int ie = team.league_rank();
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
@@ -393,7 +393,7 @@ struct update_state {
   }
 
   KOKKOS_INLINE_FUNCTION
-  void compute_temperature(Kokkos::TeamPolicy<ExecSpace>::member_type team,
+  void compute_temperature(TeamPolicy team,
                            ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v) const {
     if (m_data.qn0() == -1) {
       Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV),
@@ -414,7 +414,7 @@ struct update_state {
   // Modifies DERIVED_UN0, DERIVED_VN0, OMEGA_P, T, and DP3D
   // block_3d_scalars
   KOKKOS_INLINE_FUNCTION
-  void compute_stuff(Kokkos::TeamPolicy<ExecSpace>::member_type team,
+  void compute_stuff(TeamPolicy team,
                      FastMemManager fast_mem,
                      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure,
                      ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
@@ -529,7 +529,7 @@ struct update_state {
   // Computes the vertical advection of T and v
   KOKKOS_INLINE_FUNCTION
   void preq_vertadv(
-      const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+      const TeamPolicy &team,
       FastMemManager &fast_mem,
       const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> T,
       const ExecViewUnmanaged<const Real[NUM_LEV][2][NP][NP]> v,
@@ -574,7 +574,7 @@ struct update_state {
   }
 
   KOKKOS_INLINE_FUNCTION
-  void init_const_cache(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+  void init_const_cache(const TeamPolicy &team,
                         ExecViewUnmanaged<Real[2][2][NP][NP]> c_dinv,
                         ExecViewUnmanaged<Real[NP][NP]> c_dvv) const {
     const int ie = team.league_rank();
@@ -592,7 +592,7 @@ struct update_state {
   }
 
   KOKKOS_INLINE_FUNCTION
-  void operator()(Kokkos::TeamPolicy<ExecSpace>::member_type team) const {
+  void operator()(TeamPolicy team) const {
     FastMemManager fast_mem(team);
 
     // Used 5 times per index - basically the most important variable
