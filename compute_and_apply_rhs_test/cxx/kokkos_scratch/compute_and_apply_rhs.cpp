@@ -623,8 +623,6 @@ struct update_state {
     if (team_size < NUM_LEV) {
       tmp = FastMemManager::memory_needed(team_size);
     }
-    printf("Requesting %d bytes of memory for a team of %d threads\n", (int)tmp,
-           team_size);
     return tmp;
   }
 };
