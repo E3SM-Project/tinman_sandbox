@@ -592,11 +592,9 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void operator()(Kokkos::TeamPolicy<ExecSpace>::member_type team) const {
-    size_t mem_size;
-    Kokkos::single(Kokkos::PerTeam(team),
-                   [&]() { mem_size = shmem_size(team.team_size()); });
     Real *memory = ViewType<Real *, ScratchMemSpace, Kokkos::MemoryUnmanaged>(
-        team.team_scratch(0), mem_size / sizeof(Real)).ptr_on_device();
+        team.team_scratch(0), shmem_size(team.team_size()) / sizeof(Real))
+                       .ptr_on_device();
     FastMemManager fast_mem(memory);
 
     // Used 5 times per index - basically the most important variable
