@@ -53,23 +53,27 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> const
-  pressure() const {
-    return m_pressure;
+  pressure(const Kokkos::TeamPolicy<ExecSpace>::member_type &team) const {
+    return Kokkos::subview(m_pressure, team.league_rank(), Kokkos::ALL,
+                           Kokkos::ALL, Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> const
-  T_v() const {
-    return m_T_v;
+  T_v(const Kokkos::TeamPolicy<ExecSpace>::member_type &team) const {
+    return Kokkos::subview(m_T_v, team.league_rank(), Kokkos::ALL, Kokkos::ALL,
+                           Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> const
-  div_vdp() const {
-    return m_div_vdp;
+  div_vdp(const Kokkos::TeamPolicy<ExecSpace>::member_type &team) const {
+    return Kokkos::subview(m_div_vdp, team.league_rank(), Kokkos::ALL,
+                           Kokkos::ALL, Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][2][NP][NP]> const
-  vector_buf() const {
-    return m_vector_buf;
+  vector_buf(const Kokkos::TeamPolicy<ExecSpace>::member_type &team) const {
+    return Kokkos::subview(m_vector_buf, team.league_rank(), Kokkos::ALL,
+                           Kokkos::ALL, Kokkos::ALL, Kokkos::ALL);
   }
 
 private:
@@ -86,10 +90,10 @@ private:
   /* Device objects, to reduce the memory transfer required */
   ExecViewManaged<Real[NUM_LEV_P]> m_hybrid_a;
   ExecViewManaged<Real[NP][NP]> m_dvv; // Laplacian
-  ExecViewManaged<Real[NUM_LEV][NP][NP]> m_pressure;
-  ExecViewManaged<Real[NUM_LEV][NP][NP]> m_T_v;
-  ExecViewManaged<Real[NUM_LEV][NP][NP]> m_div_vdp;
-  ExecViewManaged<Real[NUM_LEV][2][NP][NP]> m_vector_buf;
+  ExecViewManaged<Real * [NUM_LEV][NP][NP]> m_pressure;
+  ExecViewManaged<Real * [NUM_LEV][NP][NP]> m_T_v;
+  ExecViewManaged<Real * [NUM_LEV][NP][NP]> m_div_vdp;
+  ExecViewManaged<Real * [NUM_LEV][2][NP][NP]> m_vector_buf;
 };
 
 } // Namespace TinMan

@@ -109,7 +109,7 @@ struct update_state {
           subview(pressure, ilev, Kokkos::ALL(), Kokkos::ALL());
 
       ExecViewUnmanaged<Real[2][NP][NP]> grad_buf =
-          Kokkos::subview(m_data.vector_buf(), ilev, Kokkos::ALL(),
+          Kokkos::subview(m_data.vector_buf(team), ilev, Kokkos::ALL(),
                           Kokkos::ALL(), Kokkos::ALL());
       gradient_sphere<FastMemManager, block_2d_vectors, 0>(
           team, fast_mem, p_ilev, m_data, c_dinv, grad_buf);
@@ -423,7 +423,7 @@ struct update_state {
 
     // Initialized in divergence_sphere
     // Used 2 times per index, 1 of which is in preq_omega_ps
-    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp = m_data.div_vdp();
+    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp = m_data.div_vdp(team);
 
     // Depends on DERIVED_UN0, DERIVED_VN0, METDET, DINV
     // Initializes div_vdp, which is used 2 times afterwards
@@ -433,8 +433,9 @@ struct update_state {
                          [&](const int ilev) {
 
       // Create subviews to explicitly have static dimensions
-      ExecViewUnmanaged<Real[2][NP][NP]> vdp_ilev = Kokkos::subview(
-          m_data.vector_buf(), ilev, Kokkos::ALL, Kokkos::ALL(), Kokkos::ALL());
+      ExecViewUnmanaged<Real[2][NP][NP]> vdp_ilev =
+          Kokkos::subview(m_data.vector_buf(team), ilev, Kokkos::ALL,
+                          Kokkos::ALL(), Kokkos::ALL());
 
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                            [&](const int idx) {
@@ -476,7 +477,7 @@ struct update_state {
           m_region.T_current(ie), ilev, Kokkos::ALL(), Kokkos::ALL());
 
       ExecViewUnmanaged<Real[2][NP][NP]> grad_tmp = Kokkos::subview(
-          m_data.vector_buf(), ilev, Kokkos::ALL, Kokkos::ALL, Kokkos::ALL);
+          m_data.vector_buf(team), ilev, Kokkos::ALL, Kokkos::ALL, Kokkos::ALL);
 
       gradient_sphere<FastMemManager, block_2d_vectors, 0>(
           team, fast_mem, T_ie_n0_ilev, m_data, c_dinv, grad_tmp);
@@ -592,13 +593,10 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void operator()(Kokkos::TeamPolicy<ExecSpace>::member_type team) const {
-    Real *memory = ViewType<Real *, ScratchMemSpace, Kokkos::MemoryUnmanaged>(
-        team.team_scratch(0), shmem_size(team.team_size()) / sizeof(Real))
-                       .ptr_on_device();
-    FastMemManager fast_mem(memory);
+    FastMemManager fast_mem(team);
 
     // Used 5 times per index - basically the most important variable
-    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure = m_data.pressure();
+    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure = m_data.pressure(team);
     compute_pressure(team, pressure);
 
     // Cache dinv, and dvv
@@ -607,7 +605,7 @@ struct update_state {
     ExecViewUnmanaged<const Real[NP][NP]> c_dvv = m_data.dvv();
 
     // Used 3 times per index
-    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v = m_data.T_v();
+    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v = m_data.T_v(team);
     compute_temperature(team, T_v);
 
     preq_hydrostatic(team, pressure, T_v);
@@ -623,8 +621,6 @@ struct update_state {
     if (team_size < NUM_LEV) {
       tmp = FastMemManager::memory_needed(team_size);
     }
-    printf("Requesting %d bytes of memory for a team of %d threads\n", (int)tmp,
-           team_size);
     return tmp;
   }
 };
