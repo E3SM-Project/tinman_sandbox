@@ -3,6 +3,8 @@
 
 #include "Types.hpp"
 
+#include <assert.h>
+
 namespace TinMan {
 
 // A simple holder for a pair <Count,Size>
@@ -93,8 +95,12 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   ScratchManager(TeamPolicy &team)
-    : m_team_scratch(ScratchView(team.team_scratch(0), sum_team_sizes).ptr_on_device()),
-      m_thread_scratch(ScratchView(team.thread_scratch(0), sum_thread_sizes)
+      : m_team_scratch(
+            ScratchView(team.team_scratch(0), sum_team_sizes).ptr_on_device()),
+        m_thread_scratch(ScratchView(
+            team.team_scratch(0),
+            sum_thread_sizes *
+                (team.team_size() > NUM_LEV ? NUM_LEV : team.team_size()))
                              .ptr_on_device()) {}
 
   // Get a block of memory for a given block ID
@@ -107,6 +113,7 @@ public:
   // Get a block of memory for a given thread and block ID
   template <size_t BLOCK_ID, size_t COUNTER_ID>
   KOKKOS_INLINE_FUNCTION Real *get_thread_scratch(int thread_id) const {
+    assert(thread_id < NUM_LEV);
     return m_thread_scratch + thread_id * sum_thread_sizes +
            ScratchOffset<thread_sizes_pack, BLOCK_ID, COUNTER_ID>::value;
   }
@@ -121,7 +128,7 @@ public:
     return sizeof(Real) * reals_needed(team_size);
   }
 
-private:
+  // private:
   using ScratchView =
       ViewType<Real *, ScratchMemSpace, Kokkos::MemoryUnmanaged>;
   // The memory buffer

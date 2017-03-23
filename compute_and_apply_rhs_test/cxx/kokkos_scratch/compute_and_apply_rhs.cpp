@@ -11,7 +11,7 @@
 #include <fstream>
 #include <iomanip>
 
-#include <stdio.h>
+#include <assert.h>
 
 namespace TinMan {
 
@@ -64,8 +64,8 @@ struct update_state {
   // Modifies Ephi_grad
   template <typename Grad_View, size_t scalar_mem, size_t vector_mem>
   KOKKOS_INLINE_FUNCTION void
-  compute_energy_grad(TeamPolicy &team,
-                      FastMemManager fast_mem, const int ilev,
+  compute_energy_grad(TeamPolicy &team, const FastMemManager &fast_mem,
+                      const int ilev,
                       ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
                       Grad_View Ephi_grad) const {
     const int ie = team.league_rank();
@@ -96,8 +96,7 @@ struct update_state {
   // D, DINV, U, V, FCOR, SPHEREMP, T_v
   // Modifies U, V
   KOKKOS_INLINE_FUNCTION
-  void compute_velocity(TeamPolicy &team,
-                        FastMemManager &fast_mem,
+  void compute_velocity(TeamPolicy &team, const FastMemManager &fast_mem,
                         ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure,
                         ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
                         ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v) const {
@@ -166,8 +165,7 @@ struct update_state {
   // Depends on ETA_DPDN
   // Modifies ETA_DPDN
   KOKKOS_INLINE_FUNCTION
-  void
-  compute_eta_dpdn(TeamPolicy &team) const {
+  void compute_eta_dpdn(TeamPolicy &team) const {
     const int ie = team.league_rank();
     Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV_P),
                          [&](const int ilev) {
@@ -239,34 +237,22 @@ struct update_state {
     team.team_barrier();
   }
 
-  // For each thread, requires 3 x NP x NP Scratch Memory
-  // Depends on pressure, div_vdp, omega_p
-  // Sets pressure equal to omega_p
   KOKKOS_INLINE_FUNCTION
-  void
-  preq_omega_ps(const TeamPolicy &team,
-                FastMemManager &fast_mem,
-                const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
-                const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp,
-                const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure) const {
-    const int ie = team.league_rank();
-    // NOTE: we can't use a single TeamThreadRange loop, since
-    //       gradient_sphere requires a 'consistent' pressure,
-    //       meaning that we cannot update the different pressure
-    //       points within a level before the gradient is complete!
+  void preq_omega_ps_init(
+      const TeamPolicy &team, const FastMemManager &fast_mem,
+      const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
+      const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp,
+      ExecViewUnmanaged<Real[2][NP][NP]> grad_p,
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure,
+      ExecViewUnmanaged<Real[NP][NP]> suml) const {
 
-    // Need to test if false sharing causes Kokkos::single to be faster
-    ExecViewUnmanaged<Real[NP][NP]> suml(
-        fast_mem.get_thread_scratch<block_2d_scalars, 0>(team.team_rank()));
-    ExecViewUnmanaged<Real[2][NP][NP]> grad_p(
-        fast_mem.get_team_scratch<block_team_2d_vectors, 0>());
-    ExecViewUnmanaged<Real[NP][NP]> p_ilev;
-
-    p_ilev = subview(pressure, 0, Kokkos::ALL(), Kokkos::ALL());
+    int ie = team.league_rank();
+    ExecViewUnmanaged<Real[NP][NP]> p_ilev =
+        Kokkos::subview(pressure, 0, Kokkos::ALL(), Kokkos::ALL());
     gradient_sphere<FastMemManager, block_2d_vectors, 0>(
         team, fast_mem, p_ilev, m_data, c_dinv, grad_p);
 
-    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
+    Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                          KOKKOS_LAMBDA(const int loop_idx) {
       const int jgp = loop_idx / NP;
       const int igp = loop_idx % NP;
@@ -279,14 +265,25 @@ struct update_state {
       p_ilev(igp, jgp) = vgrad_p / p_ilev(igp, jgp) - ckk * term;
       suml(igp, jgp) = term;
     });
+  }
 
+  KOKKOS_INLINE_FUNCTION
+  void preq_omega_ps_loop(
+      const TeamPolicy &team, const FastMemManager &fast_mem,
+      const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
+      const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp,
+      ExecViewUnmanaged<Real[2][NP][NP]> grad_p,
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure,
+      ExecViewUnmanaged<Real[NP][NP]> suml) const {
     // Another candidate for parallel scan
+    int ie = team.league_rank();
+    ExecViewUnmanaged<Real[NP][NP]> p_ilev;
     for (int ilev = 1; ilev < NUM_LEV - 1; ++ilev) {
       p_ilev = subview(pressure, ilev, Kokkos::ALL(), Kokkos::ALL());
       gradient_sphere<FastMemManager, block_2d_vectors, 0>(
           team, fast_mem, p_ilev, m_data, c_dinv, grad_p);
 
-      Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
+      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                            KOKKOS_LAMBDA(const int loop_idx) {
         const int jgp = loop_idx / NP;
         const int igp = loop_idx % NP;
@@ -303,11 +300,22 @@ struct update_state {
         suml(igp, jgp) += term;
       });
     }
+  }
 
-    p_ilev = subview(pressure, NUM_LEV - 1, Kokkos::ALL(), Kokkos::ALL());
+  KOKKOS_INLINE_FUNCTION
+  void preq_omega_ps_tail(
+      const TeamPolicy &team, const FastMemManager &fast_mem,
+      const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
+      const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp,
+      ExecViewUnmanaged<Real[2][NP][NP]> grad_p,
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure,
+      ExecViewUnmanaged<Real[NP][NP]> suml) const {
+    int ie = team.league_rank();
+    ExecViewUnmanaged<Real[NP][NP]> p_ilev =
+        subview(pressure, NUM_LEV - 1, Kokkos::ALL(), Kokkos::ALL());
     gradient_sphere<FastMemManager, block_2d_vectors, 0>(
         team, fast_mem, p_ilev, m_data, c_dinv, grad_p);
-    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NP * NP),
+    Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                          KOKKOS_LAMBDA(const int loop_idx) {
       const int jgp = loop_idx / NP;
       const int igp = loop_idx % NP;
@@ -320,6 +328,36 @@ struct update_state {
       const Real term = div_vdp(NUM_LEV - 1, igp, jgp);
       p_ilev(igp, jgp) =
           vgrad_p / p_ilev(igp, jgp) - ckl * suml(igp, jgp) - ckk * term;
+    });
+  }
+
+  // For each thread, requires 3 x NP x NP Scratch Memory
+  // Depends on pressure, div_vdp, omega_p
+  // Sets pressure equal to omega_p
+  KOKKOS_INLINE_FUNCTION
+  void
+  preq_omega_ps(const TeamPolicy &team, const FastMemManager &fast_mem,
+                const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
+                const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp,
+                const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure) const {
+    const int ie = team.league_rank();
+    // NOTE: we can't use a single TeamThreadRange loop, since
+    //       gradient_sphere requires a 'consistent' pressure,
+    //       meaning that we cannot update the different pressure
+    //       points within a level before the gradient is complete!
+
+    Kokkos::single(Kokkos::PerTeam(team), [&]() {
+      ExecViewUnmanaged<Real[NP][NP]> suml(
+          fast_mem.get_thread_scratch<block_2d_scalars, 0>(team.team_rank()));
+      ExecViewUnmanaged<Real[2][NP][NP]> grad_p(
+          fast_mem.get_team_scratch<block_team_2d_vectors, 0>());
+
+      preq_omega_ps_init(team, fast_mem, c_dinv, div_vdp, grad_p, pressure,
+                         suml);
+      preq_omega_ps_loop(team, fast_mem, c_dinv, div_vdp, grad_p, pressure,
+                         suml);
+      preq_omega_ps_tail(team, fast_mem, c_dinv, div_vdp, grad_p, pressure,
+                         suml);
     });
     team.team_barrier();
   }
@@ -414,8 +452,7 @@ struct update_state {
   // Modifies DERIVED_UN0, DERIVED_VN0, OMEGA_P, T, and DP3D
   // block_3d_scalars
   KOKKOS_INLINE_FUNCTION
-  void compute_stuff(TeamPolicy team,
-                     FastMemManager fast_mem,
+  void compute_stuff(TeamPolicy team, const FastMemManager &fast_mem,
                      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure,
                      ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
                      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v) const {
@@ -529,8 +566,7 @@ struct update_state {
   // Computes the vertical advection of T and v
   KOKKOS_INLINE_FUNCTION
   void preq_vertadv(
-      const TeamPolicy &team,
-      FastMemManager &fast_mem,
+      const TeamPolicy &team, const FastMemManager &fast_mem,
       const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> T,
       const ExecViewUnmanaged<const Real[NUM_LEV][2][NP][NP]> v,
       const ExecViewUnmanaged<const Real[NUM_LEV_P][NP][NP]> eta_dp_deta,
