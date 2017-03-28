@@ -19,7 +19,7 @@ struct update_state {
   const Control m_data;
   const Region m_region;
 
-  static constexpr const size_t num_2d_scalars = 1;
+  static constexpr const size_t num_2d_scalars = 0;
   static constexpr const size_t num_2d_vectors = 1;
   static constexpr const size_t num_2d_tensors = 0;
   static constexpr const size_t num_3d_scalars = 0;
@@ -62,28 +62,28 @@ struct update_state {
   // For each thread, requires 3 x NP x NP memory
   // Depends on PHI (after preq_hydrostatic), PECND
   // Modifies Ephi_grad
-  template <typename Grad_View, size_t scalar_mem, size_t vector_mem>
+  template <size_t scalar_mem, size_t vector_mem>
   KOKKOS_INLINE_FUNCTION void
   compute_energy_grad(TeamPolicy &team, const FastMemManager &fast_mem,
                       const int ilev,
                       ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
-                      Grad_View Ephi_grad) const {
+                      ExecViewUnmanaged<Real[2][NP][NP]> Ephi_grad) const {
     const int ie = team.league_rank();
 
-    ExecViewUnmanaged<Real[NP][NP]> Ephi(
-        fast_mem.get_thread_scratch<block_2d_scalars, scalar_mem>(
-            team.team_rank()));
-
+    // Using a slot larger than we need - Can be up to 4 x 4 x 2 = 32 elements
+    Real _tmp_viewptr[NP][NP];
+    ExecViewUnmanaged<Real[NP][NP]> Ephi(&_tmp_viewptr[0][0]);
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                          [&](const int idx) {
       const int igp = idx / NP;
       const int jgp = idx % NP;
-      Real v1 = m_region.U_current(ie)(ilev, igp, jgp);
-      Real v2 = m_region.V_current(ie)(ilev, igp, jgp);
+      Ephi(0, 0) = m_region.U_current(ie)(ilev, igp, jgp);
+      Ephi(0, 1) = m_region.V_current(ie)(ilev, igp, jgp);
       // Kinetic energy + PHI (thermal energy?) + PECND (potential energy?)
-      Ephi(igp, jgp) = 0.5 * (v1 * v1 + v2 * v2) +
-                       m_region.PHI_update(ie)(ilev, igp, jgp) +
-                       m_region.PECND(ie, ilev)(igp, jgp);
+      Ephi(igp, jgp) =
+          0.5 * (Ephi(0, 0) * Ephi(0, 0) + Ephi(0, 1) * Ephi(0, 1)) +
+          m_region.PHI_update(ie)(ilev, igp, jgp) +
+          m_region.PECND(ie, ilev)(igp, jgp);
     });
     gradient_sphere_update<FastMemManager, block_2d_vectors, vector_mem>(
         team, fast_mem, Ephi, m_data, c_dinv, Ephi_grad);
@@ -123,11 +123,10 @@ struct update_state {
       });
 
       // grad_buf -> Ephi_grad + glnpsi
-      compute_energy_grad<ExecViewUnmanaged<Real[2][NP][NP]>, 0, 0>(
-          team, fast_mem, ilev, c_dinv, grad_buf);
+      compute_energy_grad<0, 0>(team, fast_mem, ilev, c_dinv, grad_buf);
 
-      ExecViewUnmanaged<Real[NP][NP]> vort(
-          fast_mem.get_thread_scratch<block_2d_scalars, 0>(team.team_rank()));
+      Real _tmp_viewptr[NP][NP];
+      ExecViewUnmanaged<Real[NP][NP]> vort(&_tmp_viewptr[0][0]);
       vorticity_sphere<FastMemManager, block_2d_vectors, 0>(
           team, fast_mem, m_region.U_current(ie, ilev),
           m_region.V_current(ie, ilev), m_data, m_region.METDET(ie),
@@ -347,8 +346,8 @@ struct update_state {
     //       points within a level before the gradient is complete!
 
     Kokkos::single(Kokkos::PerTeam(team), [&]() {
-      ExecViewUnmanaged<Real[NP][NP]> suml(
-          fast_mem.get_thread_scratch<block_2d_scalars, 0>(team.team_rank()));
+      Real _tmp_viewptr[NP][NP];
+      ExecViewUnmanaged<Real[NP][NP]> suml(&_tmp_viewptr[0][0]);
       ExecViewUnmanaged<Real[2][NP][NP]> grad_p(
           fast_mem.get_team_scratch<block_team_2d_vectors, 0>());
 
@@ -663,8 +662,7 @@ struct update_state {
 
 void compute_and_apply_rhs(const Control &data, Region &region) {
   update_state f(data, region);
-  Kokkos::parallel_for(
-      Kokkos::TeamPolicy<ExecSpace>(data.num_elems(), Kokkos::AUTO), f);
+  Kokkos::parallel_for(Kokkos::TeamPolicy<ExecSpace>(data.num_elems(), 32), f);
   ExecSpace::fence();
 }
 
