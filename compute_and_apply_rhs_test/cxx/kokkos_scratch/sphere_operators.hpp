@@ -12,50 +12,49 @@ namespace TinMan {
 
 class Control;
 
-template <typename Scratch, size_t vector_memory, size_t vector_id>
-KOKKOS_INLINE_FUNCTION void gradient_sphere(
-    const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
-    const Scratch &fast_mem, const ExecViewUnmanaged<const Real[NP][NP]> scalar,
-    const Control &data, const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
-    ExecViewUnmanaged<Real[2][NP][NP]> grad_s);
+KOKKOS_INLINE_FUNCTION void
+gradient_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                const ExecViewUnmanaged<const Real[NP][NP]> scalar,
+                const Control &data,
+                const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                ExecViewUnmanaged<Real[2][NP][NP]> grad_s);
 
-template <typename Scratch, size_t vector_memory, size_t vector_id>
-KOKKOS_INLINE_FUNCTION void gradient_sphere_update(
-    const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
-    const Scratch &fast_mem, const ExecViewUnmanaged<const Real[NP][NP]> scalar,
-    const Control &data, const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
-    ExecViewUnmanaged<Real[2][NP][NP]> grad_s);
+KOKKOS_INLINE_FUNCTION void
+gradient_sphere_update(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                       const ExecViewUnmanaged<const Real[NP][NP]> scalar,
+                       const Control &data,
+                       const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                       ExecViewUnmanaged<Real[2][NP][NP]> grad_s);
 
-template <typename Scratch, size_t vector_memory, size_t vector_id>
-KOKKOS_INLINE_FUNCTION void divergence_sphere(
-    const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
-    const Scratch &fast_mem, const ExecViewUnmanaged<const Real[2][NP][NP]> v,
-    const Control &data, const ExecViewUnmanaged<const Real[NP][NP]> metDet,
-    const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
-    ExecViewUnmanaged<Real[NP][NP]> div_v);
+KOKKOS_INLINE_FUNCTION void
+divergence_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                  const ExecViewUnmanaged<const Real[2][NP][NP]> v,
+                  const Control &data,
+                  const ExecViewUnmanaged<const Real[NP][NP]> metDet,
+                  const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                  ExecViewUnmanaged<Real[NP][NP]> div_v);
 
-template <typename Scratch, size_t vector_memory, size_t vector_id>
-KOKKOS_INLINE_FUNCTION void vorticity_sphere(
-    const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
-    const Scratch &fast_mem, const ExecViewUnmanaged<const Real[NP][NP]> u,
-    const ExecViewUnmanaged<const Real[NP][NP]> v, const Control &data,
-    const ExecViewUnmanaged<const Real[NP][NP]> metDet,
-    const ExecViewUnmanaged<const Real[2][2][NP][NP]> D,
-    ExecViewUnmanaged<Real[NP][NP]> vort);
+KOKKOS_INLINE_FUNCTION void
+vorticity_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                 const ExecViewUnmanaged<const Real[NP][NP]> u,
+                 const ExecViewUnmanaged<const Real[NP][NP]> v,
+                 const Control &data,
+                 const ExecViewUnmanaged<const Real[NP][NP]> metDet,
+                 const ExecViewUnmanaged<const Real[2][2][NP][NP]> D,
+                 ExecViewUnmanaged<Real[NP][NP]> vort);
 
 // IMPLEMENTATION
 
 // Note that gradient_sphere requires scratch space of 2 x NP x NP Reals
 // This must be called from the device space
-template <typename Scratch, size_t vector_memory, size_t vector_id>
-KOKKOS_INLINE_FUNCTION void gradient_sphere(
-    const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
-    const Scratch &fast_mem, const ExecViewUnmanaged<const Real[NP][NP]> scalar,
-    const Control &data, const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
-    ExecViewUnmanaged<Real[2][NP][NP]> grad_s) {
-  ExecViewUnmanaged<Real[2][NP][NP]> v(
-      fast_mem.template get_thread_scratch<vector_memory, vector_id>(
-          team.team_rank()));
+KOKKOS_INLINE_FUNCTION void
+gradient_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                const ExecViewUnmanaged<const Real[NP][NP]> scalar,
+                const Control &data,
+                const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                ExecViewUnmanaged<Real[2][NP][NP]> grad_s) {
+  Real _tmp_viewbuf[2][NP][NP];
+  ExecViewUnmanaged<Real[2][NP][NP]> v(&_tmp_viewbuf[0][0][0]);
   constexpr int contra_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, contra_iters),
                        [&](const int loop_idx) {
@@ -83,15 +82,14 @@ KOKKOS_INLINE_FUNCTION void gradient_sphere(
   });
 }
 
-template <typename Scratch, size_t vector_memory, size_t vector_id>
-KOKKOS_INLINE_FUNCTION void gradient_sphere_update(
-    const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
-    const Scratch &fast_mem, const ExecViewUnmanaged<const Real[NP][NP]> scalar,
-    const Control &data, const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
-    ExecViewUnmanaged<Real[2][NP][NP]> grad_s) {
-  ExecViewUnmanaged<Real[2][NP][NP]> v(
-      fast_mem.template get_thread_scratch<vector_memory, vector_id>(
-          team.team_rank()));
+KOKKOS_INLINE_FUNCTION void
+gradient_sphere_update(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                       const ExecViewUnmanaged<const Real[NP][NP]> scalar,
+                       const Control &data,
+                       const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                       ExecViewUnmanaged<Real[2][NP][NP]> grad_s) {
+  Real _tmp_viewbuf[2][NP][NP];
+  ExecViewUnmanaged<Real[2][NP][NP]> v(&_tmp_viewbuf[0][0][0]);
   constexpr int contra_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, contra_iters),
                        [&](const int loop_idx) {
@@ -121,16 +119,15 @@ KOKKOS_INLINE_FUNCTION void gradient_sphere_update(
 
 // Note that divergence_sphere requires scratch space of 2 x NP x NP Reals
 // This must be called from the device space
-template <typename Scratch, size_t vector_memory, size_t vector_id>
-KOKKOS_INLINE_FUNCTION void divergence_sphere(
-    const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
-    const Scratch &fast_mem, const ExecViewUnmanaged<const Real[2][NP][NP]> v,
-    const Control &data, const ExecViewUnmanaged<const Real[NP][NP]> metDet,
-    const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
-    ExecViewUnmanaged<Real[NP][NP]> div_v) {
-  ExecViewUnmanaged<Real[2][NP][NP]> gv(
-      fast_mem.template get_thread_scratch<vector_memory, vector_id>(
-          team.team_rank()));
+KOKKOS_INLINE_FUNCTION void
+divergence_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                  const ExecViewUnmanaged<const Real[2][NP][NP]> v,
+                  const Control &data,
+                  const ExecViewUnmanaged<const Real[NP][NP]> metDet,
+                  const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                  ExecViewUnmanaged<Real[NP][NP]> div_v) {
+  Real _tmp_viewbuf[2][NP][NP];
+  ExecViewUnmanaged<Real[2][NP][NP]> gv(&_tmp_viewbuf[0][0][0]);
   constexpr int contra_iters = NP * NP * 2;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, contra_iters),
                        [&](const int loop_idx) {
@@ -160,17 +157,16 @@ KOKKOS_INLINE_FUNCTION void divergence_sphere(
 
 // Note that divergence_sphere requires scratch space of 3 x NP x NP Reals
 // This must be called from the device space
-template <typename Scratch, size_t vector_memory, size_t vector_id>
-KOKKOS_INLINE_FUNCTION void vorticity_sphere(
-    const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
-    const Scratch &fast_mem, const ExecViewUnmanaged<const Real[NP][NP]> u,
-    const ExecViewUnmanaged<const Real[NP][NP]> v, const Control &data,
-    const ExecViewUnmanaged<const Real[NP][NP]> metDet,
-    const ExecViewUnmanaged<const Real[2][2][NP][NP]> D,
-    ExecViewUnmanaged<Real[NP][NP]> vort) {
-  ExecViewUnmanaged<Real[2][NP][NP]> vcov(
-      fast_mem.template get_thread_scratch<vector_memory, vector_id>(
-          team.team_rank()));
+KOKKOS_INLINE_FUNCTION void
+vorticity_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                 const ExecViewUnmanaged<const Real[NP][NP]> u,
+                 const ExecViewUnmanaged<const Real[NP][NP]> v,
+                 const Control &data,
+                 const ExecViewUnmanaged<const Real[NP][NP]> metDet,
+                 const ExecViewUnmanaged<const Real[2][2][NP][NP]> D,
+                 ExecViewUnmanaged<Real[NP][NP]> vort) {
+  Real _tmp_viewbuf[2][NP][NP];
+  ExecViewUnmanaged<Real[2][NP][NP]> vcov(&_tmp_viewbuf[0][0][0]);
   constexpr int covar_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, covar_iters),
                        [&](const int loop_idx) {

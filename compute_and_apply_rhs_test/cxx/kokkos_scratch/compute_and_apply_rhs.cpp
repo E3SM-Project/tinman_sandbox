@@ -20,7 +20,7 @@ struct update_state {
   const Region m_region;
 
   static constexpr const size_t num_2d_scalars = 0;
-  static constexpr const size_t num_2d_vectors = 1;
+  static constexpr const size_t num_2d_vectors = 0;
   static constexpr const size_t num_2d_tensors = 0;
   static constexpr const size_t num_3d_scalars = 0;
   static constexpr const size_t num_3d_vectors = 0;
@@ -85,8 +85,7 @@ struct update_state {
           m_region.PHI_update(ie)(ilev, igp, jgp) +
           m_region.PECND(ie, ilev)(igp, jgp);
     });
-    gradient_sphere_update<FastMemManager, block_2d_vectors, vector_mem>(
-        team, fast_mem, Ephi, m_data, c_dinv, Ephi_grad);
+    gradient_sphere_update(team, Ephi, m_data, c_dinv, Ephi_grad);
     // We shouldn't need a block here, as the parallel loops were vector level,
     // not thread level
   }
@@ -110,8 +109,7 @@ struct update_state {
       ExecViewUnmanaged<Real[2][NP][NP]> grad_buf =
           Kokkos::subview(m_data.vector_buf(team), ilev, Kokkos::ALL(),
                           Kokkos::ALL(), Kokkos::ALL());
-      gradient_sphere<FastMemManager, block_2d_vectors, 0>(
-          team, fast_mem, p_ilev, m_data, c_dinv, grad_buf);
+      gradient_sphere(team, p_ilev, m_data, c_dinv, grad_buf);
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, 2 * NP * NP),
                            [&](const int idx) {
         const int hgp = (idx / NP) / NP;
@@ -127,10 +125,9 @@ struct update_state {
 
       Real _tmp_viewptr[NP][NP];
       ExecViewUnmanaged<Real[NP][NP]> vort(&_tmp_viewptr[0][0]);
-      vorticity_sphere<FastMemManager, block_2d_vectors, 0>(
-          team, fast_mem, m_region.U_current(ie, ilev),
-          m_region.V_current(ie, ilev), m_data, m_region.METDET(ie),
-          m_region.D(ie), vort);
+      vorticity_sphere(team, m_region.U_current(ie, ilev),
+                       m_region.V_current(ie, ilev), m_data,
+                       m_region.METDET(ie), m_region.D(ie), vort);
 
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                            [&](const int idx) {
@@ -248,8 +245,7 @@ struct update_state {
     int ie = team.league_rank();
     ExecViewUnmanaged<Real[NP][NP]> p_ilev =
         Kokkos::subview(pressure, 0, Kokkos::ALL(), Kokkos::ALL());
-    gradient_sphere<FastMemManager, block_2d_vectors, 0>(
-        team, fast_mem, p_ilev, m_data, c_dinv, grad_p);
+    gradient_sphere(team, p_ilev, m_data, c_dinv, grad_p);
 
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                          KOKKOS_LAMBDA(const int loop_idx) {
@@ -279,8 +275,7 @@ struct update_state {
     ExecViewUnmanaged<Real[NP][NP]> p_ilev;
     for (int ilev = 1; ilev < NUM_LEV - 1; ++ilev) {
       p_ilev = subview(pressure, ilev, Kokkos::ALL(), Kokkos::ALL());
-      gradient_sphere<FastMemManager, block_2d_vectors, 0>(
-          team, fast_mem, p_ilev, m_data, c_dinv, grad_p);
+      gradient_sphere(team, p_ilev, m_data, c_dinv, grad_p);
 
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                            KOKKOS_LAMBDA(const int loop_idx) {
@@ -312,8 +307,7 @@ struct update_state {
     int ie = team.league_rank();
     ExecViewUnmanaged<Real[NP][NP]> p_ilev =
         subview(pressure, NUM_LEV - 1, Kokkos::ALL(), Kokkos::ALL());
-    gradient_sphere<FastMemManager, block_2d_vectors, 0>(
-        team, fast_mem, p_ilev, m_data, c_dinv, grad_p);
+    gradient_sphere(team, p_ilev, m_data, c_dinv, grad_p);
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                          KOKKOS_LAMBDA(const int loop_idx) {
       const int jgp = loop_idx / NP;
@@ -493,9 +487,8 @@ struct update_state {
 
       ExecViewUnmanaged<Real[NP][NP]> div_vdp_ilev =
           Kokkos::subview(div_vdp, ilev, Kokkos::ALL(), Kokkos::ALL());
-      divergence_sphere<FastMemManager, block_2d_vectors, 0>(
-          team, fast_mem, vdp_ilev, m_data, m_region.METDET(ie), c_dinv,
-          div_vdp_ilev);
+      divergence_sphere(team, vdp_ilev, m_data, m_region.METDET(ie), c_dinv,
+                        div_vdp_ilev);
     });
 
     team.team_barrier();
@@ -515,8 +508,7 @@ struct update_state {
       ExecViewUnmanaged<Real[2][NP][NP]> grad_tmp = Kokkos::subview(
           m_data.vector_buf(team), ilev, Kokkos::ALL, Kokkos::ALL, Kokkos::ALL);
 
-      gradient_sphere<FastMemManager, block_2d_vectors, 0>(
-          team, fast_mem, T_ie_n0_ilev, m_data, c_dinv, grad_tmp);
+      gradient_sphere(team, T_ie_n0_ilev, m_data, c_dinv, grad_tmp);
 
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                            [&](const int idx) {
