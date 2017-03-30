@@ -4,8 +4,6 @@
 #include "Dimensions.hpp"
 #include "Types.hpp"
 
-#include "ScratchManager.hpp"
-
 #include <Kokkos_Core.hpp>
 
 namespace TinMan {

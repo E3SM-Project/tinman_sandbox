@@ -5,9 +5,6 @@
 #include "TestData.hpp"
 #include "sphere_operators.hpp"
 
-#include "ScratchManager.hpp"
-#include "ScratchMemoryDefs.hpp"
-
 #include <fstream>
 #include <iomanip>
 
@@ -19,42 +16,6 @@ struct update_state {
   const Control m_data;
   const Region m_region;
 
-  static constexpr const size_t num_2d_scalars = 0;
-  static constexpr const size_t num_2d_vectors = 0;
-  static constexpr const size_t num_2d_tensors = 0;
-  static constexpr const size_t num_3d_scalars = 0;
-  static constexpr const size_t num_3d_vectors = 0;
-  static constexpr const size_t num_3d_p_scalars = 0;
-  static constexpr const size_t num_team_2d_scalars = 0;
-  static constexpr const size_t num_team_2d_vectors = 1;
-
-  static constexpr const size_t size_2d_scalars = NP * NP;
-  static constexpr const size_t size_2d_vectors = 2 * NP * NP;
-  static constexpr const size_t size_2d_tensors = 2 * 2 * NP * NP;
-  static constexpr const size_t size_3d_scalars = NUM_LEV * NP * NP;
-  static constexpr const size_t size_3d_vectors = NUM_LEV * 2 * NP * NP;
-  static constexpr const size_t size_3d_p_scalars = NUM_LEV_P * NP * NP;
-
-  static constexpr const int block_2d_scalars = 0;
-  static constexpr const int block_2d_vectors = 1;
-
-  static constexpr const int block_3d_scalars = 0;
-  static constexpr const int block_3d_vectors = 1;
-  static constexpr const int block_3d_p_scalars = 2;
-  static constexpr const int block_2d_tensors = 3;
-  static constexpr const int block_team_2d_scalars = 4;
-  static constexpr const int block_team_2d_vectors = 5;
-
-  using ThreadMemory = CountAndSizePack<num_2d_scalars, size_2d_scalars,
-                                        num_2d_vectors, size_2d_vectors>;
-  using TeamMemory =
-      CountAndSizePack<num_3d_scalars, size_3d_scalars, num_3d_vectors,
-                       size_3d_vectors, num_3d_p_scalars, size_3d_p_scalars,
-                       num_2d_tensors, size_2d_tensors, num_team_2d_scalars,
-                       size_2d_scalars, num_team_2d_vectors, size_2d_vectors>;
-
-  using FastMemManager = ScratchManager<TeamMemory, ThreadMemory>;
-
   KOKKOS_INLINE_FUNCTION
   update_state(const Control &data, const Region &region)
       : m_data(data), m_region(region) {}
@@ -62,9 +23,8 @@ struct update_state {
   // For each thread, requires 3 x NP x NP memory
   // Depends on PHI (after preq_hydrostatic), PECND
   // Modifies Ephi_grad
-  template <size_t scalar_mem, size_t vector_mem>
   KOKKOS_INLINE_FUNCTION void
-  compute_energy_grad(TeamPolicy &team, const FastMemManager &fast_mem,
+  compute_energy_grad(TeamPolicy &team,
                       const int ilev,
                       ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
                       ExecViewUnmanaged<Real[2][NP][NP]> Ephi_grad) const {
@@ -95,7 +55,7 @@ struct update_state {
   // D, DINV, U, V, FCOR, SPHEREMP, T_v
   // Modifies U, V
   KOKKOS_INLINE_FUNCTION
-  void compute_velocity(TeamPolicy &team, const FastMemManager &fast_mem,
+  void compute_velocity(TeamPolicy &team,
                         ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure,
                         ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
                         ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v) const {
@@ -121,7 +81,7 @@ struct update_state {
       });
 
       // grad_buf -> Ephi_grad + glnpsi
-      compute_energy_grad<0, 0>(team, fast_mem, ilev, c_dinv, grad_buf);
+      compute_energy_grad(team, ilev, c_dinv, grad_buf);
 
       Real _tmp_viewptr[NP][NP];
       ExecViewUnmanaged<Real[NP][NP]> vort(&_tmp_viewptr[0][0]);
@@ -235,7 +195,7 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void preq_omega_ps_init(
-      const TeamPolicy &team, const FastMemManager &fast_mem,
+      const TeamPolicy &team,
       const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
       const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp,
       ExecViewUnmanaged<Real[2][NP][NP]> grad_p,
@@ -264,7 +224,7 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void preq_omega_ps_loop(
-      const TeamPolicy &team, const FastMemManager &fast_mem,
+      const TeamPolicy &team,
       const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
       const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp,
       ExecViewUnmanaged<Real[2][NP][NP]> grad_p,
@@ -298,7 +258,7 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void preq_omega_ps_tail(
-      const TeamPolicy &team, const FastMemManager &fast_mem,
+      const TeamPolicy &team,
       const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
       const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp,
       ExecViewUnmanaged<Real[2][NP][NP]> grad_p,
@@ -329,7 +289,7 @@ struct update_state {
   // Sets pressure equal to omega_p
   KOKKOS_INLINE_FUNCTION
   void
-  preq_omega_ps(const TeamPolicy &team, const FastMemManager &fast_mem,
+  preq_omega_ps(const TeamPolicy &team,
                 const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
                 const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp,
                 const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure) const {
@@ -340,16 +300,15 @@ struct update_state {
     //       points within a level before the gradient is complete!
 
     Kokkos::single(Kokkos::PerTeam(team), [&]() {
-      Real _tmp_viewptr[NP][NP];
-      ExecViewUnmanaged<Real[NP][NP]> suml(&_tmp_viewptr[0][0]);
-      ExecViewUnmanaged<Real[2][NP][NP]> grad_p(
-          fast_mem.get_team_scratch<block_team_2d_vectors, 0>());
+      Real _tmp_viewptr[2][NP][NP];
+      ExecViewUnmanaged<Real[NP][NP]> suml(&_tmp_viewptr[0][0][0]);
+      ExecViewUnmanaged<Real[2][NP][NP]> grad_p(&_tmp_viewptr[1][0][0]);
 
-      preq_omega_ps_init(team, fast_mem, c_dinv, div_vdp, grad_p, pressure,
+      preq_omega_ps_init(team, c_dinv, div_vdp, grad_p, pressure,
                          suml);
-      preq_omega_ps_loop(team, fast_mem, c_dinv, div_vdp, grad_p, pressure,
+      preq_omega_ps_loop(team, c_dinv, div_vdp, grad_p, pressure,
                          suml);
-      preq_omega_ps_tail(team, fast_mem, c_dinv, div_vdp, grad_p, pressure,
+      preq_omega_ps_tail(team, c_dinv, div_vdp, grad_p, pressure,
                          suml);
     });
     team.team_barrier();
@@ -445,7 +404,7 @@ struct update_state {
   // Modifies DERIVED_UN0, DERIVED_VN0, OMEGA_P, T, and DP3D
   // block_3d_scalars
   KOKKOS_INLINE_FUNCTION
-  void compute_stuff(TeamPolicy team, const FastMemManager &fast_mem,
+  void compute_stuff(TeamPolicy team,
                      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure,
                      ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
                      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v) const {
@@ -494,7 +453,7 @@ struct update_state {
     team.team_barrier();
 
     // TODO: Rename pressure after here to omega_p
-    preq_omega_ps(team, fast_mem, c_dinv, div_vdp, pressure);
+    preq_omega_ps(team, c_dinv, div_vdp, pressure);
     // Updates OMEGA_P, T, and DP3D
     // Depends on T (global), OMEGA_P (global), U (global), V (global),
     // SPHEREMP (global), T_v, and omega_p
@@ -557,7 +516,7 @@ struct update_state {
   // Computes the vertical advection of T and v
   KOKKOS_INLINE_FUNCTION
   void preq_vertadv(
-      const TeamPolicy &team, const FastMemManager &fast_mem,
+      const TeamPolicy &team,
       const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> T,
       const ExecViewUnmanaged<const Real[NUM_LEV][2][NP][NP]> v,
       const ExecViewUnmanaged<const Real[NUM_LEV_P][NP][NP]> eta_dp_deta,
@@ -620,7 +579,6 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void operator()(TeamPolicy team) const {
-    FastMemManager fast_mem(team);
 
     // Used 5 times per index - basically the most important variable
     ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure = m_data.pressure(team);
@@ -636,19 +594,15 @@ struct update_state {
     compute_temperature(team, T_v);
 
     preq_hydrostatic(team, pressure, T_v);
-    compute_velocity(team, fast_mem, pressure, c_dinv, T_v);
+    compute_velocity(team, pressure, c_dinv, T_v);
     compute_eta_dpdn(team);
     // Breaks pressure
-    compute_stuff(team, fast_mem, pressure, c_dinv, T_v);
+    compute_stuff(team, pressure, c_dinv, T_v);
   }
 
   KOKKOS_INLINE_FUNCTION
   size_t shmem_size(const int team_size) const {
-    size_t tmp = FastMemManager::memory_needed(NUM_LEV);
-    if (team_size < NUM_LEV) {
-      tmp = FastMemManager::memory_needed(team_size);
-    }
-    return tmp;
+    return 0;
   }
 };
 
