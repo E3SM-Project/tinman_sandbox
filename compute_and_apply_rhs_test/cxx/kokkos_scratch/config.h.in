@@ -1,0 +1,5 @@
+#cmakedefine TINMAN_CUDA_SPACE
+#cmakedefine TINMAN_OPENMP_SPACE
+#cmakedefine TINMAN_THREADS_SPACE
+#cmakedefine TINMAN_SERIAL_SPACE
+#cmakedefine TINMAN_DEFAULT_SPACE

@@ -3,6 +3,7 @@
 #include "TestData.hpp"
 #include "timer.hpp"
 #include "Kokkos_Core.hpp"
+#include "Types.hpp"
 
 #include <iostream>
 #include <cstring>
@@ -91,32 +92,33 @@ void run_simulation(int num_elems, int num_exec, bool dump_results) {
   // Print norm of initial states, to check we are using same data in all tests
   print_results_2norm(data, region);
 
-  // Burn in before timing to reduce cache effect
-  //TinMan::compute_and_apply_rhs(data, region);
+  std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
 
-  std::unique_ptr<Timer::Timer[]> timers(new Timer::Timer[num_exec]);
+  // Burn in before timing to reduce cache effect
+  TinMan::compute_and_apply_rhs(data, region);
+  TinMan::ExecSpace::fence();
+
+  Timer::Timer global_timer;
+  global_timer.startTimer();
   for (int i=0; i<num_exec; ++i)
   {
-    timers[i].startTimer();
+    //region.next_compute_apply_rhs();
     TinMan::compute_and_apply_rhs(data, region);
-//    data.update_time_levels();
-    timers[i].stopTimer();
   }
+  global_timer.stopTimer();
 
-#ifdef KOKKOS_HAVE_DEFAULT_DEVICE_TYPE_OPENMP
-  Kokkos::OpenMP::fence();
-#endif
+  std::cout << "   ---> compute_and_apply_rhs execution total time: " << global_timer << "\n";
 
-  for(int i = 0; i < num_exec; ++i) {
-    std::cout << timers[i] << std::endl;
-  }
+//  for(int i = 0; i < num_exec; ++i) {
+//    std::cout << timers[i] << std::endl;
+//  }
 
   print_results_2norm (data,region);
 
-  // if (dump_results)
-  // {
-  //   dump_results_to_file (data,region);
-  // }
+  if (dump_results)
+  {
+    region.save_state(data);
+  }
 }
 
 int main (int argc, char** argv)
@@ -133,9 +135,7 @@ int main (int argc, char** argv)
 
   Kokkos::initialize (argc, argv);
 
-#ifdef KOKKOS_HAVE_DEFAULT_DEVICE_TYPE_OPENMP
-  Kokkos::OpenMP::print_configuration(std::cout,true);
-#endif
+  TinMan::ExecSpace::print_configuration(std::cout,true);
 
   run_simulation(num_elems, num_exec, dump_results);
 

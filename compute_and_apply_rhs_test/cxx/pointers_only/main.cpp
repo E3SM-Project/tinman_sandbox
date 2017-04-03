@@ -105,20 +105,20 @@ int main (int argc, char** argv)
   print_results_2norm (data);
 
   // Burn in to avoid cache effects
-  //compute_and_apply_rhs(data);
+  compute_and_apply_rhs(data);
 
   std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
   //std::vector<Timer::Timer> timers(num_exec);
   Timer::Timer global_timer;
+  global_timer.startTimer();
   for (int i=0; i<num_exec; ++i)
   {
-    global_timer.startTimer();
     //timers[i].startTimer();
     compute_and_apply_rhs(data);
     //data.update_time_levels();
     //timers[i].stopTimer();
-    global_timer.stopTimer();
   }
+  global_timer.stopTimer();
 
 /*
   std::cout << "   ---> individual executions times:\n";

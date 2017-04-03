@@ -39,6 +39,9 @@ struct Arrays
   real* elem_derived_pecnd;
   real* elem_derived_vn0;
 
+  real* scratch_2d_0;
+  real* scratch_2d_1;
+
   void init_data ();
   void cleanup_data ();
 };

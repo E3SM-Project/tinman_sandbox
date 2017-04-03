@@ -30,6 +30,9 @@ void Arrays::init_data ()
   elem_derived_pecnd        = new real[num_elems*nlev*np*np]   {};
   elem_derived_vn0          = new real[num_elems*nlev*np*np*2] {};
 
+  scratch_2d_0              = new real[np*np] {};
+  scratch_2d_1              = new real[np*np] {};
+
   // Initialize arrays using sin^2(n*x) map.
   // This is easily portable across different platforms and/or
   // languages without relying on implementation details
@@ -51,7 +54,7 @@ void Arrays::init_data ()
 
         AT_3D(elem_fcor,      ie,ip,jp,np,np)  = sin(iip + jjp);
         AT_3D(elem_metdet,    ie,ip,jp,np,np)  = iip*jjp;
-        AT_3D(elem_rmetdet,   ie,ip,jp,np,np)  = 1./ (AT_3D(elem_metdet,ie,ip,jp,np,np));
+        AT_3D(elem_rmetdet,   ie,ip,jp,np,np)  = 1./ AT_3D(elem_metdet,ie,ip,jp,np,np);
         AT_3D(elem_spheremp,  ie,ip,jp,np,np)  = 2*iip;
         AT_3D(elem_state_phis,ie,ip,jp,np,np)  = iip + jjp;
 
@@ -112,6 +115,9 @@ void Arrays::cleanup_data ()
   delete[] elem_derived_phi;
   delete[] elem_derived_pecnd;
   delete[] elem_derived_vn0;
+
+  delete[] scratch_2d_0;
+  delete[] scratch_2d_1;
 }
 
 void Constants::init_data ()

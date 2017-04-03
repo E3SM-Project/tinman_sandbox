@@ -1,297 +1,196 @@
 #ifndef SPHERE_OPERATORS_HPP
 #define SPHERE_OPERATORS_HPP
 
-#include "config.h"
+#include "Dimensions.hpp"
 #include "Types.hpp"
 
-#include <Kokkos_Core.hpp>
-#include "ScratchMemoryDefs.hpp"
+#include "ScratchManager.hpp"
 
-namespace TinMan
-{
+#include <Kokkos_Core.hpp>
+
+namespace TinMan {
 
 class Control;
 
-template<typename MemSpaceIn, typename MemSpaceOut>
-void gradient_sphere (const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> s,
-                      const Control& data,
-                      const ExecViewUnmanaged<Real[2][2][NP][NP]> DInv,
-                      ViewType<Real[2][NP][NP],MemSpaceOut,Kokkos::MemoryUnmanaged> grad_s);
+KOKKOS_INLINE_FUNCTION void
+gradient_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                const ExecViewUnmanaged<const Real[NP][NP]> scalar,
+                const Control &data,
+                const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                ExecViewUnmanaged<Real[2][NP][NP]> grad_s);
 
-template<typename MemSpaceIn, typename MemSpaceOut>
-KOKKOS_INLINE_FUNCTION
-void gradient_sphere (const Kokkos::TeamPolicy<>::member_type &team,
-                      const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> s,
-                      const Control& data,
-                      ScratchMemoryDefs::CAARS_ScratchManager& scratch_manager,
-                      const ExecViewUnmanaged<Real[2][2][NP][NP]> DInv,
-                      ViewType<Real[2][NP][NP],MemSpaceOut,Kokkos::MemoryUnmanaged> grad_s);
+KOKKOS_INLINE_FUNCTION void
+gradient_sphere_update(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                       const ExecViewUnmanaged<const Real[NP][NP]> scalar,
+                       const Control &data,
+                       const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                       ExecViewUnmanaged<Real[2][NP][NP]> grad_s);
 
-template<typename MemSpaceIn, typename MemSpaceOut>
-void divergence_sphere (const ExecViewUnmanaged<Real[2][NP][NP]> v,
-                        const Control& data,
-                        const ExecViewUnmanaged<Real[NP][NP]> metDet,
-                        const ExecViewUnmanaged<Real[2][2][NP][NP]> DInv,
-                        ExecViewUnmanaged<Real[NP][NP]> div_v);
+KOKKOS_INLINE_FUNCTION void
+divergence_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                  const ExecViewUnmanaged<const Real[2][NP][NP]> v,
+                  const Control &data,
+                  const ExecViewUnmanaged<const Real[NP][NP]> metDet,
+                  const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                  ExecViewUnmanaged<Real[NP][NP]> div_v);
 
-template<typename MemSpaceIn, typename MemSpaceOut>
-KOKKOS_INLINE_FUNCTION
-void divergence_sphere (const Kokkos::TeamPolicy<>::member_type &team,
-                        const ViewType<Real[2][NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> v,
-                        const Control& data,
-                        const ExecViewUnmanaged<Real[NP][NP]> metDet,
-                        const ExecViewUnmanaged<Real[2][2][NP][NP]> DInv,
-                        ViewType<Real[NP][NP],MemSpaceOut,Kokkos::MemoryUnmanaged> div_v);
+KOKKOS_INLINE_FUNCTION void
+vorticity_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                 const ExecViewUnmanaged<const Real[NP][NP]> u,
+                 const ExecViewUnmanaged<const Real[NP][NP]> v,
+                 const Control &data,
+                 const ExecViewUnmanaged<const Real[NP][NP]> metDet,
+                 const ExecViewUnmanaged<const Real[2][2][NP][NP]> D,
+                 ExecViewUnmanaged<Real[NP][NP]> vort);
 
-template<typename MemSpaceIn, typename MemSpaceOut>
-void vorticity_sphere (const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> u,
-                       const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> v,
-                       const Control& data,
-                       const ExecViewUnmanaged<Real[NP][NP]> metDet,
-                       const ExecViewUnmanaged<Real[2][2][NP][NP]> D,
-                       ViewType<Real[NP][NP],MemSpaceOut,Kokkos::MemoryUnmanaged> vort);
-
-template<typename MemSpaceIn, typename MemSpaceOut>
-KOKKOS_INLINE_FUNCTION
-void vorticity_sphere (const Kokkos::TeamPolicy<>::member_type &team,
-                       const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> u,
-                       const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> v,
-                       const Control& data,
-                       const ExecViewUnmanaged<Real[NP][NP]> metDet,
-                       const ExecViewUnmanaged<Real[2][2][NP][NP]> D,
-                       ViewType<Real[NP][NP],MemSpaceOut,Kokkos::MemoryUnmanaged> vort);
-
-// ==================================== IMPLEMENTATION =================================== //
-
-template<typename MemSpaceIn, typename MemSpaceOut>
-void gradient_sphere (const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> s,
-                      const Control& data,
-                      const ExecViewUnmanaged<Real[2][2][NP][NP]> DInv,
-                      ViewType<Real[2][NP][NP],MemSpaceOut,Kokkos::MemoryUnmanaged> grad_s)
-{
-  Real rrearth = PhysicalConstants::rrearth;
-
-  Real dsdx, dsdy;
-  Real v1[NP][NP];
-  Real v2[NP][NP];
-  for (int j=0; j<NP; ++j)
-  {
-    for (int l=0; l<NP; ++l)
-    {
-      dsdx = dsdy = 0;
-      for (int i=0; i<NP; ++i)
-      {
-        dsdx += data.dvv(i, l)*s(i,j);
-        dsdy += data.dvv(i, l)*s(j,i);
-      }
-
-      v1[l][j] = dsdx * rrearth;
-      v2[j][l] = dsdy * rrearth;
-    }
-  }
-
-  for (int j=0; j<NP; ++j)
-  {
-    for (int i=0; i<NP; ++i)
-    {
-      grad_s(0, i, j) = DInv(0,0,i,j)*v1[i][j]+ DInv(1,0,i,j)*v2[i][j];
-      grad_s(1, i, j) = DInv(0,1,i,j)*v1[i][j]+ DInv(1,1,i,j)*v2[i][j];
-    }
-  }
-}
+// IMPLEMENTATION
 
 // Note that gradient_sphere requires scratch space of 2 x NP x NP Reals
 // This must be called from the device space
-template<typename MemSpaceIn, typename MemSpaceOut>
-KOKKOS_INLINE_FUNCTION
-void gradient_sphere (const Kokkos::TeamPolicy<>::member_type &team,
-                      const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> s,
-                      const Control& data,
-                      ScratchMemoryDefs::CAARS_ScratchManager& scratch_manager,
-                      const ExecViewUnmanaged<Real[2][2][NP][NP]> DInv,
-                      ViewType<Real[2][NP][NP],MemSpaceOut,Kokkos::MemoryUnmanaged> grad_s)
-{
-  Real rrearth = PhysicalConstants::rrearth;
-
-  ScratchView<Real[2][NP][NP]> v(scratch_manager.get_thread_scratch<ID_2D_VECTOR,0>(team.team_rank()));
-  constexpr const int contra_iters = NP * NP;
+KOKKOS_INLINE_FUNCTION void
+gradient_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                const ExecViewUnmanaged<const Real[NP][NP]> scalar,
+                const Control &data,
+                const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                ExecViewUnmanaged<Real[2][NP][NP]> grad_s) {
+  Real _tmp_viewbuf[2][NP][NP];
+  ExecViewUnmanaged<Real[2][NP][NP]> v(&_tmp_viewbuf[0][0][0]);
+  constexpr int contra_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, contra_iters),
                        [&](const int loop_idx) {
     const int j = loop_idx / NP;
     const int l = loop_idx % NP;
-    Real dsdx, dsdy;
-    dsdx = dsdy = 0;
-    for (int i=0; i<NP; ++i)
-    {
-      dsdx += data.dvv(i, l)*s(i,j);
-      dsdy += data.dvv(i, l)*s(j,i);
+    Real dsdx(0), dsdy(0);
+    for (int i = 0; i < NP; ++i) {
+      dsdx += data.dvv(i, l) * scalar(i, j);
+      dsdy += data.dvv(i, l) * scalar(j, i);
     }
 
-    v(0, l, j) = dsdx * rrearth;
-    v(1, j, l) = dsdy * rrearth;
+    v(0, l, j) = dsdx * PhysicalConstants::rrearth;
+    v(1, j, l) = dsdy * PhysicalConstants::rrearth;
   });
 
-  constexpr const int grad_iters = NP * NP;
+  constexpr int grad_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, grad_iters),
                        KOKKOS_LAMBDA(const int loop_idx) {
-    const int j = loop_idx % NP;
     const int i = loop_idx / NP;
-    grad_s(0, i, j) = DInv(0,0,i,j) * v(0, i, j) + DInv(1,0,i,j) * v(1, i, j); // Poor performance here
-    grad_s(1, i, j) = DInv(0,1,i,j) * v(0, i, j) + DInv(1,1,i,j) * v(1, i, j); // Poor performance here
+    const int j = loop_idx % NP;
+    grad_s(0, i, j) =
+        DInv(0, 0, i, j) * v(0, i, j) + DInv(1, 0, i, j) * v(1, i, j);
+    grad_s(1, i, j) =
+        DInv(0, 1, i, j) * v(0, i, j) + DInv(1, 1, i, j) * v(1, i, j);
   });
 }
 
-template<typename MemSpaceIn, typename MemSpaceOut>
-void divergence_sphere (const ViewType<Real[2][NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> v,
-                        const Control& data,
-                        const ExecViewUnmanaged<Real[NP][NP]> metDet,
-                        const ExecViewUnmanaged<Real[2][2][NP][NP]> DInv,
-                        ViewType<Real[NP][NP],MemSpaceOut,Kokkos::MemoryUnmanaged> div_v)
-{
-  Real rrearth = PhysicalConstants::rrearth;
-
-  Real gv[2][NP][NP];
-  for (int igp=0; igp<NP; ++igp)
-  {
-    for (int jgp=0; jgp<NP; ++jgp)
-    {
-      gv[0][igp][jgp] = metDet(igp,jgp) * ( DInv(0,0,igp,jgp)*v(0,igp,jgp) + DInv(0,1,igp,jgp)*v(1,igp,jgp) );
-      gv[1][igp][jgp] = metDet(igp,jgp) * ( DInv(1,0,igp,jgp)*v(0,igp,jgp) + DInv(1,1,igp,jgp)*v(1,igp,jgp) );
+KOKKOS_INLINE_FUNCTION void
+gradient_sphere_update(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                       const ExecViewUnmanaged<const Real[NP][NP]> scalar,
+                       const Control &data,
+                       const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                       ExecViewUnmanaged<Real[2][NP][NP]> grad_s) {
+  Real _tmp_viewbuf[2][NP][NP];
+  ExecViewUnmanaged<Real[2][NP][NP]> v(&_tmp_viewbuf[0][0][0]);
+  constexpr int contra_iters = NP * NP;
+  Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, contra_iters),
+                       [&](const int loop_idx) {
+    const int j = loop_idx / NP;
+    const int l = loop_idx % NP;
+    Real dsdx(0), dsdy(0);
+    for (int i = 0; i < NP; ++i) {
+      dsdx += data.dvv(i, l) * scalar(i, j);
+      dsdy += data.dvv(i, l) * scalar(j, i);
     }
-  }
 
-  Real dudx, dvdy;
-  for (int igp=0; igp<NP; ++igp)
-  {
-    for (int jgp=0; jgp<NP; ++jgp)
-    {
-      dudx = dvdy = 0.;
-      for (int kgp=0; kgp<NP; ++kgp)
-      {
-        dudx += data.dvv(kgp, igp) * gv[0][kgp][jgp];
-        dvdy += data.dvv(kgp, jgp) * gv[1][igp][kgp];
-      }
+    v(0, l, j) = dsdx * PhysicalConstants::rrearth;
+    v(1, j, l) = dsdy * PhysicalConstants::rrearth;
+  });
 
-      div_v(igp,jgp) = rrearth * (dudx + dvdy) / metDet(igp,jgp);
-    }
-  }
+  constexpr int grad_iters = NP * NP;
+  Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, grad_iters),
+                       KOKKOS_LAMBDA(const int loop_idx) {
+    const int i = loop_idx / NP;
+    const int j = loop_idx % NP;
+    grad_s(0, i, j) +=
+        (DInv(0, 0, i, j) * v(0, i, j) + DInv(1, 0, i, j) * v(1, i, j));
+    grad_s(1, i, j) +=
+        (DInv(0, 1, i, j) * v(0, i, j) + DInv(1, 1, i, j) * v(1, i, j));
+  });
 }
 
-// Note that divergence_sphere requires scratch space of NP x NP Reals
+// Note that divergence_sphere requires scratch space of 2 x NP x NP Reals
 // This must be called from the device space
-template<typename MemSpaceIn, typename MemSpaceOut>
-KOKKOS_INLINE_FUNCTION
-void divergence_sphere (const Kokkos::TeamPolicy<>::member_type &team,
-                        const ViewType<Real[2][NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> v,
-                        const Control& data,
-                        const ExecViewUnmanaged<Real[NP][NP]> metDet,
-                        const ExecViewUnmanaged<Real[2][2][NP][NP]> DInv,
-                        ViewType<Real[NP][NP],MemSpaceOut,Kokkos::MemoryUnmanaged> div_v)
-{
-  Real rrearth = PhysicalConstants::rrearth;
-
-  Real gv[2][NP][NP];
-  constexpr const int contra_iters = NP * NP * 2;
+KOKKOS_INLINE_FUNCTION void
+divergence_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                  const ExecViewUnmanaged<const Real[2][NP][NP]> v,
+                  const Control &data,
+                  const ExecViewUnmanaged<const Real[NP][NP]> metDet,
+                  const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                  ExecViewUnmanaged<Real[NP][NP]> div_v) {
+  Real _tmp_viewbuf[2][NP][NP];
+  ExecViewUnmanaged<Real[2][NP][NP]> gv(&_tmp_viewbuf[0][0][0]);
+  constexpr int contra_iters = NP * NP * 2;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, contra_iters),
                        [&](const int loop_idx) {
     const int igp = loop_idx / 2 / NP;
     const int jgp = (loop_idx / 2) % NP;
     const int kgp = loop_idx % 2;
-    gv[kgp][igp][jgp] = metDet(igp,jgp) * ( DInv(kgp,0,igp,jgp)*v(0,igp,jgp) + DInv(kgp,1,igp,jgp)*v(1,igp,jgp) );
+    gv(kgp, igp, jgp) =
+        metDet(igp, jgp) * (DInv(kgp, 0, igp, jgp) * v(0, igp, jgp) +
+                            DInv(kgp, 1, igp, jgp) * v(1, igp, jgp));
   });
 
-  Real dudx, dvdy;
-  constexpr const int div_iters = NP * NP;
+  constexpr int div_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, div_iters),
                        [&](const int loop_idx) {
     const int igp = loop_idx / NP;
     const int jgp = loop_idx % NP;
-    dudx = dvdy = 0.;
-    for (int kgp=0; kgp<NP; ++kgp)
-    {
-      dudx += data.dvv(kgp, igp) * gv[0][kgp][jgp];
-      dvdy += data.dvv(kgp, jgp) * gv[1][igp][kgp];
+    Real dudx = 0.0, dvdy = 0.0;
+    for (int kgp = 0; kgp < NP; ++kgp) {
+      dudx += data.dvv(kgp, igp) * gv(0, kgp, jgp);
+      dvdy += data.dvv(kgp, jgp) * gv(1, igp, kgp);
     }
 
-    div_v(igp,jgp) = rrearth * (dudx + dvdy) / metDet(igp,jgp);
+    div_v(igp, jgp) =
+        PhysicalConstants::rrearth * (dudx + dvdy) / metDet(igp, jgp);
   });
-}
-
-template<typename MemSpaceIn, typename MemSpaceOut>
-void vorticity_sphere (const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> u,
-                       const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> v,
-                       const Control& data,
-                       const ExecViewUnmanaged<Real[NP][NP]> metDet,
-                       const ExecViewUnmanaged<Real[2][2][NP][NP]> D,
-                       ViewType<Real[NP][NP],MemSpaceOut,Kokkos::MemoryUnmanaged> vort)
-{
-  Real rrearth = PhysicalConstants::rrearth;
-
-  Real vcov[2][NP][NP];
-  for (int igp=0; igp<NP; ++igp)
-  {
-    for (int jgp=0; jgp<NP; ++jgp)
-    {
-      vcov[0][igp][jgp] = D(0,0,igp,jgp)*u(igp,jgp) + D(1,0,igp,jgp)*v(igp,jgp);
-      vcov[1][igp][jgp] = D(0,1,igp,jgp)*u(igp,jgp) + D(1,1,igp,jgp)*v(igp,jgp);
-    }
-  }
-
-  Real dudy, dvdx;
-  for (int igp=0; igp<NP; ++igp)
-  {
-    for (int jgp=0; jgp<NP; ++jgp)
-    {
-      dudy = dvdx = 0.;
-      for (int kgp=0; kgp<NP; ++kgp)
-      {
-        dvdx += data.dvv(kgp, igp) * vcov[1][kgp][jgp];
-        dudy += data.dvv(kgp, jgp) * vcov[0][igp][kgp];
-      }
-
-      vort(igp,jgp) = rrearth * (dvdx - dudy) / metDet(igp,jgp);
-    }
-  }
 }
 
 // Note that divergence_sphere requires scratch space of 3 x NP x NP Reals
 // This must be called from the device space
-template<typename MemSpaceIn, typename MemSpaceOut>
-KOKKOS_INLINE_FUNCTION
-void vorticity_sphere (const Kokkos::TeamPolicy<>::member_type &team,
-                       const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> u,
-                       const ViewType<Real[NP][NP],MemSpaceIn,Kokkos::MemoryUnmanaged> v,
-                       const Control& data,
-                       const ExecViewUnmanaged<Real[NP][NP]> metDet,
-                       const ExecViewUnmanaged<Real[2][2][NP][NP]> D,
-                       ViewType<Real[NP][NP],MemSpaceOut,Kokkos::MemoryUnmanaged> vort)
-{
-  Real rrearth = PhysicalConstants::rrearth;
-
-  Real vcov[2][NP][NP];
-  constexpr const int covar_iters = NP * NP;
+KOKKOS_INLINE_FUNCTION void
+vorticity_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
+                 const ExecViewUnmanaged<const Real[NP][NP]> u,
+                 const ExecViewUnmanaged<const Real[NP][NP]> v,
+                 const Control &data,
+                 const ExecViewUnmanaged<const Real[NP][NP]> metDet,
+                 const ExecViewUnmanaged<const Real[2][2][NP][NP]> D,
+                 ExecViewUnmanaged<Real[NP][NP]> vort) {
+  Real _tmp_viewbuf[2][NP][NP];
+  ExecViewUnmanaged<Real[2][NP][NP]> vcov(&_tmp_viewbuf[0][0][0]);
+  constexpr int covar_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, covar_iters),
                        [&](const int loop_idx) {
     const int igp = loop_idx / NP;
     const int jgp = loop_idx % NP;
-    vcov[0][igp][jgp] = D(0,0,igp,jgp)*u(igp,jgp) + D(1,0,igp,jgp)*v(igp,jgp);
-    vcov[1][igp][jgp] = D(0,1,igp,jgp)*u(igp,jgp) + D(1,1,igp,jgp)*v(igp,jgp);
+    vcov(0, igp, jgp) =
+        D(0, 0, igp, jgp) * u(igp, jgp) + D(1, 0, igp, jgp) * v(igp, jgp);
+    vcov(1, igp, jgp) =
+        D(0, 1, igp, jgp) * u(igp, jgp) + D(1, 1, igp, jgp) * v(igp, jgp);
   });
 
-  Real dudy, dvdx;
-  constexpr const int vort_iters = NP * NP;
+  constexpr int vort_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, vort_iters),
                        [&](const int loop_idx) {
     const int igp = loop_idx / NP;
     const int jgp = loop_idx % NP;
-    dudy = dvdx = 0.;
-    for (int kgp=0; kgp<NP; ++kgp)
-    {
-      dvdx += data.dvv(kgp, igp) * vcov[1][kgp][jgp];
-      dudy += data.dvv(kgp, jgp) * vcov[0][igp][kgp];
+    Real dudy = 0.0, dvdx = 0.0;
+    for (int kgp = 0; kgp < NP; ++kgp) {
+      dvdx += data.dvv(kgp, igp) * vcov(1, kgp, jgp);
+      dudy += data.dvv(kgp, jgp) * vcov(0, igp, kgp);
     }
 
-    vort(igp,jgp) = rrearth * (dvdx - dudy) / metDet(igp,jgp);
+    vort(igp, jgp) =
+        PhysicalConstants::rrearth * (dvdx - dudy) / metDet(igp, jgp);
   });
 }
 

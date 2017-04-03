@@ -16,8 +16,8 @@ void gradient_sphere (const real* const s, const TestData& data,
   real* Dinv = SLICE_5D (data.arrays.elem_Dinv,ielem,np,np,2,2);
 
   real dsdx, dsdy;
-  real v1[np][np];
-  real v2[np][np];
+  real* v1 = data.arrays.scratch_2d_0;//[np][np];
+  real* v2 = data.arrays.scratch_2d_1;//[np][np];
   for (int j=0; j<np; ++j)
   {
     for (int l=0; l<np; ++l)
@@ -29,8 +29,8 @@ void gradient_sphere (const real* const s, const TestData& data,
         dsdy += Dvv[i][l]*AT_2D(s,j,i,np);
       }
 
-      v1[l][j] = dsdx * rrearth;
-      v2[j][l] = dsdy * rrearth;
+      AT_2D(v1,l,j,np) = dsdx * rrearth;
+      AT_2D(v2,j,l,np) = dsdy * rrearth;
     }
   }
 
@@ -38,11 +38,11 @@ void gradient_sphere (const real* const s, const TestData& data,
   {
     for (int i=0; i<np; ++i)
     {
-      AT_3D (ds, i, j, 0, np, 2) = AT_4D(Dinv,i,j,0,0,np,2,2)*v1[i][j]
-                                 + AT_4D(Dinv,i,j,1,0,np,2,2)*v2[i][j];
+      AT_3D (ds, i, j, 0, np, 2) = AT_4D(Dinv,i,j,0,0,np,2,2)*AT_2D(v1,i,j,np)
+                                 + AT_4D(Dinv,i,j,1,0,np,2,2)*AT_2D(v2,i,j,np);
 
-      AT_3D (ds, i, j, 1, np, 2) = AT_4D(Dinv,i,j,0,1,np,2,2)*v1[i][j]
-                                 + AT_4D(Dinv,i,j,1,1,np,2,2)*v2[i][j];
+      AT_3D (ds, i, j, 1, np, 2) = AT_4D(Dinv,i,j,0,1,np,2,2)*AT_2D(v1,i,j,np)
+                                 + AT_4D(Dinv,i,j,1,1,np,2,2)*AT_2D(v2,i,j,np);
     }
   }
 }
@@ -59,15 +59,17 @@ void divergence_sphere (const real* const v, const TestData& data,
   real* metdet  = SLICE_3D (data.arrays.elem_metdet,ielem,np,np);
   real* rmetdet = SLICE_3D (data.arrays.elem_rmetdet,ielem,np,np);
 
-  real gv[np][np][2];
+//  real gv[np][np][2];
+  real* gv1 = data.arrays.scratch_2d_0;//[np][np];
+  real* gv2 = data.arrays.scratch_2d_1;//[np][np];
   for (int igp=0; igp<np; ++igp)
   {
     for (int jgp=0; jgp<np; ++jgp)
     {
-      gv[igp][jgp][0] = AT_2D(metdet,igp,jgp,np)* ( AT_4D(Dinv,igp,jgp,0,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
-                                                   +AT_4D(Dinv,igp,jgp,0,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2) );
-      gv[igp][jgp][1] = AT_2D(metdet,igp,jgp,np)* ( AT_4D(Dinv,igp,jgp,1,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
-                                                   +AT_4D(Dinv,igp,jgp,1,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2) );
+      AT_2D(gv1,igp,jgp,np) = AT_2D(metdet,igp,jgp,np)* ( AT_4D(Dinv,igp,jgp,0,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
+                                                         +AT_4D(Dinv,igp,jgp,0,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2) );
+      AT_2D(gv2,igp,jgp,np) = AT_2D(metdet,igp,jgp,np)* ( AT_4D(Dinv,igp,jgp,1,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
+                                                         +AT_4D(Dinv,igp,jgp,1,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2) );
     }
   }
 
@@ -79,8 +81,8 @@ void divergence_sphere (const real* const v, const TestData& data,
       dudx = dvdy = 0.;
       for (int kgp=0; kgp<np; ++kgp)
       {
-        dudx += Dvv[kgp][igp] * gv[kgp][jgp][0];
-        dvdy += Dvv[kgp][jgp] * gv[igp][kgp][1];
+        dudx += Dvv[kgp][igp] * AT_2D(gv1,kgp,jgp,np);//gv[kgp][jgp][0];
+        dvdy += Dvv[kgp][jgp] * AT_2D(gv2,igp,kgp,np);//gv[igp][kgp][1];
       }
 
       AT_2D(div,igp,jgp,np) = (dudx + dvdy) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
@@ -99,15 +101,17 @@ void vorticity_sphere (const real* const v, const TestData& data,
   real* D       = SLICE_5D (data.arrays.elem_D,ielem,np,np,2,2);
   real* rmetdet = SLICE_3D (data.arrays.elem_rmetdet,ielem,np,np);
 
-  real vcov[np][np][2];
+  //real vcov[np][np][2];
+  real* vcov1 = data.arrays.scratch_2d_0;//[np][np];
+  real* vcov2 = data.arrays.scratch_2d_1;//[np][np];
   for (int igp=0; igp<np; ++igp)
   {
     for (int jgp=0; jgp<np; ++jgp)
     {
-      vcov[igp][jgp][0] = AT_4D(D,igp,jgp,0,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
-                        + AT_4D(D,igp,jgp,1,0,np,2,2)*AT_3D(v,igp,jgp,1,np,2);
-      vcov[igp][jgp][1] = AT_4D(D,igp,jgp,0,1,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
-                        + AT_4D(D,igp,jgp,1,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2);
+      AT_2D(vcov1,igp,jgp,np) = AT_4D(D,igp,jgp,0,0,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
+                              + AT_4D(D,igp,jgp,1,0,np,2,2)*AT_3D(v,igp,jgp,1,np,2);
+      AT_2D(vcov2,igp,jgp,np) = AT_4D(D,igp,jgp,0,1,np,2,2)*AT_3D(v,igp,jgp,0,np,2)
+                              + AT_4D(D,igp,jgp,1,1,np,2,2)*AT_3D(v,igp,jgp,1,np,2);
     }
   }
 
@@ -119,8 +123,8 @@ void vorticity_sphere (const real* const v, const TestData& data,
       dudy = dvdx = 0.;
       for (int kgp=0; kgp<np; ++kgp)
       {
-        dvdx += Dvv[kgp][igp] * vcov[kgp][jgp][1];
-        dudy += Dvv[kgp][jgp] * vcov[igp][kgp][0];
+        dvdx += Dvv[kgp][igp] * AT_2D(vcov2,kgp,jgp,np);//vcov[kgp][jgp][1];
+        dudy += Dvv[kgp][jgp] * AT_2D(vcov1,igp,kgp,np);//vcov[igp][kgp][0];
       }
 
       AT_2D(vort,igp,jgp,np) = (dvdx - dudy) * AT_2D(rmetdet,igp,jgp,np) * rrearth;
