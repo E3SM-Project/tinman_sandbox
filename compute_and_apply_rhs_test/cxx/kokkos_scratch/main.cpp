@@ -9,6 +9,8 @@
 #include <cstring>
 #include <memory>
 
+#include <cuda_profiler_api.h>
+
 bool is_unsigned_int(const char* str)
 {
   const size_t len = strlen (str);
@@ -89,25 +91,24 @@ void run_simulation(int num_elems, int num_exec, bool dump_results) {
   TinMan::Control data(num_elems);
   TinMan::Region region(num_elems);
 
-  // Print norm of initial states, to check we are using same data in all tests
-  print_results_2norm(data, region);
-
-  std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
-
   // Burn in before timing to reduce cache effect
   TinMan::compute_and_apply_rhs(data, region);
   TinMan::ExecSpace::fence();
 
-  Timer::Timer global_timer;
-  global_timer.startTimer();
-  for (int i=0; i<num_exec; ++i)
+  std::vector<Timer::Timer> timers(num_exec);
+  for (Timer::Timer t : timers)
   {
     //region.next_compute_apply_rhs();
+    t.startTimer();
     TinMan::compute_and_apply_rhs(data, region);
+    t.stopTimer();
   }
-  global_timer.stopTimer();
 
-  std::cout << "   ---> compute_and_apply_rhs execution total time: " << global_timer << "\n";
+  int id = 0;
+  for (Timer::Timer t : timers) {
+    std::cout << id << "  " << t << "\n";
+    id++;
+  }
 
 //  for(int i = 0; i < num_exec; ++i) {
 //    std::cout << timers[i] << std::endl;
@@ -137,7 +138,9 @@ int main (int argc, char** argv)
 
   TinMan::ExecSpace::print_configuration(std::cout,true);
 
+  cudaProfilerStop();
   run_simulation(num_elems, num_exec, dump_results);
+  cudaProfilerStop();
 
   Kokkos::finalize ();
   return 0;
