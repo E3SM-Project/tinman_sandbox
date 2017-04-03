@@ -300,16 +300,14 @@ struct update_state {
     //       points within a level before the gradient is complete!
 
     Kokkos::single(Kokkos::PerTeam(team), [&]() {
-      Real _tmp_viewptr[2][NP][NP];
-      ExecViewUnmanaged<Real[NP][NP]> suml(&_tmp_viewptr[0][0][0]);
-      ExecViewUnmanaged<Real[2][NP][NP]> grad_p(&_tmp_viewptr[1][0][0]);
+      Real _tmp_viewptr_1[NP][NP];
+      ExecViewUnmanaged<Real[NP][NP]> suml(&_tmp_viewptr_1[0][0]);
+      Real _tmp_viewptr_2[2][NP][NP];
+      ExecViewUnmanaged<Real[2][NP][NP]> grad_p(&_tmp_viewptr_2[0][0][0]);
 
-      preq_omega_ps_init(team, c_dinv, div_vdp, grad_p, pressure,
-                         suml);
-      preq_omega_ps_loop(team, c_dinv, div_vdp, grad_p, pressure,
-                         suml);
-      preq_omega_ps_tail(team, c_dinv, div_vdp, grad_p, pressure,
-                         suml);
+      preq_omega_ps_init(team, c_dinv, div_vdp, grad_p, pressure, suml);
+      preq_omega_ps_loop(team, c_dinv, div_vdp, grad_p, pressure, suml);
+      preq_omega_ps_tail(team, c_dinv, div_vdp, grad_p, pressure, suml);
     });
     team.team_barrier();
   }
