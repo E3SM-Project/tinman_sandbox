@@ -12,14 +12,20 @@ typedef double Real;
 // Selecting the execution space. If no specific request, use Kokkos default exec space
 #ifdef TINMAN_CUDA_SPACE
 using ExecSpace = Kokkos::Cuda;
+// CUDA Can't have less than 32 threads per warp or less than 1 warp per block
+static constexpr const int ThreadsPerTeam = 32;
 #elif defined(TINMAN_OPENMP_SPACE)
 using ExecSpace = Kokkos::OpenMP;
+constexpr const int ThreadsPerTeam = 1;
 #elif defined(TINMAN_THREADS_SPACE)
 using ExecSpace = Kokkos::Threads;
+constexpr const int ThreadsPerTeam = 1;
 #elif defined(TINMAN_SERIAL_SPACE)
 using ExecSpace = Kokkos::Serial;
+constexpr const int ThreadsPerTeam = 1;
 #elif defined(TINMAN_DEFAULT_SPACE)
 using ExecSpace = Kokkos::DefaultExecutionSpace::execution_space;
+constexpr const int ThreadsPerTeam = 1;
 #else
 #error "No valid execution space choice"
 #endif

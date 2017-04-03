@@ -654,7 +654,7 @@ struct update_state {
 
 void compute_and_apply_rhs(const Control &data, Region &region) {
   update_state f(data, region);
-  Kokkos::parallel_for(Kokkos::TeamPolicy<ExecSpace>(data.num_elems(), 32), f);
+  Kokkos::parallel_for(Kokkos::TeamPolicy<ExecSpace>(data.num_elems(), ThreadsPerTeam), f);
   ExecSpace::fence();
 }
 
