@@ -1,0 +1,35 @@
+#!/usr/bin/sh
+#
+#BSUB -n 1        
+#BSUB -W 12:00  
+#BSUB -P tm_perf_eval
+#BSUB -o perf_test.log
+#BSUB -o perf_test.err
+
+pointers='./pointers_only/pointers_only'
+kokkos='./kokkos_scratch/kokkos-scratch'
+
+for lev_idx in `seq 0 4`; do
+    for base in 64 72; do
+	num_lev=$((base*2**lev_idx))
+	sed -i "s:PLEV [0-9]*:PLEV ${num_lev}:" ../../../compute_and_apply_rhs_test/config.h.in
+	sed -i "s:NUM_LEV \( *[= ] \)[0-9]*:NUM_LEV \1${num_lev}:" ../../../compute_and_apply_rhs_test/cxx/kokkos_scratch/Dimensions.hpp
+	echo Building with ${num_lev} levels
+	cd ../../
+	make -j16 `basename ${kokkos}` & make -j16 `basename ${pointers}`
+	cd compute_and_apply_rhs_test/cxx
+	for impl in $pointers $kokkos; do
+	    for nelem in `seq 500 50 600`; do
+		for nthreads in `seq 1 32`; do
+		    for vector_idx in `seq 0 5`; do
+			# The minimum statistically "large" value
+			nexec=30
+			nvectors=$((2**${vector_idx}))
+			echo ${impl} --tinman-num-elems=${nelem} --tinman-num-exec=${nexec} --tinman-threads=${nthreads} --tinman-vectors=${nvectors}
+			${impl} --tinman-num-elems=${nelem} --tinman-num-exec=${nexec} --tinman-threads=${nthreads} --tinman-vectors=${nvectors} > performance/`basename ${impl}`.level_${num_lev}.exec_${nexec}.elem_${nelem}.threads_${nthreads}.vectors_${nvectors}
+		    done
+		done
+	    done
+	done
+    done
+done
