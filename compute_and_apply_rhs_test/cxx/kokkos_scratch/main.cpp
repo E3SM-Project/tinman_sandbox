@@ -106,15 +106,18 @@ void run_simulation(int num_elems, int num_exec, bool dump_results, int threads,
   TinMan::Control data(num_elems);
   TinMan::Region region(num_elems);
 
+  std::vector<Timer::Timer> timers(num_exec);
   // Burn in before timing to reduce cache effect
+  timers[0].startTimer();
   TinMan::compute_and_apply_rhs(data, region, threads, vectors);
+  timers[0].stopTimer();
   TinMan::ExecSpace::fence();
 
-  std::vector<Timer::Timer> timers(num_exec);
   for (Timer::Timer t : timers) {
-    // region.next_compute_apply_rhs();
+    region.next_compute_apply_rhs();
     t.startTimer();
     TinMan::compute_and_apply_rhs(data, region, threads, vectors);
+
     t.stopTimer();
   }
 
@@ -123,6 +126,14 @@ void run_simulation(int num_elems, int num_exec, bool dump_results, int threads,
     std::cout << id << "  " << t << "\n";
     id++;
   }
+  print_results_2norm(data, region);
+  // ||v||_2  = 6756166.17359074
+  // ||T||_2  = 5594554.09064558
+  // ||dp||_2 = 4947346.82471321
+
+  // ||v||_2  = 6756166.17359074
+  // ||T||_2  = 5594554.09064558
+  // ||dp||_2 = 4947346.82471321
 }
 
 int main(int argc, char **argv) {

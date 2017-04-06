@@ -106,15 +106,17 @@ int main (int argc, char** argv)
   std::vector<Timer::Timer> timers(num_exec);
   for (int i=0; i<num_exec; ++i)
   {
+    data.update_time_levels();
     timers[i].startTimer();
     compute_and_apply_rhs(data);
-    //data.update_time_levels();
     timers[i].stopTimer();
   }
 
   for(int i = 0; i < num_exec; ++i) {
     std::cout << i << "  " << timers[i] << std::endl;
   }
+
+  print_results_2norm(data);
 
   data.cleanup_data ();
 
