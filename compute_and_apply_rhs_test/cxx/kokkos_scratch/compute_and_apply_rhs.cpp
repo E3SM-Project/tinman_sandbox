@@ -24,8 +24,7 @@ struct update_state {
   // Depends on PHI (after preq_hydrostatic), PECND
   // Modifies Ephi_grad
   KOKKOS_INLINE_FUNCTION void
-  compute_energy_grad(TeamPolicy &team,
-                      const int ilev,
+  compute_energy_grad(TeamPolicy &team, const int ilev,
                       ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
                       ExecViewUnmanaged<Real[2][NP][NP]> Ephi_grad) const {
     const int ie = team.league_rank();
@@ -304,12 +303,9 @@ struct update_state {
       ExecViewUnmanaged<Real[NP][NP]> suml(&_tmp_viewptr[0][0][0]);
       ExecViewUnmanaged<Real[2][NP][NP]> grad_p(&_tmp_viewptr[1][0][0]);
 
-      preq_omega_ps_init(team, c_dinv, div_vdp, grad_p, pressure,
-                         suml);
-      preq_omega_ps_loop(team, c_dinv, div_vdp, grad_p, pressure,
-                         suml);
-      preq_omega_ps_tail(team, c_dinv, div_vdp, grad_p, pressure,
-                         suml);
+      preq_omega_ps_init(team, c_dinv, div_vdp, grad_p, pressure, suml);
+      preq_omega_ps_loop(team, c_dinv, div_vdp, grad_p, pressure, suml);
+      preq_omega_ps_tail(team, c_dinv, div_vdp, grad_p, pressure, suml);
     });
     team.team_barrier();
   }
@@ -601,14 +597,16 @@ struct update_state {
   }
 
   KOKKOS_INLINE_FUNCTION
-  size_t shmem_size(const int team_size) const {
-    return 0;
-  }
+  size_t shmem_size(const int team_size) const { return 0; }
 };
 
-void compute_and_apply_rhs(const Control &data, Region &region) {
+void compute_and_apply_rhs(const Control &data, Region &region,
+                           int threads_per_team, int vectors_per_thread) {
   update_state f(data, region);
-  Kokkos::parallel_for(Kokkos::TeamPolicy<ExecSpace>(data.num_elems(), ThreadsPerTeam), f);
+  Kokkos::parallel_for(Kokkos::TeamPolicy<ExecSpace>(data.num_elems(),
+                                                     threads_per_team,
+                                                     vectors_per_thread),
+                       f);
   ExecSpace::fence();
 }
 
