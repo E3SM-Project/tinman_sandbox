@@ -139,14 +139,13 @@ struct update_state {
     });
   }
 
-  // For each thread, requires 0 Scratch Memory
-  // Depends on PHIS, DP3D, PHI, T_v
+  // Depends on PHIS, DP3D, PHI, pressure, T_v
   // Modifies PHI
   KOKKOS_INLINE_FUNCTION
-  void
-  preq_hydrostatic(const TeamPolicy &team,
-                   const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure,
-                   const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v) const {
+  void preq_hydrostatic(
+      const TeamPolicy &team,
+      const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> pressure,
+      const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> T_v) const {
     const int ie = team.league_rank();
 
     ExecViewUnmanaged<const Real[NP][NP]> phis = m_region.PHIS(ie);
@@ -346,6 +345,19 @@ struct update_state {
   }
 
   KOKKOS_INLINE_FUNCTION
+  void compute_pressure_omegap_phis(
+      const TeamPolicy &team,
+      const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
+      const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp,
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p,
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure) {
+    Kokkos::single(Kokkos::PerTeam(team), KOKKOS_LAMBDA() {
+      for (int ilev = 0; ilev < NUM_LEV; ilev++) {
+      }
+    });
+  }
+
+  KOKKOS_INLINE_FUNCTION
   void compute_temperature_no_tracers_helper(
       TeamPolicy team, int ilev,
       ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v) const {
@@ -378,9 +390,52 @@ struct update_state {
     });
   }
 
+  // Depends on DERIVED_UN0, DERIVED_VN0, METDET, DINV
+  // Initializes div_vdp, which is used 2 times afterwards
+  // Modifies DERIVED_UN0, DERIVED_VN0
+  // Requires NUM_LEV * 5 * NP * NP
   KOKKOS_INLINE_FUNCTION
-  void compute_temperature(TeamPolicy team,
-                           ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v) const {
+  void compute_div_vdp(TeamPolicy team, int ilev,
+                       const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
+                       ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp) const {
+    const int ie = team.league_rank();
+
+    // Create subviews to explicitly have static dimensions
+    ExecViewUnmanaged<Real[2][NP][NP]> vdp_ilev =
+        Kokkos::subview(m_data.vector_buf(team), ilev, Kokkos::ALL,
+                        Kokkos::ALL(), Kokkos::ALL());
+
+    Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
+                         [&](const int idx) {
+      const int igp = idx / NP;
+      const int jgp = idx % NP;
+      Real v1 = m_region.U_current(ie)(ilev, igp, jgp);
+      Real v2 = m_region.V_current(ie)(ilev, igp, jgp);
+
+      vdp_ilev(0, igp, jgp) = v1 * m_region.DP3D_current(ie)(ilev, igp, jgp);
+      vdp_ilev(1, igp, jgp) = v2 * m_region.DP3D_current(ie)(ilev, igp, jgp);
+
+      m_region.DERIVED_UN0_update(ie, ilev)(igp, jgp) =
+          m_region.DERIVED_UN0(ie, ilev)(igp, jgp) +
+          PhysicalConstants::eta_ave_w * vdp_ilev(0, igp, jgp);
+      m_region.DERIVED_VN0_update(ie, ilev)(igp, jgp) =
+          m_region.DERIVED_VN0(ie, ilev)(igp, jgp) +
+          PhysicalConstants::eta_ave_w * vdp_ilev(1, igp, jgp);
+    });
+
+    ExecViewUnmanaged<Real[NP][NP]> div_vdp_ilev =
+        Kokkos::subview(div_vdp, ilev, Kokkos::ALL(), Kokkos::ALL());
+    divergence_sphere(team, vdp_ilev, m_data, m_region.METDET(ie), c_dinv,
+                      div_vdp_ilev);
+  }
+
+  // Depends on T_current
+  // Might depend on QDP, DP3D_current
+  KOKKOS_INLINE_FUNCTION
+  void compute_temperature_div_vdp(
+      TeamPolicy team, const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv,
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v,
+      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp) const {
     if (m_data.qn0() == -1) {
       Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV),
                            KOKKOS_LAMBDA(const int ilev) {
@@ -392,6 +447,7 @@ struct update_state {
         compute_temperature_tracers_helper(team, ilev, T_v);
       });
     }
+    team.team_barrier();
   }
 
   // Requires 2 x NUM_LEV x NP x NP team memory
@@ -406,47 +462,11 @@ struct update_state {
                      ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v) const {
     const int ie = team.league_rank();
 
-    // Initialized in divergence_sphere
     // Used 2 times per index, 1 of which is in preq_omega_ps
     ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp = m_data.div_vdp(team);
-
-    // Depends on DERIVED_UN0, DERIVED_VN0, METDET, DINV
-    // Initializes div_vdp, which is used 2 times afterwards
-    // Modifies DERIVED_UN0, DERIVED_VN0
-    // Requires NUM_LEV * 5 * NP * NP
-    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV),
-                         [&](const int ilev) {
-
-      // Create subviews to explicitly have static dimensions
-      ExecViewUnmanaged<Real[2][NP][NP]> vdp_ilev =
-          Kokkos::subview(m_data.vector_buf(team), ilev, Kokkos::ALL,
-                          Kokkos::ALL(), Kokkos::ALL());
-
-      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                           [&](const int idx) {
-        const int igp = idx / NP;
-        const int jgp = idx % NP;
-        Real v1 = m_region.U_current(ie)(ilev, igp, jgp);
-        Real v2 = m_region.V_current(ie)(ilev, igp, jgp);
-
-        vdp_ilev(0, igp, jgp) = v1 * m_region.DP3D_current(ie)(ilev, igp, jgp);
-        vdp_ilev(1, igp, jgp) = v2 * m_region.DP3D_current(ie)(ilev, igp, jgp);
-
-        m_region.DERIVED_UN0_update(ie, ilev)(igp, jgp) =
-            m_region.DERIVED_UN0(ie, ilev)(igp, jgp) +
-            PhysicalConstants::eta_ave_w * vdp_ilev(0, igp, jgp);
-        m_region.DERIVED_VN0_update(ie, ilev)(igp, jgp) =
-            m_region.DERIVED_VN0(ie, ilev)(igp, jgp) +
-            PhysicalConstants::eta_ave_w * vdp_ilev(1, igp, jgp);
-      });
-
-      ExecViewUnmanaged<Real[NP][NP]> div_vdp_ilev =
-          Kokkos::subview(div_vdp, ilev, Kokkos::ALL(), Kokkos::ALL());
-      divergence_sphere(team, vdp_ilev, m_data, m_region.METDET(ie), c_dinv,
-                        div_vdp_ilev);
-    });
-
-    team.team_barrier();
+    Kokkos::parallel_for(
+        Kokkos::TeamThreadRange(team, NUM_LEV),
+        [&](const int ilev) { compute_div_vdp(team, ilev, c_dinv, div_vdp); });
 
     // TODO: Rename pressure after here to omega_p
     preq_omega_ps(team, c_dinv, div_vdp, pressure);
@@ -557,14 +577,12 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void init_const_cache(const TeamPolicy &team,
-                        ExecViewUnmanaged<Real[2][2][NP][NP]> c_dinv,
-                        ExecViewUnmanaged<Real[NP][NP]> c_dvv) const {
+                        ExecViewUnmanaged<Real[2][2][NP][NP]> c_dinv) const {
     const int ie = team.league_rank();
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                          KOKKOS_LAMBDA(int idx) {
       const int hgp = idx / NP;
       const int igp = idx % NP;
-      c_dvv(hgp, igp) = m_data.dvv(hgp, igp);
       for (int jgp = 0; jgp < 2; ++jgp) {
         for (int kgp = 0; kgp < 2; ++kgp) {
           c_dinv(jgp, kgp, hgp, igp) = m_region.DINV(ie)(jgp, kgp, hgp, igp);
@@ -573,21 +591,31 @@ struct update_state {
     });
   }
 
+  template <typename Data>
+  KOKKOS_INLINE_FUNCTION Real *scratch_to_ptr(TeamPolicy team) const {
+    ViewType<Data, ScratchMemSpace, Kokkos::MemoryUnmanaged> view(
+        team.team_scratch(0));
+    return view.data();
+  }
+
   KOKKOS_INLINE_FUNCTION
   void operator()(TeamPolicy team) const {
+    // Used 2 times per index, 1 of which is in preq_omega_ps
+    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp = m_data.div_vdp(team);
+
+    // Cache dinv, and dvv
+    Real *ptr = scratch_to_ptr<Real[2][2][NP][NP]>(team);
+    ExecViewUnmanaged<Real[2][2][NP][NP]> c_dinv(ptr);
+    ExecViewUnmanaged<const Real[NP][NP]> c_dvv = m_data.dvv();
+    init_const_cache(team, c_dinv);
+
+    // Used 3 times per index
+    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v = m_data.T_v(team);
+    compute_temperature_div_vdp(team, c_dinv, T_v, div_vdp);
 
     // Used 5 times per index - basically the most important variable
     ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure = m_data.pressure(team);
     compute_pressure(team, pressure);
-
-    // Cache dinv, and dvv
-    ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv =
-        m_region.DINV(team.league_rank());
-    ExecViewUnmanaged<const Real[NP][NP]> c_dvv = m_data.dvv();
-
-    // Used 3 times per index
-    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v = m_data.T_v(team);
-    compute_temperature(team, T_v);
 
     preq_hydrostatic(team, pressure, T_v);
     compute_velocity(team, pressure, c_dinv, T_v);
@@ -597,7 +625,9 @@ struct update_state {
   }
 
   KOKKOS_INLINE_FUNCTION
-  size_t shmem_size(const int team_size) const { return 0; }
+  size_t shmem_size(const int team_size) const {
+    return sizeof(Real[2][2][NP][NP]);
+  }
 };
 
 void compute_and_apply_rhs(const Control &data, Region &region,
