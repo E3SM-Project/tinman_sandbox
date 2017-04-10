@@ -79,10 +79,15 @@ print *, "Main: nelemd = ", nelemd
 !----------------- INITIALIZATION --------------------
 
   ! Derivative structure
-  Dvv_init(1:16) = (/ -3.0000000000000000_8, -0.80901699437494745_8,  0.30901699437494745_8, -0.5000000000000000_8, &
-                       4.0450849718747373_8,  0.00000000000000000_8, -1.11803398874989490_8,  1.5450849718747370_8, &
-                      -1.5450849718747370_8,  1.11803398874989490_8,  0.00000000000000000_8, -4.0450849718747373_8, &
-                       0.5000000000000000_8, -0.30901699437494745_8,  0.80901699437494745_8,  3.0000000000000000_8 /)
+
+  ! This is a douple-prec array init-ed with single prec values.
+  ! Since Ttest values were computed based on this init, switching to double
+  ! prec here would break tests (unless Ttest is recomputed).
+  Dvv_init(1:16) = (/ -3.0,  -0.80901699437494745,   0.30901699437494745, &
+  -0.50000000000000000 ,4.0450849718747373, 0.0, -1.1180339887498949, &
+   1.5450849718747370, -1.5450849718747370, 1.1180339887498949, &
+   0.0, -4.0450849718747373, 0.50, -0.30901699437494745, 0.80901699437494745, 3.0 /)
+
   do j =1 , np
    do i = 1, np
      deriv%Dvv(i,j) = Dvv_init((j-1)*np+i)
@@ -133,14 +138,14 @@ print *, "Main: nelemd = ", nelemd
       elem(ie)%state%v(i,j,2,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*3.0
       elem(ie)%state%T(i,j,k,1:timelevels) = 1000-kk-ii-jj+iee/10 + (/1,2,3/)
       elem(ie)%state%Qdp(i,j,k,1,qn0) = 1.0+SIN(ii*jj*kk)
-      elem(ie)%state%phis(i,j) = ii + jj
+      elem(ie)%state%phis(i,j) = 0.0d0
 #else
       ST( iXjXkXdpXdXie )   = 10*kk+iee+ii+jj + (/1,2,3/)
       ST( iXjXkXuXdXie )    = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*2.0
       ST( iXjXkXvXdXie )    = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*3.0
       ST( iXjXkXtXdXie )    = 1000-kk-ii-jj+iee/10 + (/1,2,3/)
       ST( iXjXkXqXdXie )    = 1.0+SIN(ii*jj*kk)
-      ST( iXjX1XphisX1Xie ) = ii + jj
+      ST( iXjX1XphisX1Xie ) = 0.0d0
 #endif
      enddo
     enddo
