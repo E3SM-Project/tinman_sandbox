@@ -19,8 +19,6 @@ implicit none
     read (arg, *)  nelemd
   endif
 
-  nlev = 256
-
   call main_body
 
 end program main
@@ -49,7 +47,9 @@ implicit none
   real (kind=real_kind) :: ii, jj, kk, iee
 
 ! local
-  real (kind=real_kind), pointer, dimension(:,:,:)   :: phi
+!  real (kind=real_kind), pointer, dimension(:,:,:)   :: phi
+  real (kind=real_kind),  dimension(np,np,nlev)   :: phi
+
   real (kind=real_kind), pointer, dimension(:,:,:)   :: dp
   real (kind=real_kind), dimension(np,np,nlev)   :: omega_p
   real (kind=real_kind), dimension(np,np,nlev)   :: T_v
@@ -189,14 +189,23 @@ print *, "Main: nelemd = ", nelemd
 !loop 1, like in caar
   call tick(start)
   do ind = 1, loopmax
+    do ie = nets, nete
+
 #if ORIG
 
 #else
-   p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + ST( dXdX1XdpXn0Xie  ) /2
+
+    phi = elem(ie)%derived%phi(:,:,:)
+    p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + ST( dXdX1XdpXn0Xie  ) /2
+    do k=2,nlev
+      p(:,:,k)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkXdpXn0Xie )/2
+    enddo
+
 #if HOMP
 !$omp parallel do private(k,i,j,v1,v2,Qt,eta_ave_w,E,Ephi)
 #endif
    do k=1,nlev
+
 !        tid = OMP_GET_THREAD_NUM()     
 !        print *, 'next loop: My tid is ', tid
      grad_p(:,:,:,k) = gradient_sphere(p(:,:,k),deriv,elem(ie)%Dinv)
@@ -204,10 +213,13 @@ print *, "Main: nelemd = ", nelemd
      rdp(:,:,k) = 1.0D0/ST( dXdXkXdpXn0Xie )
 
      vtemp1(:,:,:,k)   = gradient_sphere( ST( dXdXkXtXn0Xie ), deriv,elem(ie)%Dinv)
+
      do j=1,np
         do i=1,np
+
            v1 = ST( iXjXkXuXn0Xie )
            v2 = ST( iXjXkXvXn0Xie )
+
            vgrad_p(i,j,k) = (v1*grad_p(i,j,1,k) + v2*grad_p(i,j,2,k))
            vdp(i,j,1,k) = v1*ST( iXjXkXdpXn0Xie )
            vdp(i,j,2,k) = v2*ST( iXjXkXdpXn0Xie )
@@ -219,7 +231,6 @@ print *, "Main: nelemd = ", nelemd
            E = 0.5D0*( v1*v1 + v2*v2 )
            Ephi(i,j)=E+phi(i,j,k)+elem(ie)%derived%pecnd(i,j,k)
            vgrad_T(i,j,k) =  v1*vtemp1(i,j,1,k) + v2*vtemp1(i,j,2,k)
-
         end do
      end do
 
@@ -234,6 +245,7 @@ print *, "Main: nelemd = ", nelemd
 
   enddo
 #endif
+  enddo !ie
   enddo !loopmax
   finish = tock(start)
 
