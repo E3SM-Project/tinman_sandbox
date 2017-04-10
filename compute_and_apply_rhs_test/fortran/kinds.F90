@@ -13,7 +13,7 @@ public
   integer, public, parameter :: timelevels = 3
   integer, public, parameter :: np=4
   integer, public, parameter :: nlev=72
-  integer, public, parameter :: nlevp=nlev+1
+!  integer, public            :: nlevp=nlev+1
   integer, public, parameter :: qsize_d=1
 !this is probably num of tracers <= qsize_d but the use of
 !it isn't clear 

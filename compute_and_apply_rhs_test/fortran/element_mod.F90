@@ -74,8 +74,8 @@ module element_mod
     ! diagnostics for explicit timestep
     real (kind=real_kind) :: phi(np,np,nlev)                          ! geopotential
     real (kind=real_kind) :: omega_p(np,np,nlev)                      ! vertical tendency (derived)
-    real (kind=real_kind) :: eta_dot_dpdn(np,np,nlevp)                ! mean vertical flux from dynamics
-    real (kind=real_kind) :: eta_dot_dpdn_prescribed(np,np,nlevp)     ! prescribed wind test cases
+    real (kind=real_kind) :: eta_dot_dpdn(np,np,nlev+1)                ! mean vertical flux from dynamics
+    real (kind=real_kind) :: eta_dot_dpdn_prescribed(np,np,nlev+1)     ! prescribed wind test cases
 
     ! semi-implicit diagnostics: computed in explict-component, reused in Helmholtz-component.
     real (kind=real_kind) :: grad_lnps(np,np,2)                       ! gradient of log surface pressure
@@ -94,7 +94,7 @@ module element_mod
     real (kind=real_kind) :: FQ(np,np,nlev,qsize_d, 1)                ! tracer forcing
     real (kind=real_kind) :: FM(np,np,2,nlev, 1)                      ! momentum forcing
     real (kind=real_kind) :: FT(np,np,nlev, 1)                        ! temperature forcing
-    real (kind=real_kind) :: etadot_prescribed(np,np,nlevp)           ! prescribed vertical tendency
+    real (kind=real_kind) :: etadot_prescribed(np,np,nlev+1)           ! prescribed vertical tendency
     real (kind=real_kind) :: u_met(np,np,nlev)                        ! zonal component of prescribed meteorology winds
     real (kind=real_kind) :: dudt_met(np,np,nlev)                     ! rate of change of zonal component of prescribed meteorology winds
     real (kind=real_kind) :: v_met(np,np,nlev)                        ! meridional component of prescribed meteorology winds
