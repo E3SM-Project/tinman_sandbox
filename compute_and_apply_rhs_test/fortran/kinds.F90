@@ -15,6 +15,8 @@ public
   integer, public, parameter :: nlev=72
   integer, public, parameter :: nlevp=nlev+1
   integer, public, parameter :: qsize_d=1
+!this is probably num of tracers <= qsize_d but the use of
+!it isn't clear 
   integer, public, parameter :: ntrac = 1
   integer, public            :: nelemd = 3
   integer, public, parameter :: npsq=np*np
@@ -24,8 +26,7 @@ public
   integer, public, parameter :: qn0 = 1
   integer, public, parameter :: numst = 41
 
-  integer, public, parameter :: loopmax =  1  ! Do not go above ~10 if you update
-                                              ! time levels, or will get NaN's
+  integer, public, parameter :: loopmax =  10000 
 
 contains
 
