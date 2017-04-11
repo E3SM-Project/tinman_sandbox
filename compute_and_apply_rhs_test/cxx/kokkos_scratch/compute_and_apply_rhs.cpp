@@ -1,8 +1,8 @@
 #include "compute_and_apply_rhs.hpp"
 
-#include "Types.hpp"
 #include "Region.hpp"
 #include "TestData.hpp"
+#include "Types.hpp"
 #include "sphere_operators.hpp"
 
 #include <fstream>
@@ -25,7 +25,6 @@ struct update_state {
   update_state(const Control &data, const Region &region)
       : m_data(data), m_region(region) {}
 
-  // For each thread, requires 3 x NP x NP memory
   // Depends on PHI (after preq_hydrostatic), PECND
   // Modifies Ephi_grad
   KOKKOS_INLINE_FUNCTION void
@@ -37,113 +36,115 @@ struct update_state {
     // Using a slot larger than we need - Can be up to 4 x 4 x 2 = 32 elements
     Real _tmp_viewptr[NP][NP];
     ExecViewUnmanaged<Real[NP][NP]> Ephi(&_tmp_viewptr[0][0]);
-    Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                         [&](const int idx) {
-      const int igp = idx / NP;
-      const int jgp = idx % NP;
-      Ephi(0, 0) = m_region.U_current(ie)(ilev, igp, jgp);
-      Ephi(0, 1) = m_region.V_current(ie)(ilev, igp, jgp);
-      // Kinetic energy + PHI (thermal energy?) + PECND (potential energy?)
-      Ephi(igp, jgp) =
-          0.5 * (Ephi(0, 0) * Ephi(0, 0) + Ephi(0, 1) * Ephi(0, 1)) +
-          m_region.PHI_update(ie)(ilev, igp, jgp) +
-          m_region.PECND(ie, ilev)(igp, jgp);
-    });
+    Kokkos::parallel_for(
+        Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+          const int igp = idx / NP;
+          const int jgp = idx % NP;
+          Ephi(0, 0) = m_region.U_current(ie)(ilev, igp, jgp);
+          Ephi(0, 1) = m_region.V_current(ie)(ilev, igp, jgp);
+          // Kinetic energy + PHI (thermal energy?) + PECND (potential energy?)
+          Ephi(igp, jgp) =
+              0.5 * (Ephi(0, 0) * Ephi(0, 0) + Ephi(0, 1) * Ephi(0, 1)) +
+              m_region.PHI_update(ie)(ilev, igp, jgp) +
+              m_region.PECND(ie, ilev)(igp, jgp);
+        });
     gradient_sphere_update(team, Ephi, m_data, c_dinv, Ephi_grad);
     // We shouldn't need a block here, as the parallel loops were vector level,
     // not thread level
   }
 
-  // For each thread, requires NP x NP x 6 Scratch Memory
+  KOKKOS_INLINE_FUNCTION void
+  compute_velocity_eta_dpdn(TeamPolicy team,
+                            ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv) const {
+    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV),
+                         [&](const int ilev) {
+                           compute_velocity(team, ilev, c_dinv);
+                           compute_eta_dpdn(team, ilev);
+                         });
+  }
+
   // Depends on pressure, PHI, U_current, V_current, METDET,
   // D, DINV, U, V, FCOR, SPHEREMP, T_v
   // Modifies U, V
   KOKKOS_INLINE_FUNCTION
   void
-  compute_velocity(TeamPolicy &team,
+  compute_velocity(TeamPolicy team, int ilev,
                    ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv) const {
     const int ie = team.league_rank();
     const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> T_v = m_data.T_v(team);
     const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> pressure =
         m_data.pressure(team);
 
-    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV),
-                         [&](const int ilev) {
-      ExecViewUnmanaged<const Real[NP][NP]> p_ilev =
-          subview(pressure, ilev, Kokkos::ALL(), Kokkos::ALL());
+    ExecViewUnmanaged<const Real[NP][NP]> p_ilev =
+        subview(pressure, ilev, Kokkos::ALL(), Kokkos::ALL());
 
-      ExecViewUnmanaged<Real[2][NP][NP]> grad_buf =
-          Kokkos::subview(m_data.vector_buf(team), ilev, Kokkos::ALL(),
-                          Kokkos::ALL(), Kokkos::ALL());
-      gradient_sphere(team, p_ilev, m_data, c_dinv, grad_buf);
-      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, 2 * NP * NP),
-                           [&](const int idx) {
-        const int hgp = (idx / NP) / NP;
-        const int igp = (idx / NP) % NP;
-        const int jgp = idx % NP;
+    ExecViewUnmanaged<Real[2][NP][NP]> grad_buf =
+        Kokkos::subview(m_data.vector_buf(team), ilev, Kokkos::ALL(),
+                        Kokkos::ALL(), Kokkos::ALL());
+    gradient_sphere(team, p_ilev, m_data, c_dinv, grad_buf);
+    Kokkos::parallel_for(
+        Kokkos::ThreadVectorRange(team, 2 * NP * NP), [&](const int idx) {
+          const int hgp = (idx / NP) / NP;
+          const int igp = (idx / NP) % NP;
+          const int jgp = idx % NP;
 
-        const Real gpterm = T_v(ilev, igp, jgp) / p_ilev(igp, jgp);
-        grad_buf(hgp, igp, jgp) *= PhysicalConstants::Rgas * gpterm;
-      });
+          const Real gpterm = T_v(ilev, igp, jgp) / p_ilev(igp, jgp);
+          grad_buf(hgp, igp, jgp) *= PhysicalConstants::Rgas * gpterm;
+        });
 
-      // grad_buf -> Ephi_grad + glnpsi
-      compute_energy_grad(team, ilev, c_dinv, grad_buf);
+    // grad_buf -> Ephi_grad + glnpsi
+    compute_energy_grad(team, ilev, c_dinv, grad_buf);
 
-      Real _tmp_viewptr[NP][NP];
-      ExecViewUnmanaged<Real[NP][NP]> vort(&_tmp_viewptr[0][0]);
-      vorticity_sphere(team, m_region.U_current(ie, ilev),
-                       m_region.V_current(ie, ilev), m_data,
-                       m_region.METDET(ie), m_region.D(ie), vort);
+    Real _tmp_viewptr[NP][NP];
+    ExecViewUnmanaged<Real[NP][NP]> vort(&_tmp_viewptr[0][0]);
+    vorticity_sphere(team, m_region.U_current(ie, ilev),
+                     m_region.V_current(ie, ilev), m_data, m_region.METDET(ie),
+                     m_region.D(ie), vort);
 
-      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                           [&](const int idx) {
-        const int igp = idx / NP;
-        const int jgp = idx % NP;
+    Kokkos::parallel_for(
+        Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+          const int igp = idx / NP;
+          const int jgp = idx % NP;
 
-        vort(igp, jgp) += m_region.FCOR(ie)(igp, jgp);
+          vort(igp, jgp) += m_region.FCOR(ie)(igp, jgp);
 
-        const Real vtens1 =
-            // v_vadv(igp, jgp, 0)
-            m_region.V_current(ie)(ilev, igp, jgp) * vort(igp, jgp) -
-            grad_buf(0, igp, jgp);
+          const Real vtens1 =
+              // v_vadv(igp, jgp, 0)
+              m_region.V_current(ie)(ilev, igp, jgp) * vort(igp, jgp) -
+              grad_buf(0, igp, jgp);
 
-        m_region.U_future(ie)(ilev, igp, jgp) =
-            m_region.SPHEREMP(ie)(igp, jgp) *
-            (m_region.U_previous(ie)(ilev, igp, jgp) + m_data.dt2() * vtens1);
+          m_region.U_future(ie)(ilev, igp, jgp) =
+              m_region.SPHEREMP(ie)(igp, jgp) *
+              (m_region.U_previous(ie)(ilev, igp, jgp) + m_data.dt2() * vtens1);
 
-        const Real vtens2 =
-            // v_vadv(igp, jgp, 1) -
-            -m_region.U_current(ie)(ilev, igp, jgp) * vort(igp, jgp) -
-            grad_buf(1, igp, jgp);
+          const Real vtens2 =
+              // v_vadv(igp, jgp, 1) -
+              -m_region.U_current(ie)(ilev, igp, jgp) * vort(igp, jgp) -
+              grad_buf(1, igp, jgp);
 
-        m_region.V_future(ie)(ilev, igp, jgp) =
-            m_region.SPHEREMP(ie)(igp, jgp) *
-            (m_region.V_previous(ie)(ilev, igp, jgp) + m_data.dt2() * vtens2);
-      });
-    });
+          m_region.V_future(ie)(ilev, igp, jgp) =
+              m_region.SPHEREMP(ie)(igp, jgp) *
+              (m_region.V_previous(ie)(ilev, igp, jgp) + m_data.dt2() * vtens2);
+        });
   }
 
-  // For each thread, requires 0 Scratch Memory
   // Depends on ETA_DPDN
   // Modifies ETA_DPDN
   KOKKOS_INLINE_FUNCTION
-  void compute_eta_dpdn(TeamPolicy &team) const {
+  void compute_eta_dpdn(TeamPolicy team, int ilev) const {
     const int ie = team.league_rank();
-    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV_P),
-                         [&](const int ilev) {
-      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                           [&](const int idx) {
-        const int igp = idx / NP;
-        const int jgp = idx % NP;
+    Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
+                         [&](const int idx) {
+                           const int igp = idx / NP;
+                           const int jgp = idx % NP;
 
-        // TODO: Compute the actual value for this
-        Real eta_dot_dpdn_ie = 0.0;
+                           // TODO: Compute the actual value for this
+                           Real eta_dot_dpdn_ie = 0.0;
 
-        m_region.ETA_DPDN_update(ie)(ilev, igp, jgp) =
-            m_region.ETA_DPDN(ie)(ilev, igp, jgp) +
-            PhysicalConstants::eta_ave_w * eta_dot_dpdn_ie;
-      });
-    });
+                           m_region.ETA_DPDN_update(ie)(ilev, igp, jgp) =
+                               m_region.ETA_DPDN(ie)(ilev, igp, jgp) +
+                               PhysicalConstants::eta_ave_w * eta_dot_dpdn_ie;
+                         });
   }
 
   // Depends on PHIS, DP3D, PHI, pressure, T_v
@@ -207,20 +208,21 @@ struct update_state {
         Kokkos::subview(pressure, 0, Kokkos::ALL(), Kokkos::ALL());
     gradient_sphere(team, p_ilev, m_data, c_dinv, grad_p);
 
-    Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                         KOKKOS_LAMBDA(const int loop_idx) {
-      const int jgp = loop_idx / NP;
-      const int igp = loop_idx % NP;
-      const Real vgrad_p =
-          m_region.U_current(ie)(0, igp, jgp) * grad_p(0, igp, jgp) +
-          m_region.V_current(ie)(0, igp, jgp) * grad_p(1, igp, jgp);
+    Kokkos::parallel_for(
+        Kokkos::ThreadVectorRange(team, NP * NP),
+        KOKKOS_LAMBDA(const int loop_idx) {
+          const int jgp = loop_idx / NP;
+          const int igp = loop_idx % NP;
+          const Real vgrad_p =
+              m_region.U_current(ie)(0, igp, jgp) * grad_p(0, igp, jgp) +
+              m_region.V_current(ie)(0, igp, jgp) * grad_p(1, igp, jgp);
 
-      const Real ckk = 0.5 / p_ilev(igp, jgp);
-      const Real term = m_data.div_vdp(ie, 0, igp, jgp);
-      m_data.omega_p(team)(0, igp, jgp) =
-          vgrad_p / p_ilev(igp, jgp) - ckk * term;
-      suml(igp, jgp) = term;
-    });
+          const Real ckk = 0.5 / p_ilev(igp, jgp);
+          const Real term = m_data.div_vdp(ie, 0, igp, jgp);
+          m_data.omega_p(ie, 0, igp, jgp) =
+              vgrad_p / p_ilev(igp, jgp) - ckk * term;
+          suml(igp, jgp) = term;
+        });
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -233,28 +235,28 @@ struct update_state {
     int ie = team.league_rank();
     const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> pressure =
         m_data.pressure(team);
-    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p = m_data.omega_p(team);
     ExecViewUnmanaged<const Real[NP][NP]> p_ilev;
     for (int ilev = 1; ilev < NUM_LEV - 1; ++ilev) {
       p_ilev = subview(pressure, ilev, Kokkos::ALL(), Kokkos::ALL());
       gradient_sphere(team, p_ilev, m_data, c_dinv, grad_p);
 
-      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                           KOKKOS_LAMBDA(const int loop_idx) {
-        const int jgp = loop_idx / NP;
-        const int igp = loop_idx % NP;
-        const Real vgrad_p =
-            m_region.U_current(ie)(ilev, igp, jgp) * grad_p(0, igp, jgp) +
-            m_region.V_current(ie)(ilev, igp, jgp) * grad_p(1, igp, jgp);
+      Kokkos::parallel_for(
+          Kokkos::ThreadVectorRange(team, NP * NP),
+          KOKKOS_LAMBDA(const int loop_idx) {
+            const int jgp = loop_idx / NP;
+            const int igp = loop_idx % NP;
+            const Real vgrad_p =
+                m_region.U_current(ie)(ilev, igp, jgp) * grad_p(0, igp, jgp) +
+                m_region.V_current(ie)(ilev, igp, jgp) * grad_p(1, igp, jgp);
 
-        const Real ckk = 0.5 / p_ilev(igp, jgp);
-        const Real ckl = 2.0 * ckk;
-        const Real term = m_data.div_vdp(ie, ilev, igp, jgp);
-        omega_p(ie, ilev, igp, jgp) =
-            vgrad_p / p_ilev(igp, jgp) - ckl * suml(igp, jgp) - ckk * term;
+            const Real ckk = 0.5 / p_ilev(igp, jgp);
+            const Real ckl = 2.0 * ckk;
+            const Real term = m_data.div_vdp(ie, ilev, igp, jgp);
+            m_data.omega_p(ie, ilev, igp, jgp) =
+                vgrad_p / p_ilev(igp, jgp) - ckl * suml(igp, jgp) - ckk * term;
 
-        suml(igp, jgp) += term;
-      });
+            suml(igp, jgp) += term;
+          });
     }
   }
 
@@ -267,31 +269,32 @@ struct update_state {
     int ie = team.league_rank();
     const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure =
         m_data.pressure(team);
-    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p = m_data.omega_p(team);
     const ExecViewUnmanaged<Real[NP][NP]> p_ilev =
         subview(pressure, NUM_LEV - 1, Kokkos::ALL(), Kokkos::ALL());
     gradient_sphere(team, p_ilev, m_data, c_dinv, grad_p);
-    Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                         KOKKOS_LAMBDA(const int loop_idx) {
-      const int jgp = loop_idx / NP;
-      const int igp = loop_idx % NP;
-      const Real vgrad_p =
-          m_region.U_current(ie)(NUM_LEV - 1, igp, jgp) * grad_p(0, igp, jgp) +
-          m_region.V_current(ie)(NUM_LEV - 1, igp, jgp) * grad_p(1, igp, jgp);
+    Kokkos::parallel_for(
+        Kokkos::ThreadVectorRange(team, NP * NP),
+        KOKKOS_LAMBDA(const int loop_idx) {
+          const int jgp = loop_idx / NP;
+          const int igp = loop_idx % NP;
+          const Real vgrad_p = m_region.U_current(ie)(NUM_LEV - 1, igp, jgp) *
+                                   grad_p(0, igp, jgp) +
+                               m_region.V_current(ie)(NUM_LEV - 1, igp, jgp) *
+                                   grad_p(1, igp, jgp);
 
-      const Real ckk = 0.5 / p_ilev(igp, jgp);
-      const Real ckl = 2.0 * ckk;
-      const Real term = m_data.div_vdp(ie, NUM_LEV - 1, igp, jgp);
-      m_data.omega_p(team)(NUM_LEV - 1, igp, jgp) =
-          vgrad_p / p_ilev(igp, jgp) - ckl * suml(igp, jgp) - ckk * term;
-    });
+          const Real ckk = 0.5 / p_ilev(igp, jgp);
+          const Real ckl = 2.0 * ckk;
+          const Real term = m_data.div_vdp(ie, NUM_LEV - 1, igp, jgp);
+          m_data.omega_p(ie, NUM_LEV - 1, igp, jgp) =
+              vgrad_p / p_ilev(igp, jgp) - ckl * suml(igp, jgp) - ckk * term;
+        });
   }
 
   // Depends on pressure, U_current, V_current, div_vdp, omega_p
   KOKKOS_INLINE_FUNCTION
-  void preq_omega_ps(const TeamPolicy &team,
-                     const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv)
-      const {
+  void preq_omega_ps(
+      const TeamPolicy &team,
+      const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv) const {
     // NOTE: we can't use a single TeamThreadRange loop, since
     //       gradient_sphere requires a 'consistent' pressure,
     //       meaning that we cannot update the different pressure
@@ -311,23 +314,24 @@ struct update_state {
   void compute_pressure(TeamPolicy team) const {
     const int ie = team.league_rank();
     ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure = m_data.pressure(team);
-    Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                         KOKKOS_LAMBDA(const int idx) {
-      const int igp = idx / NP;
-      const int jgp = idx % NP;
-      pressure(0, igp, jgp) = m_data.hybrid_a(0) * m_data.ps0() +
-                              0.5 * m_region.DP3D_current(ie)(0, igp, jgp);
-    });
+    Kokkos::parallel_for(
+        Kokkos::ThreadVectorRange(team, NP * NP), KOKKOS_LAMBDA(const int idx) {
+          const int igp = idx / NP;
+          const int jgp = idx % NP;
+          pressure(0, igp, jgp) = m_data.hybrid_a(0) * m_data.ps0() +
+                                  0.5 * m_region.DP3D_current(ie)(0, igp, jgp);
+        });
     for (int ilev = 1; ilev < NUM_LEV; ilev++) {
-      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                           KOKKOS_LAMBDA(const int idx) {
-        int igp = idx / NP;
-        int jgp = idx % NP;
-        pressure(ilev, igp, jgp) =
-            pressure(ilev - 1, igp, jgp) +
-            0.5 * (m_region.DP3D_current(ie)(ilev - 1, igp, jgp) +
-                   m_region.DP3D_current(ie)(ilev, igp, jgp));
-      });
+      Kokkos::parallel_for(
+          Kokkos::ThreadVectorRange(team, NP * NP),
+          KOKKOS_LAMBDA(const int idx) {
+            int igp = idx / NP;
+            int jgp = idx % NP;
+            pressure(ilev, igp, jgp) =
+                pressure(ilev - 1, igp, jgp) +
+                0.5 * (m_region.DP3D_current(ie)(ilev - 1, igp, jgp) +
+                       m_region.DP3D_current(ie)(ilev, igp, jgp));
+          });
     }
   }
 
@@ -342,37 +346,39 @@ struct update_state {
       preq_hydrostatic(team);
       preq_omega_ps(team, c_dinv);
     });
+    team.team_barrier();
   }
 
   KOKKOS_INLINE_FUNCTION
   void compute_temperature_no_tracers_helper(TeamPolicy team, int ilev) const {
     const int ie = team.league_rank();
     ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v = m_data.T_v(team);
-    Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                         KOKKOS_LAMBDA(const int idx) {
-      const int igp = idx / NP;
-      const int jgp = idx % NP;
-      T_v(ilev, igp, jgp) = m_region.T_current(ie)(ilev, igp, jgp);
-    });
+    Kokkos::parallel_for(
+        Kokkos::ThreadVectorRange(team, NP * NP), KOKKOS_LAMBDA(const int idx) {
+          const int igp = idx / NP;
+          const int jgp = idx % NP;
+          T_v(ilev, igp, jgp) = m_region.T_current(ie)(ilev, igp, jgp);
+        });
   }
 
   KOKKOS_INLINE_FUNCTION
   void compute_temperature_tracers_helper(TeamPolicy team, int ilev) const {
     const int ie = team.league_rank();
     ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> T_v = m_data.T_v(team);
-    Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                         KOKKOS_LAMBDA(const int idx) {
-      const int igp = idx / NP;
-      const int jgp = idx % NP;
+    Kokkos::parallel_for(
+        Kokkos::ThreadVectorRange(team, NP * NP), KOKKOS_LAMBDA(const int idx) {
+          const int igp = idx / NP;
+          const int jgp = idx % NP;
 
-      Real Qt = m_region.QDP(ie, 0, m_data.qn0())(ilev, igp, jgp) /
-                m_region.DP3D_current(ie)(ilev, igp, jgp);
-      T_v(ilev, igp, jgp) =
-          m_region.T_current(ie)(ilev, igp, jgp) *
-          (1.0 +
-           (PhysicalConstants::Rwater_vapor / PhysicalConstants::Rgas - 1.0) *
-               Qt);
-    });
+          Real Qt = m_region.QDP(ie, 0, m_data.qn0())(ilev, igp, jgp) /
+                    m_region.DP3D_current(ie)(ilev, igp, jgp);
+          T_v(ilev, igp, jgp) =
+              m_region.T_current(ie)(ilev, igp, jgp) *
+              (1.0 +
+               (PhysicalConstants::Rwater_vapor / PhysicalConstants::Rgas -
+                1.0) *
+                   Qt);
+        });
   }
 
   // Depends on DERIVED_UN0, DERIVED_VN0, METDET, DINV
@@ -380,32 +386,34 @@ struct update_state {
   // Modifies DERIVED_UN0, DERIVED_VN0
   // Requires NUM_LEV * 5 * NP * NP
   KOKKOS_INLINE_FUNCTION
-  void compute_div_vdp(TeamPolicy team, int ilev,
-                       const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv)
-      const {
+  void compute_div_vdp(
+      TeamPolicy team, int ilev,
+      const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv) const {
     const int ie = team.league_rank();
     // Create subviews to explicitly have static dimensions
     ExecViewUnmanaged<Real[2][NP][NP]> vdp_ilev =
         Kokkos::subview(m_data.vector_buf(team), ilev, Kokkos::ALL,
                         Kokkos::ALL(), Kokkos::ALL());
 
-    Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                         [&](const int idx) {
-      const int igp = idx / NP;
-      const int jgp = idx % NP;
-      Real v1 = m_region.U_current(ie)(ilev, igp, jgp);
-      Real v2 = m_region.V_current(ie)(ilev, igp, jgp);
+    Kokkos::parallel_for(
+        Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+          const int igp = idx / NP;
+          const int jgp = idx % NP;
+          Real v1 = m_region.U_current(ie)(ilev, igp, jgp);
+          Real v2 = m_region.V_current(ie)(ilev, igp, jgp);
 
-      vdp_ilev(0, igp, jgp) = v1 * m_region.DP3D_current(ie)(ilev, igp, jgp);
-      vdp_ilev(1, igp, jgp) = v2 * m_region.DP3D_current(ie)(ilev, igp, jgp);
+          vdp_ilev(0, igp, jgp) =
+              v1 * m_region.DP3D_current(ie)(ilev, igp, jgp);
+          vdp_ilev(1, igp, jgp) =
+              v2 * m_region.DP3D_current(ie)(ilev, igp, jgp);
 
-      m_region.DERIVED_UN0_update(ie, ilev)(igp, jgp) =
-          m_region.DERIVED_UN0(ie, ilev)(igp, jgp) +
-          PhysicalConstants::eta_ave_w * vdp_ilev(0, igp, jgp);
-      m_region.DERIVED_VN0_update(ie, ilev)(igp, jgp) =
-          m_region.DERIVED_VN0(ie, ilev)(igp, jgp) +
-          PhysicalConstants::eta_ave_w * vdp_ilev(1, igp, jgp);
-    });
+          m_region.DERIVED_UN0_update(ie, ilev)(igp, jgp) =
+              m_region.DERIVED_UN0(ie, ilev)(igp, jgp) +
+              PhysicalConstants::eta_ave_w * vdp_ilev(0, igp, jgp);
+          m_region.DERIVED_VN0_update(ie, ilev)(igp, jgp) =
+              m_region.DERIVED_VN0(ie, ilev)(igp, jgp) +
+              PhysicalConstants::eta_ave_w * vdp_ilev(1, igp, jgp);
+        });
 
     ExecViewUnmanaged<Real[NP][NP]> div_vdp_ilev = Kokkos::subview(
         m_data.div_vdp(team), ilev, Kokkos::ALL(), Kokkos::ALL());
@@ -422,16 +430,17 @@ struct update_state {
     if (m_data.qn0() == -1) {
       Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV),
                            KOKKOS_LAMBDA(const int ilev) {
-        compute_temperature_no_tracers_helper(team, ilev);
-        compute_div_vdp(team, ilev, c_dinv);
-      });
+                             compute_temperature_no_tracers_helper(team, ilev);
+                             compute_div_vdp(team, ilev, c_dinv);
+                           });
     } else {
       Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV),
                            KOKKOS_LAMBDA(const int ilev) {
-        compute_temperature_tracers_helper(team, ilev);
-        compute_div_vdp(team, ilev, c_dinv);
-      });
+                             compute_temperature_tracers_helper(team, ilev);
+                             compute_div_vdp(team, ilev, c_dinv);
+                           });
     }
+    team.team_barrier();
   }
 
   // Requires 2 x NUM_LEV x NP x NP team memory
@@ -447,52 +456,55 @@ struct update_state {
     ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> pressure =
         m_data.pressure(team);
 
-    // Updates OMEGA_P, T, and DP3D
     // Depends on T (global), OMEGA_P (global), U (global), V (global),
     // SPHEREMP (global), T_v, and omega_p
     // Requires 2 * NUM_LEV * NP * NP scratch memory
-    Kokkos::parallel_for(Kokkos::TeamThreadRange(team, NUM_LEV),
-                         [&](const int ilev) {
-      // Create subviews to explicitly have static dimensions
-      ExecViewUnmanaged<const Real[NP][NP]> T_ie_n0_ilev = Kokkos::subview(
-          m_region.T_current(ie), ilev, Kokkos::ALL(), Kokkos::ALL());
+    Kokkos::parallel_for(
+        Kokkos::TeamThreadRange(team, NUM_LEV), [&](const int ilev) {
+          // Create subviews to explicitly have static dimensions
+          ExecViewUnmanaged<const Real[NP][NP]> T_ie_n0_ilev = Kokkos::subview(
+              m_region.T_current(ie), ilev, Kokkos::ALL(), Kokkos::ALL());
 
-      ExecViewUnmanaged<Real[2][NP][NP]> grad_tmp = Kokkos::subview(
-          m_data.vector_buf(team), ilev, Kokkos::ALL, Kokkos::ALL, Kokkos::ALL);
+          ExecViewUnmanaged<Real[2][NP][NP]> grad_tmp =
+              Kokkos::subview(m_data.vector_buf(team), ilev, Kokkos::ALL,
+                              Kokkos::ALL, Kokkos::ALL);
 
-      gradient_sphere(team, T_ie_n0_ilev, m_data, c_dinv, grad_tmp);
+          gradient_sphere(team, T_ie_n0_ilev, m_data, c_dinv, grad_tmp);
 
-      Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
-                           [&](const int idx) {
-        const int igp = idx / NP;
-        const int jgp = idx % NP;
+          Kokkos::parallel_for(
+              Kokkos::ThreadVectorRange(team, NP * NP), [&](const int idx) {
+                const int igp = idx / NP;
+                const int jgp = idx % NP;
 
-        m_region.OMEGA_P_update(ie, ilev)(igp, jgp) =
-            m_region.OMEGA_P(ie, ilev)(igp, jgp) +
-            PhysicalConstants::eta_ave_w * m_data.omega_p(team)(ilev, igp, jgp);
+                m_region.OMEGA_P_update(ie, ilev)(igp, jgp) =
+                    m_region.OMEGA_P(ie, ilev)(igp, jgp) +
+                    PhysicalConstants::eta_ave_w *
+									m_data.omega_p(ie, ilev, igp, jgp);
 
-        const Real cur_T_v = T_v(ilev, igp, jgp);
+                const Real cur_T_v = T_v(ilev, igp, jgp);
 
-        const Real v1 = m_region.U_current(ie)(ilev, igp, jgp);
-        const Real v2 = m_region.V_current(ie)(ilev, igp, jgp);
+                const Real v1 = m_region.U_current(ie)(ilev, igp, jgp);
+                const Real v2 = m_region.V_current(ie)(ilev, igp, jgp);
 
-        const Real ttens =
-            // T_vadv(ilev, igp, jgp)
-            0.0 - (v1 * grad_tmp(0, igp, jgp) + v2 * grad_tmp(1, igp, jgp)) +
-            // kappa_star(ilev, igp, jgp)
-            PhysicalConstants::kappa * cur_T_v *
-                m_data.omega_p(team)(ilev, igp, jgp);
+                const Real ttens =
+                    // T_vadv(ilev, igp, jgp)
+                    0.0 -
+                    (v1 * grad_tmp(0, igp, jgp) + v2 * grad_tmp(1, igp, jgp)) +
+                    // kappa_star(ilev, igp, jgp)
+                    PhysicalConstants::kappa * cur_T_v *
+									m_data.omega_p(ie, ilev, igp, jgp);
 
-        m_region.T_future(ie)(ilev, igp, jgp) =
-            m_region.SPHEREMP(ie)(igp, jgp) *
-            (m_region.T_previous(ie)(ilev, igp, jgp) + m_data.dt2() * ttens);
+                m_region.T_future(ie)(ilev, igp, jgp) =
+                    m_region.SPHEREMP(ie)(igp, jgp) *
+                    (m_region.T_previous(ie)(ilev, igp, jgp) +
+                     m_data.dt2() * ttens);
 
-        m_region.DP3D_future(ie)(ilev, igp, jgp) =
-            m_region.SPHEREMP(ie)(igp, jgp) *
-            (m_region.DP3D_previous(ie)(ilev, igp, jgp) -
-             m_data.dt2() * m_data.div_vdp(ie, ilev, igp, jgp));
-      });
-    });
+                m_region.DP3D_future(ie)(ilev, igp, jgp) =
+                    m_region.SPHEREMP(ie)(igp, jgp) *
+                    (m_region.DP3D_previous(ie)(ilev, igp, jgp) -
+                     m_data.dt2() * m_data.div_vdp(ie, ilev, igp, jgp));
+              });
+        });
   }
 
   // Computes the vertical advection of T and v
@@ -547,14 +559,15 @@ struct update_state {
     const int ie = team.league_rank();
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
                          KOKKOS_LAMBDA(int idx) {
-      const int hgp = idx / NP;
-      const int igp = idx % NP;
-      for (int jgp = 0; jgp < 2; ++jgp) {
-        for (int kgp = 0; kgp < 2; ++kgp) {
-          c_dinv(jgp, kgp, hgp, igp) = m_region.DINV(ie)(jgp, kgp, hgp, igp);
-        }
-      }
-    });
+                           const int hgp = idx / NP;
+                           const int igp = idx % NP;
+                           for (int jgp = 0; jgp < 2; ++jgp) {
+                             for (int kgp = 0; kgp < 2; ++kgp) {
+                               c_dinv(jgp, kgp, hgp, igp) =
+                                   m_region.DINV(ie)(jgp, kgp, hgp, igp);
+                             }
+                           }
+                         });
   }
 
   template <typename Data>
@@ -575,8 +588,7 @@ struct update_state {
 
     compute_scan_properties(team, c_dinv);
 
-    compute_velocity(team, c_dinv);
-    compute_eta_dpdn(team);
+    compute_velocity_eta_dpdn(team, c_dinv);
     // Breaks pressure
     compute_stuff(team, c_dinv);
   }

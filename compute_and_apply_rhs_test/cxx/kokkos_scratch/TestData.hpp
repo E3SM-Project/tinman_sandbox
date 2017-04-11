@@ -65,7 +65,7 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION Real &pressure(const int &ie, const int &ilev,
-                                        const int &igp, const int &jgp) {
+                                        const int &igp, const int &jgp) const {
     return m_pressure(ie, ilev, igp, jgp);
   }
 
@@ -82,7 +82,7 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION Real &omega_p(const int ie, const int ilev,
-                                       const int igp, const int jgp) {
+                                       const int igp, const int jgp) const {
     return m_omega_p(ie, ilev, igp, jgp);
   }
 
