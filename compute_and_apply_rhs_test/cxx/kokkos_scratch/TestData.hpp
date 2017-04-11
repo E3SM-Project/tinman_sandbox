@@ -64,9 +64,26 @@ public:
                            Kokkos::ALL);
   }
 
-  KOKKOS_INLINE_FUNCTION Real &
-  pressure(const int &ie, const int &ilev, const int &igp, const int &jgp) {
+  KOKKOS_INLINE_FUNCTION Real &pressure(const int &ie, const int &ilev,
+                                        const int &igp, const int &jgp) {
     return m_pressure(ie, ilev, igp, jgp);
+  }
+
+  KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> const
+  omega_p(const TeamPolicy &team) const {
+    return Kokkos::subview(m_omega_p, team.league_rank(), Kokkos::ALL,
+                           Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> const
+  omega_p(const int &ie) const {
+    return Kokkos::subview(m_omega_p, ie, Kokkos::ALL, Kokkos::ALL,
+                           Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION Real &omega_p(const int ie, const int ilev,
+                                       const int igp, const int jgp) {
+    return m_omega_p(ie, ilev, igp, jgp);
   }
 
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> const
@@ -79,6 +96,11 @@ public:
   div_vdp(const TeamPolicy &team) const {
     return Kokkos::subview(m_div_vdp, team.league_rank(), Kokkos::ALL,
                            Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION Real &div_vdp(int ie, int ilev, int igp,
+                                       int jgp) const {
+    return m_div_vdp(ie, ilev, igp, jgp);
   }
 
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][2][NP][NP]> const
@@ -102,6 +124,7 @@ private:
   ExecViewManaged<Real[NUM_LEV_P]> m_hybrid_a;
   ExecViewManaged<Real[NP][NP]> m_dvv; // Laplacian
   ExecViewManaged<Real * [NUM_LEV][NP][NP]> m_pressure;
+  ExecViewManaged<Real * [NUM_LEV][NP][NP]> m_omega_p;
   ExecViewManaged<Real * [NUM_LEV][NP][NP]> m_T_v;
   ExecViewManaged<Real * [NUM_LEV][NP][NP]> m_div_vdp;
   ExecViewManaged<Real * [NUM_LEV][2][NP][NP]> m_vector_buf;

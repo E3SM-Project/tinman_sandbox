@@ -16,6 +16,11 @@ struct update_state {
   const Control m_data;
   const Region m_region;
 
+  struct KernelVariables {
+    ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv;
+    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> c_buf_1;
+  };
+
   KOKKOS_INLINE_FUNCTION
   update_state(const Control &data, const Region &region)
       : m_data(data), m_region(region) {}
@@ -197,8 +202,6 @@ struct update_state {
                      ExecViewUnmanaged<Real[NP][NP]> suml) const {
 
     int ie = team.league_rank();
-    const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp =
-        m_data.div_vdp(team);
     ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure = m_data.pressure(team);
     ExecViewUnmanaged<Real[NP][NP]> p_ilev =
         Kokkos::subview(pressure, 0, Kokkos::ALL(), Kokkos::ALL());
@@ -213,8 +216,9 @@ struct update_state {
           m_region.V_current(ie)(0, igp, jgp) * grad_p(1, igp, jgp);
 
       const Real ckk = 0.5 / p_ilev(igp, jgp);
-      const Real term = div_vdp(0, igp, jgp);
-      p_ilev(igp, jgp) = vgrad_p / p_ilev(igp, jgp) - ckk * term;
+      const Real term = m_data.div_vdp(ie, 0, igp, jgp);
+      m_data.omega_p(team)(0, igp, jgp) =
+          vgrad_p / p_ilev(igp, jgp) - ckk * term;
       suml(igp, jgp) = term;
     });
   }
@@ -227,10 +231,10 @@ struct update_state {
                      ExecViewUnmanaged<Real[NP][NP]> suml) const {
     // Another candidate for parallel scan
     int ie = team.league_rank();
-    const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp =
-        m_data.div_vdp(team);
-    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure = m_data.pressure(team);
-    ExecViewUnmanaged<Real[NP][NP]> p_ilev;
+    const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> pressure =
+        m_data.pressure(team);
+    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p = m_data.omega_p(team);
+    ExecViewUnmanaged<const Real[NP][NP]> p_ilev;
     for (int ilev = 1; ilev < NUM_LEV - 1; ++ilev) {
       p_ilev = subview(pressure, ilev, Kokkos::ALL(), Kokkos::ALL());
       gradient_sphere(team, p_ilev, m_data, c_dinv, grad_p);
@@ -245,8 +249,8 @@ struct update_state {
 
         const Real ckk = 0.5 / p_ilev(igp, jgp);
         const Real ckl = 2.0 * ckk;
-        const Real term = div_vdp(ilev, igp, jgp);
-        p_ilev(igp, jgp) =
+        const Real term = m_data.div_vdp(ie, ilev, igp, jgp);
+        omega_p(ie, ilev, igp, jgp) =
             vgrad_p / p_ilev(igp, jgp) - ckl * suml(igp, jgp) - ckk * term;
 
         suml(igp, jgp) += term;
@@ -261,10 +265,9 @@ struct update_state {
                      ExecViewUnmanaged<Real[2][NP][NP]> grad_p,
                      ExecViewUnmanaged<Real[NP][NP]> suml) const {
     int ie = team.league_rank();
-    const ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> div_vdp =
-        m_data.div_vdp(team);
     const ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure =
         m_data.pressure(team);
+    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> omega_p = m_data.omega_p(team);
     const ExecViewUnmanaged<Real[NP][NP]> p_ilev =
         subview(pressure, NUM_LEV - 1, Kokkos::ALL(), Kokkos::ALL());
     gradient_sphere(team, p_ilev, m_data, c_dinv, grad_p);
@@ -278,38 +281,34 @@ struct update_state {
 
       const Real ckk = 0.5 / p_ilev(igp, jgp);
       const Real ckl = 2.0 * ckk;
-      const Real term = div_vdp(NUM_LEV - 1, igp, jgp);
-      p_ilev(igp, jgp) =
+      const Real term = m_data.div_vdp(ie, NUM_LEV - 1, igp, jgp);
+      m_data.omega_p(team)(NUM_LEV - 1, igp, jgp) =
           vgrad_p / p_ilev(igp, jgp) - ckl * suml(igp, jgp) - ckk * term;
     });
   }
 
-  // For each thread, requires 3 x NP x NP Scratch Memory
-  // Depends on pressure, div_vdp, omega_p
-  // Sets pressure equal to omega_p
+  // Depends on pressure, U_current, V_current, div_vdp, omega_p
   KOKKOS_INLINE_FUNCTION
   void preq_omega_ps(const TeamPolicy &team,
                      const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv)
       const {
-    const int ie = team.league_rank();
     // NOTE: we can't use a single TeamThreadRange loop, since
     //       gradient_sphere requires a 'consistent' pressure,
     //       meaning that we cannot update the different pressure
     //       points within a level before the gradient is complete!
 
-    Kokkos::single(Kokkos::PerTeam(team), [&]() {
-      Real _suml_viewptr[NP][NP];
-      ExecViewUnmanaged<Real[NP][NP]> suml(&_suml_viewptr[0][0]);
-      Real _grad_p_viewptr[2][NP][NP];
-      ExecViewUnmanaged<Real[2][NP][NP]> grad_p(&_grad_p_viewptr[0][0][0]);
-      preq_omega_ps_init(team, c_dinv, grad_p, suml);
-      preq_omega_ps_loop(team, c_dinv, grad_p, suml);
-      preq_omega_ps_tail(team, c_dinv, grad_p, suml);
-    });
+    Real _suml_viewptr[NP][NP];
+    ExecViewUnmanaged<Real[NP][NP]> suml(&_suml_viewptr[0][0]);
+    Real _grad_p_viewptr[2][NP][NP];
+    ExecViewUnmanaged<Real[2][NP][NP]> grad_p(&_grad_p_viewptr[0][0][0]);
+    preq_omega_ps_init(team, c_dinv, grad_p, suml);
+    preq_omega_ps_loop(team, c_dinv, grad_p, suml);
+    preq_omega_ps_tail(team, c_dinv, grad_p, suml);
   }
 
+  // Depends on DP3D
   KOKKOS_INLINE_FUNCTION
-  void compute_pressure_helper(TeamPolicy team) const {
+  void compute_pressure(TeamPolicy team) const {
     const int ie = team.league_rank();
     ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> pressure = m_data.pressure(team);
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, NP * NP),
@@ -332,12 +331,16 @@ struct update_state {
     }
   }
 
-  // Depends on DP3D
+  // Depends on DP3D, PHIS, DP3D, PHI, T_v
+  // Modifies pressure, PHI
   KOKKOS_INLINE_FUNCTION
-  void compute_pressure(TeamPolicy team) const {
+  void compute_scan_properties(
+      TeamPolicy team,
+      const ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv) const {
     Kokkos::single(Kokkos::PerTeam(team), KOKKOS_LAMBDA() {
-      compute_pressure_helper(team);
+      compute_pressure(team);
       preq_hydrostatic(team);
+      preq_omega_ps(team, c_dinv);
     });
   }
 
@@ -410,7 +413,7 @@ struct update_state {
                       div_vdp_ilev);
   }
 
-  // Depends on T_current
+  // Depends on T_current, DERIVE_UN0, DERIVED_VN0, METDET, DINV
   // Might depend on QDP, DP3D_current
   KOKKOS_INLINE_FUNCTION
   void compute_temperature_div_vdp(
@@ -443,10 +446,7 @@ struct update_state {
     ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> T_v = m_data.T_v(team);
     ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> pressure =
         m_data.pressure(team);
-    ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> div_vdp = m_data.div_vdp(team);
 
-    // TODO: Rename pressure after here to omega_p
-    preq_omega_ps(team, c_dinv);
     // Updates OMEGA_P, T, and DP3D
     // Depends on T (global), OMEGA_P (global), U (global), V (global),
     // SPHEREMP (global), T_v, and omega_p
@@ -469,7 +469,7 @@ struct update_state {
 
         m_region.OMEGA_P_update(ie, ilev)(igp, jgp) =
             m_region.OMEGA_P(ie, ilev)(igp, jgp) +
-            PhysicalConstants::eta_ave_w * pressure(ilev, igp, jgp);
+            PhysicalConstants::eta_ave_w * m_data.omega_p(team)(ilev, igp, jgp);
 
         const Real cur_T_v = T_v(ilev, igp, jgp);
 
@@ -480,7 +480,8 @@ struct update_state {
             // T_vadv(ilev, igp, jgp)
             0.0 - (v1 * grad_tmp(0, igp, jgp) + v2 * grad_tmp(1, igp, jgp)) +
             // kappa_star(ilev, igp, jgp)
-            PhysicalConstants::kappa * cur_T_v * pressure(ilev, igp, jgp);
+            PhysicalConstants::kappa * cur_T_v *
+                m_data.omega_p(team)(ilev, igp, jgp);
 
         m_region.T_future(ie)(ilev, igp, jgp) =
             m_region.SPHEREMP(ie)(igp, jgp) *
@@ -489,7 +490,7 @@ struct update_state {
         m_region.DP3D_future(ie)(ilev, igp, jgp) =
             m_region.SPHEREMP(ie)(igp, jgp) *
             (m_region.DP3D_previous(ie)(ilev, igp, jgp) -
-             m_data.dt2() * div_vdp(ilev, igp, jgp));
+             m_data.dt2() * m_data.div_vdp(ie, ilev, igp, jgp));
       });
     });
   }
@@ -570,13 +571,10 @@ struct update_state {
     ExecViewUnmanaged<Real[2][2][NP][NP]> c_dinv(ptr);
     init_const_cache(team, c_dinv);
 
-    // Used 3 times per index
     compute_temperature_div_vdp(team, c_dinv);
 
-    // Used 5 times per index - basically the most important variable
-    compute_pressure(team);
+    compute_scan_properties(team, c_dinv);
 
-    preq_hydrostatic(team);
     compute_velocity(team, c_dinv);
     compute_eta_dpdn(team);
     // Breaks pressure
@@ -585,7 +583,7 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   size_t shmem_size(const int team_size) const {
-    return sizeof(Real[2][2][NP][NP]);
+    return sizeof(Real[4][2][2][NP][NP]);
   }
 };
 
