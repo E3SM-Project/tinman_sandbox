@@ -9,9 +9,12 @@
 
 #calc(){ awk "BEGIN { print "$*" }"  };
 
-exec='./origomp'
+exec='./fs4omp'   #'./origomp'
 
-#export OMP_DISPLAY_ENV=true
+export OMP_DISPLAY_ENV=true
+export OMP_PROC_BIND=close
+export OMP_SCHEDULE=static
+export OMP_DYNAMIC=false
 
 for (( th=1; th<=16; th=th+1 )); do
 
