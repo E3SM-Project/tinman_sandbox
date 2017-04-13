@@ -64,6 +64,12 @@ public:
                            Kokkos::ALL);
   }
 
+  KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NP][NP]> const
+  pressure(const int &ie, const int &ilev) const {
+    return Kokkos::subview(m_pressure, ie, ilev, Kokkos::ALL,
+                           Kokkos::ALL);
+  }
+
   KOKKOS_INLINE_FUNCTION Real &pressure(const int &ie, const int &ilev,
                                         const int &igp, const int &jgp) const {
     return m_pressure(ie, ilev, igp, jgp);
@@ -111,6 +117,18 @@ public:
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][2][NP][NP]> const
   vector_buf(const TeamPolicy &team) const {
     return Kokkos::subview(m_vector_buf, team.league_rank(), Kokkos::ALL,
+                           Kokkos::ALL, Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][2][NP][NP]> const
+  vector_buf(const int &ie) const {
+    return Kokkos::subview(m_vector_buf, ie, Kokkos::ALL,
+                           Kokkos::ALL, Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[2][NP][NP]> const
+  vector_buf(const int &ie, const int &ilev) const {
+    return Kokkos::subview(m_vector_buf, ie, ilev,
                            Kokkos::ALL, Kokkos::ALL, Kokkos::ALL);
   }
 
