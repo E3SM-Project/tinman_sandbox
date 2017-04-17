@@ -241,30 +241,29 @@ struct update_state {
 
         const Real ckk = 0.5 / p_ilev(igp, jgp);
         const Real ckl = 2.0 * ckk;
-        const Real term = m_data.div_vdp(k_locals.ie, ilev, igp, jgp);
         m_data.omega_p(k_locals.ie, ilev, igp, jgp) =
             vgrad_p / p_ilev(igp, jgp) - ckl * k_locals.c_buf_1(0, igp, jgp) -
-            ckk * term;
-#if 1
-      if (k_locals.ie == 0) {
-        const char *fmt_str = "(%02d, %d, %d):"
-					                    "  pressure: % 17.9e"
-					                    "  g_0: % 17.9e"
-					                    "  g_1: % 17.9e"
-					                    "  term: % 17.9e"
-					                    "  omega_p: % 17.9e"
-                              "\n";
-        printf(fmt_str, ilev, igp, jgp
-               , p_ilev(igp, jgp)
-               , grad_p(0, igp, jgp)
-               , grad_p(1, igp, jgp)
-               , term
-               , m_data.omega_p(k_locals.ie, ilev, igp, jgp)
-							 );
-      }
+            ckk * m_data.div_vdp(k_locals.ie, ilev, igp, jgp);
+#if 0
+        if (k_locals.ie == 0) {
+          const char *fmt_str = "(%02d, %d, %d):"
+                                "  pressure: % 17.9e"
+                                "  g_0: % 17.9e"
+                                "  g_1: % 17.9e"
+                                "  div_vdp: % 17.9e"
+                                "  omega_p: % 17.9e"
+                                "\n";
+          printf(fmt_str, ilev, igp, jgp
+                 , p_ilev(igp, jgp)
+                 , grad_p(0, igp, jgp)
+                 , grad_p(1, igp, jgp)
+                 , m_data.div_vdp(k_locals.ie, ilev, igp, jgp)
+                 , m_data.omega_p(k_locals.ie, ilev, igp, jgp)
+                 );
+        }
 #endif
 
-        k_locals.c_buf_1(0, igp, jgp) += term;
+        k_locals.c_buf_1(0, igp, jgp) += m_data.div_vdp(k_locals.ie, ilev, igp, jgp);
       });
     }
   }
@@ -405,7 +404,27 @@ struct update_state {
         m_data.div_vdp(k_locals.team), ilev, Kokkos::ALL(), Kokkos::ALL());
     divergence_sphere(k_locals.team, vdp_ilev, m_data,
                       m_region.METDET(k_locals.ie), k_locals.c_dinv,
-                      div_vdp_ilev);
+                      k_locals.c_buf_1, div_vdp_ilev);
+#if 0
+    if (k_locals.ie == 0) {
+      const char *fmt_str = "(%02d, %d, %d):"
+                            "  vdp 0: % 17.9e"
+                            "  vdp 1: % 17.9e"
+                            "  div_vdp: % 17.9e"
+                            "\n";
+      Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
+                           KOKKOS_LAMBDA(const int idx) {
+        const int igp = idx / NP;
+        const int jgp = idx % NP;
+
+        printf(fmt_str, ilev, igp, jgp
+               , vdp_ilev(0, igp, jgp)
+               , vdp_ilev(1, igp, jgp)
+               , div_vdp_ilev(igp, jgp)
+        );
+      });
+    }
+#endif
   }
 
   // Depends on T_current, DERIVE_UN0, DERIVED_VN0, METDET, DINV

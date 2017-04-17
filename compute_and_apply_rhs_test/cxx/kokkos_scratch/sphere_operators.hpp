@@ -31,6 +31,7 @@ divergence_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
                   const Control &data,
                   const ExecViewUnmanaged<const Real[NP][NP]> metDet,
                   const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                  ExecViewUnmanaged<Real[2][NP][NP]> gv,
                   ExecViewUnmanaged<Real[NP][NP]> div_v);
 
 KOKKOS_FUNCTION void
@@ -124,9 +125,8 @@ divergence_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
                   const Control &data,
                   const ExecViewUnmanaged<const Real[NP][NP]> metDet,
                   const ExecViewUnmanaged<const Real[2][2][NP][NP]> DInv,
+                  ExecViewUnmanaged<Real[2][NP][NP]> gv,
                   ExecViewUnmanaged<Real[NP][NP]> div_v) {
-  Real _tmp_viewbuf[2][NP][NP];
-  ExecViewUnmanaged<Real[2][NP][NP]> gv(&_tmp_viewbuf[0][0][0]);
   constexpr int contra_iters = NP * NP * 2;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, contra_iters),
                        [&](const int loop_idx) {
