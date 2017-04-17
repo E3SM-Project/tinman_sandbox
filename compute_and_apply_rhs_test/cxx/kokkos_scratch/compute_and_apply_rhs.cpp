@@ -20,12 +20,15 @@ struct update_state {
     KOKKOS_INLINE_FUNCTION
     KernelVariables(const TeamPolicy &team,
                     ExecViewUnmanaged<const Real[2][2][NP][NP]> dinv,
-                    ExecViewUnmanaged<Real[2][NP][NP]> buf_1)
-        : team(team), ie(team.league_rank()), c_dinv(dinv), c_buf_1(buf_1) {}
+                    ExecViewUnmanaged<Real[NP][NP]> scalar_buf_1,
+                    ExecViewUnmanaged<Real[2][NP][NP]> vector_buf_1)
+        : team(team), ie(team.league_rank()), c_dinv(dinv),
+          c_scalar_buf_1(scalar_buf_1), c_vector_buf_1(vector_buf_1) {}
     const TeamPolicy &team;
     const int ie;
     ExecViewUnmanaged<const Real[2][2][NP][NP]> c_dinv;
-    ExecViewUnmanaged<Real[2][NP][NP]> c_buf_1;
+    ExecViewUnmanaged<Real[NP][NP]> c_scalar_buf_1;
+    ExecViewUnmanaged<Real[2][NP][NP]> c_vector_buf_1;
   };
 
   KOKKOS_INLINE_FUNCTION
@@ -36,9 +39,7 @@ struct update_state {
   // Modifies Ephi_grad
   KOKKOS_INLINE_FUNCTION void
   compute_energy_grad(const KernelVariables &k_locals, const int ilev) const {
-    // Hacky way of using a view for register memory
-    Real _tmp_viewptr[NP][NP];
-    ExecViewUnmanaged<Real[NP][NP]> Ephi(&_tmp_viewptr[0][0]);
+    ExecViewUnmanaged<Real[NP][NP]> Ephi = k_locals.c_scalar_buf_1;
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
                          KOKKOS_LAMBDA(const int idx) {
       const int igp = idx / NP;
@@ -52,9 +53,9 @@ struct update_state {
           m_region.PHI_update(k_locals.ie)(ilev, igp, jgp) +
           m_region.PECND(k_locals.ie, ilev)(igp, jgp);
     });
-    k_locals.team.team_barrier();
     gradient_sphere_update(k_locals.team, Ephi, m_data, k_locals.c_dinv,
-                           k_locals.c_buf_1);
+                           m_data.vector_buf(k_locals.ie, ilev),
+                           k_locals.c_vector_buf_1);
   }
 
   // Depends on pressure, PHI, U_current, V_current, METDET,
@@ -64,7 +65,6 @@ struct update_state {
     Kokkos::parallel_for(Kokkos::TeamThreadRange(k_locals.team, NUM_LEV),
                          KOKKOS_LAMBDA(const int ilev) {
       compute_eta_dpdn(k_locals, ilev);
-      k_locals.team.team_barrier();
       compute_velocity(k_locals, ilev);
     });
   }
@@ -80,7 +80,8 @@ struct update_state {
         m_data.pressure(k_locals.ie, ilev);
 
     gradient_sphere(k_locals.team, p_ilev, m_data, k_locals.c_dinv,
-                    m_data.vector_buf(k_locals.ie, ilev), k_locals.c_buf_1);
+                    m_data.vector_buf(k_locals.ie, ilev),
+                    k_locals.c_vector_buf_1);
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, 2 * NP * NP),
                          KOKKOS_LAMBDA(const int idx) {
       const int hgp = (idx / NP) / NP;
@@ -88,15 +89,14 @@ struct update_state {
       const int jgp = idx % NP;
 
       const Real gpterm = T_v(ilev, igp, jgp) / p_ilev(igp, jgp);
-      k_locals.c_buf_1(hgp, igp, jgp) *= PhysicalConstants::Rgas * gpterm;
+      k_locals.c_vector_buf_1(hgp, igp, jgp) *=
+          PhysicalConstants::Rgas * gpterm;
     });
 
-    // k_locals.c_buf_1 -> Ephi_grad + glnpsi
+    // k_locals.c_vector_buf_1 -> Ephi_grad + glnpsi
     compute_energy_grad(k_locals, ilev);
-    k_locals.team.team_barrier();
 
-    Real _tmp_viewptr[NP][NP];
-    ExecViewUnmanaged<Real[NP][NP]> vort(&_tmp_viewptr[0][0]);
+    ExecViewUnmanaged<Real[NP][NP]> vort = m_data.scalar_buf(k_locals.ie, ilev);
     vorticity_sphere(k_locals.team, m_region.U_current(k_locals.ie, ilev),
                      m_region.V_current(k_locals.ie, ilev), m_data,
                      m_region.METDET(k_locals.ie), m_region.D(k_locals.ie),
@@ -112,7 +112,7 @@ struct update_state {
       const Real vtens1 =
           // v_vadv(igp, jgp, 0)
           m_region.V_current(k_locals.ie, ilev)(igp, jgp) * vort(igp, jgp) -
-          k_locals.c_buf_1(0, igp, jgp);
+          k_locals.c_vector_buf_1(0, igp, jgp);
 
       m_region.U_future(k_locals.ie)(ilev, igp, jgp) =
           m_region.SPHEREMP(k_locals.ie)(igp, jgp) *
@@ -122,7 +122,7 @@ struct update_state {
       const Real vtens2 =
           // v_vadv(igp, jgp, 1) -
           -m_region.U_current(k_locals.ie, ilev)(igp, jgp) * vort(igp, jgp) -
-          k_locals.c_buf_1(1, igp, jgp);
+          k_locals.c_vector_buf_1(1, igp, jgp);
 
       m_region.V_future(k_locals.ie)(ilev, igp, jgp) =
           m_region.SPHEREMP(k_locals.ie)(igp, jgp) *
@@ -199,10 +199,10 @@ struct update_state {
 
   KOKKOS_INLINE_FUNCTION
   void preq_omega_ps_init(const KernelVariables &k_locals) const {
-		const ExecViewUnmanaged<Real[2][NP][NP]> grad_p = k_locals.c_buf_1;
+    const ExecViewUnmanaged<Real[2][NP][NP]> grad_p = k_locals.c_vector_buf_1;
     ExecViewUnmanaged<Real[NP][NP]> p_ilev = m_data.pressure(k_locals.ie, 0);
     gradient_sphere(k_locals.team, p_ilev, m_data, k_locals.c_dinv,
-                    k_locals.c_buf_1, grad_p);
+                    k_locals.c_vector_buf_1, grad_p);
 
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
                          KOKKOS_LAMBDA(const int loop_idx) {
@@ -216,19 +216,19 @@ struct update_state {
       const Real term = m_data.div_vdp(k_locals.ie, 0, igp, jgp);
       m_data.omega_p(k_locals.ie, 0, igp, jgp) =
           vgrad_p / p_ilev(igp, jgp) - ckk * term;
-      k_locals.c_buf_1(0, igp, jgp) = term;
+      k_locals.c_vector_buf_1(0, igp, jgp) = term;
     });
   }
 
   KOKKOS_INLINE_FUNCTION
   void preq_omega_ps_loop(const KernelVariables &k_locals) const {
     // Another candidate for parallel scan
-		const ExecViewUnmanaged<Real[2][NP][NP]> grad_p = k_locals.c_buf_1;
+    const ExecViewUnmanaged<Real[2][NP][NP]> grad_p = k_locals.c_vector_buf_1;
     ExecViewUnmanaged<const Real[NP][NP]> p_ilev;
     for (int ilev = 1; ilev < NUM_LEV - 1; ++ilev) {
       p_ilev = m_data.pressure(k_locals.ie, ilev);
       gradient_sphere(k_locals.team, p_ilev, m_data, k_locals.c_dinv,
-                      k_locals.c_buf_1, grad_p);
+                      k_locals.c_vector_buf_1, grad_p);
 
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
                            KOKKOS_LAMBDA(const int loop_idx) {
@@ -241,40 +241,41 @@ struct update_state {
 
         const Real ckk = 0.5 / p_ilev(igp, jgp);
         const Real ckl = 2.0 * ckk;
-        const Real term = m_data.div_vdp(k_locals.ie, ilev, igp, jgp);
         m_data.omega_p(k_locals.ie, ilev, igp, jgp) =
-            vgrad_p / p_ilev(igp, jgp) - ckl * k_locals.c_buf_1(0, igp, jgp) -
-            ckk * term;
-#if 1
-      if (k_locals.ie == 0) {
-        const char *fmt_str = "(%02d, %d, %d):"
-					                    "  pressure: % 17.9e"
-					                    "  g_0: % 17.9e"
-					                    "  g_1: % 17.9e"
-					                    "  term: % 17.9e"
-					                    "  omega_p: % 17.9e"
-                              "\n";
-        printf(fmt_str, ilev, igp, jgp
-               , p_ilev(igp, jgp)
-               , grad_p(0, igp, jgp)
-               , grad_p(1, igp, jgp)
-               , term
-               , m_data.omega_p(k_locals.ie, ilev, igp, jgp)
-							 );
-      }
+            vgrad_p / p_ilev(igp, jgp) -
+            ckl * k_locals.c_vector_buf_1(0, igp, jgp) -
+            ckk * m_data.div_vdp(k_locals.ie, ilev, igp, jgp);
+#if 0
+        if (k_locals.ie == 0) {
+          const char *fmt_str = "(%02d, %d, %d):"
+                                "  pressure: % 17.9e"
+                                "  g_0: % 17.9e"
+                                "  g_1: % 17.9e"
+                                "  div_vdp: % 17.9e"
+                                "  omega_p: % 17.9e"
+                                "\n";
+          printf(fmt_str, ilev, igp, jgp
+                 , p_ilev(igp, jgp)
+                 , grad_p(0, igp, jgp)
+                 , grad_p(1, igp, jgp)
+                 , m_data.div_vdp(k_locals.ie, ilev, igp, jgp)
+                 , m_data.omega_p(k_locals.ie, ilev, igp, jgp)
+                 );
+        }
 #endif
-
-        k_locals.c_buf_1(0, igp, jgp) += term;
+        k_locals.c_vector_buf_1(0, igp, jgp) +=
+            m_data.div_vdp(k_locals.ie, ilev, igp, jgp);
       });
     }
   }
 
   KOKKOS_INLINE_FUNCTION
   void preq_omega_ps_tail(const KernelVariables &k_locals) const {
-		const ExecViewUnmanaged<Real[2][NP][NP]> grad_p = k_locals.c_buf_1;
-    ExecViewUnmanaged<Real[NP][NP]> p_ilev = m_data.pressure(k_locals.ie, NUM_LEV - 1);
+    const ExecViewUnmanaged<Real[2][NP][NP]> grad_p = k_locals.c_vector_buf_1;
+    ExecViewUnmanaged<Real[NP][NP]> p_ilev =
+        m_data.pressure(k_locals.ie, NUM_LEV - 1);
     gradient_sphere(k_locals.team, p_ilev, m_data, k_locals.c_dinv,
-                    k_locals.c_buf_1, grad_p);
+                    k_locals.c_vector_buf_1, grad_p);
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
                          KOKKOS_LAMBDA(const int loop_idx) {
       const int igp = loop_idx / NP;
@@ -289,8 +290,8 @@ struct update_state {
       const Real ckl = 2.0 * ckk;
       const Real term = m_data.div_vdp(k_locals.ie, NUM_LEV - 1, igp, jgp);
       m_data.omega_p(k_locals.ie, NUM_LEV - 1, igp, jgp) =
-          vgrad_p / p_ilev(igp, jgp) - ckl * k_locals.c_buf_1(0, igp, jgp) -
-          ckk * term;
+          vgrad_p / p_ilev(igp, jgp) -
+          ckl * k_locals.c_vector_buf_1(0, igp, jgp) - ckk * term;
     });
   }
 
@@ -336,7 +337,6 @@ struct update_state {
       preq_hydrostatic(k_locals);
       preq_omega_ps(k_locals);
     }
-    k_locals.team.team_barrier();
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -405,7 +405,27 @@ struct update_state {
         m_data.div_vdp(k_locals.team), ilev, Kokkos::ALL(), Kokkos::ALL());
     divergence_sphere(k_locals.team, vdp_ilev, m_data,
                       m_region.METDET(k_locals.ie), k_locals.c_dinv,
-                      div_vdp_ilev);
+                      k_locals.c_vector_buf_1, div_vdp_ilev);
+#if 0
+    if (k_locals.ie == 0) {
+      const char *fmt_str = "(%02d, %d, %d):"
+                            "  vdp 0: % 17.9e"
+                            "  vdp 1: % 17.9e"
+                            "  div_vdp: % 17.9e"
+                            "\n";
+      Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
+                           KOKKOS_LAMBDA(const int idx) {
+        const int igp = idx / NP;
+        const int jgp = idx % NP;
+
+        printf(fmt_str, ilev, igp, jgp
+               , vdp_ilev(0, igp, jgp)
+               , vdp_ilev(1, igp, jgp)
+               , div_vdp_ilev(igp, jgp)
+        );
+      });
+    }
+#endif
   }
 
   // Depends on T_current, DERIVE_UN0, DERIVED_VN0, METDET, DINV
@@ -425,7 +445,6 @@ struct update_state {
         compute_div_vdp(k_locals, ilev);
       });
     }
-    k_locals.team.team_barrier();
   }
 
   // Requires 7 x NP x NP thread memory
@@ -451,7 +470,7 @@ struct update_state {
                           Kokkos::ALL, Kokkos::ALL);
 
       gradient_sphere(k_locals.team, temperature, m_data, k_locals.c_dinv,
-                      k_locals.c_buf_1, grad_tmp);
+                      k_locals.c_vector_buf_1, grad_tmp);
 
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
                            [&](const int idx) {
@@ -589,13 +608,15 @@ struct update_state {
   KOKKOS_INLINE_FUNCTION
   void operator()(TeamPolicy team) const {
     // Cache dinv, and dvv
-    ExecViewUnmanaged<Real[2][NP][NP]> c_buf_1(
+    ExecViewUnmanaged<Real[2][NP][NP]> c_vector_buf(
         allocate_thread<Real[2][NP][NP]>(team));
+    ExecViewUnmanaged<Real[NP][NP]> c_scalar_buf(
+        allocate_thread<Real[NP][NP]>(team));
     ExecViewUnmanaged<Real[2][2][NP][NP]> c_dinv(
         allocate_team<Real[2][2][NP][NP]>(team));
 
     init_const_cache(team, c_dinv);
-    KernelVariables k_locals(team, c_dinv, c_buf_1);
+    KernelVariables k_locals(team, c_dinv, c_scalar_buf, c_vector_buf);
 
     compute_temperature_div_vdp(k_locals);
 
@@ -608,7 +629,8 @@ struct update_state {
   KOKKOS_INLINE_FUNCTION
   size_t shmem_size(const int team_size) const {
     size_t mem_size =
-        sizeof(Real[2][2][NP][NP]) + sizeof(Real[2][NP][NP]) * team_size;
+        sizeof(Real[2][2][NP][NP]) +
+        (sizeof(Real[2][NP][NP]) + sizeof(Real[NP][NP])) * team_size;
     return mem_size;
   }
 };
