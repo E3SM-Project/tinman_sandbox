@@ -11,34 +11,34 @@ namespace TinMan {
 
 namespace {
 // The number of fields for each dimension
-constexpr int NUM_4D_SCALARS = 4;
-constexpr int NUM_3D_SCALARS = 5;
-constexpr int NUM_2D_SCALARS = 4;
-constexpr int NUM_2D_TENSORS = 2;
+static constexpr const int NUM_4D_SCALARS = 4;
+static constexpr const int NUM_3D_SCALARS = 5;
+static constexpr const int NUM_2D_SCALARS = 4;
+static constexpr const int NUM_2D_TENSORS = 2;
 
 // Some constexpr for the index of different variables in the views
 // 4D Scalars
-constexpr int IDX_U    = 0;
-constexpr int IDX_V    = 1;
-constexpr int IDX_T    = 2;
-constexpr int IDX_DP3D = 3;
+static constexpr const int IDX_U = 0;
+static constexpr const int IDX_V = 1;
+static constexpr const int IDX_T = 2;
+static constexpr const int IDX_DP3D = 3;
 
 // 3D Scalars
-constexpr int IDX_OMEGA_P     = 0;
-constexpr int IDX_PECND       = 1;
-constexpr int IDX_PHI         = 2;
-constexpr int IDX_DERIVED_UN0 = 3;
-constexpr int IDX_DERIVED_VN0 = 4;
+static constexpr const int IDX_OMEGA_P = 0;
+static constexpr const int IDX_PECND = 1;
+static constexpr const int IDX_PHI = 2;
+static constexpr const int IDX_DERIVED_UN0 = 3;
+static constexpr const int IDX_DERIVED_VN0 = 4;
 
 // 2D Scalars
-constexpr int IDX_FCOR     = 0;
-constexpr int IDX_SPHEREMP = 1;
-constexpr int IDX_METDET   = 2;
-constexpr int IDX_PHIS     = 3;
+static constexpr const int IDX_FCOR = 0;
+static constexpr const int IDX_SPHEREMP = 1;
+static constexpr const int IDX_METDET = 2;
+static constexpr const int IDX_PHIS = 3;
 
 // 2D Tensors
-constexpr int IDX_D    = 0;
-constexpr int IDX_DINV = 1;
+static constexpr const int IDX_D = 0;
+static constexpr const int IDX_DINV = 1;
 }
 
 /* Per element data - specific velocity, temperature, pressure, etc. */
@@ -135,6 +135,11 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
+  Real U_current(int ie, int ilev, int igp, int jgp) const {
+    return m_4d_scalars(ie, m_timelevels.n0, IDX_U, ilev, igp, jgp);
+  }
+
+  KOKKOS_INLINE_FUNCTION
   ExecViewUnmanaged<const Real[NUM_LEV][NP][NP]> V_current(int ie) const {
     return Kokkos::subview(m_4d_scalars, ie, m_timelevels.n0, IDX_V,
                            Kokkos::ALL, Kokkos::ALL, Kokkos::ALL);
@@ -144,6 +149,11 @@ public:
   ExecViewUnmanaged<const Real[NP][NP]> V_current(int ie, int ilev) const {
     return Kokkos::subview(m_4d_scalars, ie, m_timelevels.n0, IDX_V, ilev,
                            Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  Real V_current(int ie, int ilev, int igp, int jgp) const {
+    return m_4d_scalars(ie, m_timelevels.n0, IDX_V, ilev, igp, jgp);
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -207,6 +217,11 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
+  Real &U_future(int ie, int ilev, int igp, int jgp) const {
+    return m_4d_scalars(ie, m_timelevels.np1, IDX_U, ilev, igp, jgp);
+  }
+
+  KOKKOS_INLINE_FUNCTION
   ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> V_future(int ie) const {
     return Kokkos::subview(m_4d_scalars, ie, m_timelevels.np1, IDX_V,
                            Kokkos::ALL, Kokkos::ALL, Kokkos::ALL);
@@ -216,6 +231,11 @@ public:
   ExecViewUnmanaged<Real[NP][NP]> V_future(int ie, int ilev) const {
     return Kokkos::subview(m_4d_scalars, ie, m_timelevels.np1, IDX_V, ilev,
                            Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  Real &V_future(int ie, int ilev, int igp, int jgp) const {
+    return m_4d_scalars(ie, m_timelevels.np1, IDX_V, ilev, igp, jgp);
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -232,15 +252,20 @@ public:
 
   /* 3D Scalars */
   KOKKOS_INLINE_FUNCTION
-  ExecViewUnmanaged<const Real[NP][NP]> OMEGA_P(int ie, int level) const {
-    return Kokkos::subview(m_3d_scalars, ie, IDX_OMEGA_P, level, Kokkos::ALL,
+  ExecViewUnmanaged<const Real[NP][NP]> OMEGA_P(int ie, int ilev) const {
+    return Kokkos::subview(m_3d_scalars, ie, IDX_OMEGA_P, ilev, Kokkos::ALL,
                            Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION
-  ExecViewUnmanaged<const Real[NP][NP]> PECND(int ie, int level) const {
-    return Kokkos::subview(m_3d_scalars, ie, IDX_PECND, level, Kokkos::ALL,
+  ExecViewUnmanaged<const Real[NP][NP]> PECND(int ie, int ilev) const {
+    return Kokkos::subview(m_3d_scalars, ie, IDX_PECND, ilev, Kokkos::ALL,
                            Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  Real &PECND(int ie, int ilev, int igp, int jgp) const {
+    return m_3d_scalars(ie, IDX_PECND, ilev, igp, jgp);
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -277,6 +302,11 @@ public:
   ExecViewUnmanaged<Real[NUM_LEV][NP][NP]> PHI_update(int ie) const {
     return Kokkos::subview(m_3d_scalars_update, ie, IDX_PHI, Kokkos::ALL,
                            Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  Real &PHI_update(int ie, int ilev, int igp, int jgp) const {
+    return m_3d_scalars_update(ie, IDX_PHI, ilev, igp, jgp);
   }
 
   KOKKOS_INLINE_FUNCTION
