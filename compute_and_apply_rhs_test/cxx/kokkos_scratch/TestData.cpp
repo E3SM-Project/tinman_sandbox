@@ -6,7 +6,11 @@ Control::Control(int num_elems)
     : m_num_elems(num_elems), m_qn0(0), m_dt2(1.0), m_ps0(10.0),
       m_hybrid_a(
           "Hybrid coordinates; translates between pressure and velocity"),
-      m_dvv("Laplacian"), m_pressure("Pressure", num_elems), m_omega_p("omega_p", num_elems), m_T_v("Vertical Temperature", num_elems), m_div_vdp("Global array scratch", num_elems), m_vector_buf("Vector buffer for vectors on each level", num_elems) {
+      m_dvv("Laplacian"), m_pressure("Pressure", num_elems),
+      m_omega_p("omega_p", num_elems), m_T_v("Vertical Temperature", num_elems),
+      m_div_vdp("Global array scratch", num_elems),
+      m_scalar_buf("Scalar buffer for scalars on each level", num_elems),
+      m_vector_buf("Vector buffer for vectors on each level", num_elems) {
   ExecViewManaged<Real[NP][NP]>::HostMirror dvv_host =
       Kokkos::create_mirror_view(m_dvv);
   for (int i = 0; i < NP; ++i) {
