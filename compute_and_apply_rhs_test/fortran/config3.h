@@ -47,6 +47,9 @@
 #define dXdXdXuXnm1Xie    :,:,:,1,nm1,ie
 #define dXdXdXvXnm1Xie    :,:,:,2,nm1,ie
 
+#define dXdXdXuXnp1Xie    :,:,:,1,np1,ie
+#define dXdXdXvXnp1Xie    :,:,:,2,np1,ie
+
 #define dXdXdXtXnp1Xie    :,:,:,3,np1,ie
 #endif
 

@@ -54,9 +54,9 @@ implicit none
   real (kind=real_kind) :: ii, jj, kk, iee
 
 ! local
-  integer :: i,j,k,ie,tl,ind
+  integer :: i,j,k,ie,tl,ind,comp
 
-  real (kind=real_kind) :: Tt(np,np,nlev)
+  real (kind=real_kind) :: Tt(np,np,nlev), v1t(np,np,nlev), v2t(np,np,nlev)
   real (kind=real_kind) :: v_norm(nelemd), t_norm(nelemd), dp_norm(nelemd)
 
 #if   STVER1
@@ -83,10 +83,11 @@ print *, "Main: nelemd = ", nelemd
   ! This is a douple-prec array init-ed with single prec values.
   ! Since Ttest values were computed based on this init, switching to double
   ! prec here would break tests (unless Ttest is recomputed).
+
   Dvv_init(1:16) = (/ -3.0,  -0.80901699437494745,   0.30901699437494745, &
-  -0.50000000000000000 ,4.0450849718747373, 0.0, -1.1180339887498949, &
+  -0.5 ,4.0450849718747373, 0.0, -1.1180339887498949, &
    1.5450849718747370, -1.5450849718747370, 1.1180339887498949, &
-   0.0, -4.0450849718747373, 0.50, -0.30901699437494745, 0.80901699437494745, 3.0 /)
+   0.0, -4.0450849718747373, 0.5, -0.30901699437494745, 0.80901699437494745, 3.0 /)
 
   do j =1 , np
    do i = 1, np
@@ -138,14 +139,14 @@ print *, "Main: nelemd = ", nelemd
       elem(ie)%state%v(i,j,2,k,1:timelevels) = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*3.0
       elem(ie)%state%T(i,j,k,1:timelevels) = 1000-kk-ii-jj+iee/10 + (/1,2,3/)
       elem(ie)%state%Qdp(i,j,k,1,qn0) = 1.0+SIN(ii*jj*kk)
-      elem(ie)%state%phis(i,j) = 0.0d0
+      elem(ie)%state%phis(i,j) = i+j
 #else
       ST( iXjXkXdpXdXie )   = 10*kk+iee+ii+jj + (/1,2,3/)
       ST( iXjXkXuXdXie )    = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*2.0
       ST( iXjXkXvXdXie )    = 1.0+kk/2+ii+jj+iee/5 + (/1,2,3/)*3.0
       ST( iXjXkXtXdXie )    = 1000-kk-ii-jj+iee/10 + (/1,2,3/)
       ST( iXjXkXqXdXie )    = 1.0+SIN(ii*jj*kk)
-      ST( iXjX1XphisX1Xie ) = 0.0d0
+      ST( iXjX1XphisX1Xie ) = i+j
 #endif
      enddo
     enddo
@@ -210,27 +211,66 @@ print *, "Main: nelemd = ", nelemd
   finish = tock(start)
 
 ! ---------------- DO NOT MODIFY ------------------------
+ie = 1
+#if 0
+do k = 1,nlev
+print *, elem(ie)%state%T(1,1,k,np1),'d0,', elem(ie)%state%T(2,1,k,np1),'d0,',& 
+elem(ie)%state%T(3,1,k,np1),'d0,',elem(ie)%state%T(4,1,k,np1),'d0,&'
+print *, elem(ie)%state%T(1,2,k,np1),'d0,', elem(ie)%state%T(2,2,k,np1),'d0,',&
+elem(ie)%state%T(3,2,k,np1),'d0,', elem(ie)%state%T(4,2,k,np1),'d0,&'
+print *, elem(ie)%state%T(1,3,k,np1),'d0,', elem(ie)%state%T(2,3,k,np1),'d0,',&
+elem(ie)%state%T(3,3,k,np1),'d0,', elem(ie)%state%T(4,3,k,np1),'d0,&'
+print *, elem(ie)%state%T(1,4,k,np1),'d0,', elem(ie)%state%T(2,4,k,np1),'d0,',&
+elem(ie)%state%T(3,4,k,np1),'d0,', elem(ie)%state%T(4,4,k,np1),'d0,&'
+enddo
+#endif
+#if 0
+comp = 2
+do k = 1,nlev
+print *, elem(ie)%state%v(1,1,comp,k,np1),'d0,', elem(ie)%state%v(2,1,comp,k,np1),'d0,',&
+elem(ie)%state%v(3,1,comp,k,np1),'d0,',elem(ie)%state%v(4,1,comp,k,np1),'d0,&'
+print *, elem(ie)%state%v(1,2,comp,k,np1),'d0,', elem(ie)%state%v(2,2,comp,k,np1),'d0,',&
+elem(ie)%state%v(3,2,comp,k,np1),'d0,', elem(ie)%state%v(4,2,comp,k,np1),'d0,&'
+print *, elem(ie)%state%v(1,3,comp,k,np1),'d0,', elem(ie)%state%v(2,3,comp,k,np1),'d0,',&
+elem(ie)%state%v(3,3,comp,k,np1),'d0,', elem(ie)%state%v(4,3,comp,k,np1),'d0,&'
+print *, elem(ie)%state%v(1,4,comp,k,np1),'d0,', elem(ie)%state%v(2,4,comp,k,np1),'d0,',&
+elem(ie)%state%v(3,4,comp,k,np1),'d0,', elem(ie)%state%v(4,4,comp,k,np1),'d0,&'
+enddo
+#endif
+
   ie = 1
   ind = 1
   do k = 1,nlev;
    do j = 1,np;
     do i = 1,np
      Tt(i,j,k) = Ttest(ind)
+     v1t(i,j,k) = v1test(ind)
+     v2t(i,j,k) = v2test(ind)
      ind = ind+1
     enddo
    enddo
   enddo
 
 #if STVER1
-  print *, 'STVER1 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
+  print *, 'STVER1 T diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
+  print *, 'STVER1 V1 diff', maxval(abs(v1t - ST( dXdXdXuXnp1Xie )))
+  print *, 'STVER1 V2 diff', maxval(abs(v2t - ST( dXdXdXvXnp1Xie )))
 #elif STVER2
-  print *, 'STVER2 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
+  print *, 'STVER2 T diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
+  print *, 'STVER2 V1 diff', maxval(abs(v1t - ST( dXdXdXuXnp1Xie )))
+  print *, 'STVER2 V2 diff', maxval(abs(v2t - ST( dXdXdXvXnp1Xie )))
 #elif STVER3
-  print *, 'STVER3 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
+  print *, 'STVER3 T diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
+  print *, 'STVER3 V1 diff', maxval(abs(v1t - ST( dXdXdXuXnp1Xie )))
+  print *, 'STVER3 V2 diff', maxval(abs(v2t - ST( dXdXdXvXnp1Xie )))
 #elif STVER4
-  print *, 'STVER4 diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
+  print *, 'STVER4 T diff', maxval(abs(Tt - ST( dXdXdXtXnp1Xie )))
+  print *, 'STVER4 V1 diff', maxval(abs(v1t - ST( dXdXdXuXnp1Xie )))
+  print *, 'STVER4 V2 diff', maxval(abs(v2t - ST( dXdXdXvXnp1Xie )))
 #else
-  print *, 'ORIGINAL diff', maxval(abs(Tt - elem(ie)%state%T(:,:,:,np1)))
+  print *, 'ORIGINAL T diff', maxval(abs(Tt - elem(ie)%state%T(:,:,:,np1)))
+  print *, 'ORIGINAL V1 diff', maxval(abs(v1t - elem(ie)%state%v(:,:,1,:,np1)))
+  print *, 'ORIGINAL V2 diff', maxval(abs(v2t - elem(ie)%state%v(:,:,2,:,np1)))
 #endif
 !---------------------------------------------------------
 

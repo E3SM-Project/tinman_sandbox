@@ -50,6 +50,9 @@
 #define dXdXdXuXnm1Xie    :,:,:,nm1,1,ie
 #define dXdXdXvXnm1Xie    :,:,:,nm1,2,ie
 
+#define dXdXdXuXnp1Xie    :,:,:,np1,1,ie
+#define dXdXdXvXnp1Xie    :,:,:,np1,2,ie
+
 #define dXdXdXtXnp1Xie    :,:,:,np1,3,ie
 #endif
 
