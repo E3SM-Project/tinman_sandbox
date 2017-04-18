@@ -464,8 +464,7 @@ struct update_state {
         m_region.T_current(k_locals.ie), ilev, Kokkos::ALL(), Kokkos::ALL());
 
     ExecViewUnmanaged<Real[2][NP][NP]> grad_tmp =
-        Kokkos::subview(m_data.vector_buf(k_locals.team, 0), ilev, Kokkos::ALL,
-                        Kokkos::ALL, Kokkos::ALL);
+      m_data.vector_buf(k_locals.ie, 0, ilev);
 
     gradient_sphere(k_locals.team, temperature, m_data, k_locals.c_dinv,
                     k_locals.c_vector_buf, grad_tmp);
