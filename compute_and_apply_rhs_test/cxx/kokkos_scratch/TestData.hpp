@@ -5,6 +5,8 @@
 
 #include "Types.hpp"
 
+#include <assert.h>
+
 namespace TinMan {
 
 struct PhysicalConstants {
@@ -131,21 +133,24 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][2][NP][NP]>
-  vector_buf(const TeamPolicy &team) const {
-    return Kokkos::subview(m_vector_buf, team.league_rank(), Kokkos::ALL,
-                           Kokkos::ALL, Kokkos::ALL, Kokkos::ALL);
+  vector_buf(const TeamPolicy &team, const int &buf_id) const {
+    assert(buf_id < 2);
+    return Kokkos::subview(m_vector_buf, team.league_rank(), buf_id,
+                           Kokkos::ALL, Kokkos::ALL, Kokkos::ALL, Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][2][NP][NP]>
-  vector_buf(const int &ie) const {
-    return Kokkos::subview(m_vector_buf, ie, Kokkos::ALL, Kokkos::ALL,
+  vector_buf(const int &ie, const int &buf_id) const {
+    assert(buf_id < 2);
+    return Kokkos::subview(m_vector_buf, ie, buf_id, Kokkos::ALL, Kokkos::ALL,
                            Kokkos::ALL, Kokkos::ALL);
   }
 
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[2][NP][NP]>
-  vector_buf(const int &ie, const int &ilev) const {
-    return Kokkos::subview(m_vector_buf, ie, ilev, Kokkos::ALL, Kokkos::ALL,
-                           Kokkos::ALL);
+  vector_buf(const int &ie, const int &buf_id, const int &ilev) const {
+    assert(buf_id < 2);
+    return Kokkos::subview(m_vector_buf, ie, buf_id, ilev, Kokkos::ALL,
+                           Kokkos::ALL, Kokkos::ALL);
   }
 
 private:
@@ -167,7 +172,7 @@ private:
   ExecViewManaged<Real * [NUM_LEV][NP][NP]> m_T_v;
   ExecViewManaged<Real * [NUM_LEV][NP][NP]> m_div_vdp;
   ExecViewManaged<Real * [NUM_LEV][NP][NP]> m_scalar_buf;
-  ExecViewManaged<Real * [NUM_LEV][2][NP][NP]> m_vector_buf;
+  ExecViewManaged<Real * [NUM_LEV][2][2][NP][NP]> m_vector_buf;
 };
 
 } // Namespace TinMan
