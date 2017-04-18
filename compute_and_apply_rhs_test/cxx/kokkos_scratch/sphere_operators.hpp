@@ -103,7 +103,6 @@ gradient_sphere_update(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
     v_buf(0, l, j) = dsdx * PhysicalConstants::rrearth;
     v_buf(1, j, l) = dsdy * PhysicalConstants::rrearth;
   });
-  team.team_barrier();
 
   constexpr int grad_iters = NP * NP;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, grad_iters),
