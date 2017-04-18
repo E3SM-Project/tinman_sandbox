@@ -211,7 +211,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
      enddo
 
 #if HOMP
-!$omp parallel do private(k,i,j,v1,v2,Qt,eta_ave_w,E,Ephi)
+!$omp parallel do private(k,i,j,v1,v2,Qt,eta_ave_w)
 #endif
      do k=1,nlev
 
@@ -235,14 +235,14 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
               T_v(i,j,k) = Virtual_Temperature1d( ST( iXjXkXtXn0Xie ),Qt)
               kappa_star(i,j,k) = kappa
 
-              E = 0.5D0*( v1*v1 + v2*v2 )
-              Ephi(i,j)=E+phi(i,j,k)+elem(ie)%derived%pecnd(i,j,k)
+              !E = 0.5D0*( v1*v1 + v2*v2 )
+              !Ephi(i,j)=E+phi(i,j,k)+elem(ie)%derived%pecnd(i,j,k)
               vgrad_T(i,j,k) =  v1*vtemp1(i,j,1,k) + v2*vtemp1(i,j,2,k)
 
            end do
         end do
 
-        vtemp2(:,:,:,k) = gradient_sphere(Ephi(:,:),deriv,elem(ie)%Dinv)
+        !vtemp2(:,:,:,k) = gradient_sphere(Ephi(:,:),deriv,elem(ie)%Dinv)
 
         elem(ie)%derived%vn0(:,:,:,k)=elem(ie)%derived%vn0(:,:,:,k)+eta_ave_w*vdp(:,:,:,k)
         divdp(:,:,k)=divergence_sphere(vdp(:,:,:,k),deriv,elem(ie))
@@ -263,9 +263,18 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
      v_vadv=0
 
 #if HOMP
-!$omp parallel do private(k,v1,v2,gpterm,glnps1,glnps2)
+!$omp parallel do private(k,v1,v2,gpterm,glnps1,glnps2,E,Ephi,vtemp2)
 #endif
      vertloop: do k=1,nlev
+        do j=1,np
+           do i=1,np
+              v1 = ST( iXjXkXuXn0Xie )
+              v2 = ST( iXjXkXvXn0Xie )
+              E = 0.5D0*( v1*v1 + v2*v2 )
+              Ephi(i,j)=E+phi(i,j,k)+elem(ie)%derived%pecnd(i,j,k)
+           end do
+        end do
+        vtemp2(:,:,:,k) = gradient_sphere(Ephi(:,:),deriv,elem(ie)%Dinv)
         do j=1,np
            do i=1,np
               gpterm = T_v(i,j,k)/p(i,j,k)
@@ -285,7 +294,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
         end do
 
         ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXuXnm1Xie ) + dt2*vtens1(:,:,k) )
-        ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXvXnm1Xie ) + dt2*vtens2(:,:,k) )
+        ST( dXdXkXvXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXvXnm1Xie ) + dt2*vtens2(:,:,k) )
         ST( dXdXkXtXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXtXnm1Xie ) + dt2*ttens(:,:,k)  )
         ST( dXdXkXdpXnp1Xie ) = &
              elem(ie)%spheremp(:,:) * ( ST( dXdXkXdpXnm1Xie ) - &
