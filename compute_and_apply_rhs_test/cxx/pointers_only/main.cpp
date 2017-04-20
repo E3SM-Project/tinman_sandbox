@@ -98,45 +98,26 @@ int main (int argc, char** argv)
 
   TestData data;
 
-  std::cout << " --- Initializing data...\n";
   data.init_data();
-
-  // Print norm of initial states, to check we are using same data in all tests
-  print_results_2norm (data);
 
   // Burn in to avoid cache effects
   compute_and_apply_rhs(data);
 
-  std::cout << " --- Performing computations... (" << num_exec << " executions of the main loop on " << num_elems << " elements)\n";
-  //std::vector<Timer::Timer> timers(num_exec);
-  Timer::Timer global_timer;
-  global_timer.startTimer();
+  std::vector<Timer::Timer> timers(num_exec);
   for (int i=0; i<num_exec; ++i)
   {
-    //timers[i].startTimer();
+    data.update_time_levels();
+    timers[i].startTimer();
     compute_and_apply_rhs(data);
-    //data.update_time_levels();
-    //timers[i].stopTimer();
+    timers[i].stopTimer();
   }
-  global_timer.stopTimer();
 
-/*
-  std::cout << "   ---> individual executions times:\n";
   for(int i = 0; i < num_exec; ++i) {
-    std::cout << timers[i] << std::endl;
-  }
-*/
-  std::cout << "   ---> compute_and_apply_rhs execution total time: " << global_timer << "\n";
-
-  print_results_2norm (data);
-
-  if (dump_res)
-  {
-    std::cout << " --- Dumping results to file...\n";
-    dump_results_to_file (data);
+    std::cout << i << "  " << timers[i] << std::endl;
   }
 
-  std::cout << " --- Cleaning up data...\n";
+  print_results_2norm(data);
+
   data.cleanup_data ();
 
   return 0;
