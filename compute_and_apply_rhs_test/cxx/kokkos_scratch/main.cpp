@@ -9,8 +9,6 @@
 #include <cstring>
 #include <memory>
 
-#include <cuda_profiler_api.h>
-
 bool is_unsigned_int(const char *str) {
   const size_t len = strlen(str);
   for (size_t i = 0; i < len; ++i) {
@@ -20,6 +18,9 @@ bool is_unsigned_int(const char *str) {
   }
   return true;
 }
+
+// Source: http://stackoverflow.com/a/3638454
+bool is_2_power(unsigned int x) { return x && !(x & (x - 1)); }
 
 void parse_args(int argc, char **argv, int &num_elems, int &num_exec,
                 bool &dump_results, int &threads, int &vectors) {
@@ -53,6 +54,7 @@ void parse_args(int argc, char **argv, int &num_elems, int &num_exec,
       } else if (strncmp(argv[iarg], "--tinman-vectors=", 17) == 0) {
         char *val = strchr(argv[iarg], '=') + 1;
         vectors = std::stoi(val);
+        assert(is_2_power(vectors));
 
         ++iarg;
         continue;
@@ -86,6 +88,10 @@ void parse_args(int argc, char **argv, int &num_elems, int &num_exec,
                      "file (default=no)  |\n"
                   << "|  --tinman-num-exec=N   : number of times to execute "
                      "(default=1)        |\n"
+                  << "|  --tinman-threads      : number of vertical threads    "
+                     "                |\n"
+                  << "|  --tinman-vectors      : number of point threads, only "
+                     "powers of 2     |\n"
                   << "|  --tinman-help         : prints this message           "
                      "                |\n"
                   << "|  --kokkos-help         : prints kokkos help            "
@@ -114,7 +120,7 @@ void run_simulation(int num_elems, int num_exec, bool dump_results, int threads,
   TinMan::ExecSpace::fence();
 
   for (Timer::Timer t : timers) {
-    region.next_compute_apply_rhs();
+    // region.next_compute_apply_rhs();
     t.startTimer();
     TinMan::compute_and_apply_rhs(data, region, threads, vectors);
 
@@ -145,6 +151,7 @@ int main(int argc, char **argv) {
   parse_args(argc, argv, num_elems, num_exec, dump_results, threads, vectors);
 
   Kokkos::initialize(argc, argv);
+  TinMan::ExecSpace::print_configuration(std::cout, true);
 
   run_simulation(num_elems, num_exec, dump_results, threads, vectors);
 
