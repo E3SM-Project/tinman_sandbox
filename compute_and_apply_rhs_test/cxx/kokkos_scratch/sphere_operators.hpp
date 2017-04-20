@@ -155,7 +155,7 @@ divergence_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
 
 // Note that divergence_sphere requires scratch space of 3 x NP x NP Reals
 // This must be called from the device space
-KOKKOS_FUNCTION void
+KOKKOS_INLINE_FUNCTION void
 vorticity_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
                  const ExecViewUnmanaged<const Real[NP][NP]> u,
                  const ExecViewUnmanaged<const Real[NP][NP]> v,
