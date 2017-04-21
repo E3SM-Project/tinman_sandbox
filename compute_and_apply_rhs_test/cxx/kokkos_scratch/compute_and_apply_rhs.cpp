@@ -78,7 +78,7 @@ struct update_state {
                          [&](const int idx) {
       k_locals.igp() = idx / NP;
       k_locals.jgp() = idx % NP;
-      // Kinetic energy + PHI (thermal energy?) + PECND (potential energy?)
+      // Kinetic energy + PHI (geopotential energy) + PECND (potential energy?)
       // Ephi(igp, jgp) =
       //     0.5 * (m_region.U_current(k_locals.ie(), k_locals.ilev())(igp, jgp)
       // *
@@ -249,12 +249,13 @@ struct update_state {
         // Real phii = k_locals.c_scalar_buf(0, 0);
         {
           // const Real hk = k_locals.c_scalar_buf(0, 1);
+          k_locals.c_scalar_buf(0, 0) =
+              PhysicalConstants::Rgas *
+              T_v(NUM_LEV - 1, k_locals.igp(), k_locals.jgp());
           k_locals.c_scalar_buf(0, 1) =
               dp(NUM_LEV - 1, k_locals.igp(), k_locals.jgp()) /
               pressure(NUM_LEV - 1, k_locals.igp(), k_locals.jgp());
-          k_locals.c_scalar_buf(0, 0) =
-              PhysicalConstants::Rgas *
-              T_v(NUM_LEV - 1, k_locals.igp(), k_locals.jgp()) *
+          k_locals.c_scalar_buf(0, 0) *=
               k_locals.c_scalar_buf(0, 1);
           phi_update(NUM_LEV - 1, k_locals.igp(), k_locals.jgp()) =
               phis(k_locals.igp(), k_locals.jgp()) +
