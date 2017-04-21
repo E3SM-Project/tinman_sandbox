@@ -407,88 +407,6 @@ end subroutine caar
        end do
 end subroutine preq_hydrostatic_
 
-! shorter routine to replace the original
-! its vert loop is now from 1 to nlev and maybe
-! with a little work it can be merged with omega_ps calculations
-subroutine preq_hydrostatic2(phi,phis,T_v,p,dp)
-    use kinds, only : real_kind, np, nlev
-    use physical_constants, only : rgas
-    implicit none
-    real(kind=real_kind), intent(out) :: phi(np,np,nlev)
-    real(kind=real_kind), intent(in) :: phis(np,np)
-    real(kind=real_kind), intent(in) :: T_v(np,np,nlev)
-    real(kind=real_kind), intent(in) :: p(np,np,nlev)
-    real(kind=real_kind), intent(in) :: dp(np,np,nlev)
-    integer i,j,k,q                         ! longitude, level indices
-    real(kind=real_kind), dimension(np) :: summ
-#if HOMP
-!$omp parallel do private(k,j,i,summ)
-#endif
-       do j=1,np   !   Loop inversion (AAM)
-          do i=1,np
-summ(i) = sum(Rgas*T_v(i,j,1:nlev)*dp(i,j,1:nlev)/p(i,j,1:nlev))
-          end do
-          do k=1,nlev
-             do i=1,np
-                summ(i) = summ(i)-Rgas*T_v(i,j,k)*dp(i,j,k)/p(i,j,k)
-                phi(i,j,k) = phis(i,j) + summ(i) + Rgas*T_v(i,j,k)*dp(i,j,k)*0.5d0/p(i,j,k)
-             end do
-          end do
-       end do
-end subroutine preq_hydrostatic2
-
-! another version, with i*j omp parallel region
-subroutine preq_hydrostatic3(phi,phis,T_v,p,dp)
-    use kinds, only : real_kind, np, nlev
-    use physical_constants, only : rgas
-    implicit none
-    real(kind=real_kind), intent(out) :: phi(np*np,nlev)
-    real(kind=real_kind), intent(in) :: phis(np*np)
-    real(kind=real_kind), intent(in) :: T_v(np*np,nlev)
-    real(kind=real_kind), intent(in) :: p(np*np,nlev)
-    real(kind=real_kind), intent(in) :: dp(np*np,nlev)
-    integer i,j,k,q                         ! longitude, level indices
-    real(kind=real_kind) :: summ
-#if HOMP
-!$omp parallel do private(j,summ)
-#endif
-       do j=1,np*np   !   Loop inversion (AAM)
-          summ = sum(Rgas*T_v(j,1:nlev)*dp(j,1:nlev)/p(j,1:nlev))
-          do k=1,nlev
-             summ = summ-Rgas*T_v(j,k)*dp(j,k)/p(j,k)
-             phi(j,k) = phis(j) + summ + Rgas*T_v(j,k)*dp(j,k)*0.5d0/p(j,k)
-          end do
-       end do
-end subroutine preq_hydrostatic3
-
-! twice as slow as the original
-subroutine preq_hydrostatic4(phi,phis,T_v,p,dp)
-    use kinds, only : real_kind, np, nlev
-    use physical_constants, only : rgas
-    implicit none
-    real(kind=real_kind), intent(out) :: phi(np*np,nlev)
-    real(kind=real_kind), intent(in) :: phis(np*np)
-    real(kind=real_kind), intent(in) :: T_v(np*np,nlev)
-    real(kind=real_kind), intent(in) :: p(np*np,nlev)
-    real(kind=real_kind), intent(in) :: dp(np*np,nlev)
-    integer i,j,k,q                         ! longitude, level indices
-    real(kind=real_kind) :: summ, accum, philoc(nlev)
-#if HOMP
-!$omp parallel do private(j,summ,accum,philoc)
-#endif
-       do j=1,np*np   !   Loop inversion (AAM)
-          summ = sum(Rgas*T_v(j,1:nlev)*dp(j,1:nlev)/p(j,1:nlev))
-          do k=1,nlev
-             summ = summ-Rgas*T_v(j,k)*dp(j,k)/p(j,k)
-             phi(j,k) = phis(j) + summ + Rgas*T_v(j,k)*dp(j,k)*0.5d0/p(j,k)
-             !philoc(k) = phis(j) + summ + Rgas*T_v(j,k)*dp(j,k)*0.5d0/p(j,k)
-          end do
-          !phi(j,1:nlev) = philoc(1:nlev)
-       end do
-end subroutine preq_hydrostatic4
-
-
-
 subroutine preq_hydrostatic(phi,phis,T_v,p,dp)
     use kinds, only : real_kind, np, nlev
     use physical_constants, only : rgas
@@ -514,10 +432,6 @@ subroutine preq_hydrostatic(phi,phis,T_v,p,dp)
           end do
        end do
 end subroutine preq_hydrostatic
-
-
-
-
 
 
 
