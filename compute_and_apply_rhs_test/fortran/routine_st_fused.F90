@@ -408,4 +408,83 @@ end subroutine caar
 end subroutine preq_hydrostatic
 
 
+
+
+
+
+subroutine preq_hydrostatic_(phi,phis,T_v,p,dp)
+    use kinds, only : real_kind, np, nlev
+    use physical_constants, only : rgas
+    implicit none
+    real(kind=real_kind), intent(out) :: phi(np,np,nlev)
+    real(kind=real_kind), intent(in) :: phis(np,np)
+    real(kind=real_kind), intent(in) :: T_v(np,np,nlev)
+    real(kind=real_kind), intent(in) :: p(np,np,nlev)
+    real(kind=real_kind), intent(in) :: dp(np,np,nlev)
+    integer i,j,k,q                         ! longitude, level indices
+    real(kind=real_kind) Hkk(np),Hkl(np)          ! diagonal term of energy
+    real(kind=real_kind), dimension(np,np,nlev) :: phii       ! Geopotential at
+    real(kind=real_kind), dimension(np) :: summ
+#if (defined COLUMN_OPENMP)
+!$omp parallel do private(k,j,i,hkk,hkl,summ)
+#endif
+       do j=1,np   !   Loop inversion (AAM)
+!do q=1,10
+          do i=1,np
+             hkk(i) = dp(i,j,nlev)*0.5d0/p(i,j,nlev)
+             hkl(i) = 2*hkk(i)
+             phii(i,j,nlev)  = Rgas*T_v(i,j,nlev)*hkl(i)
+             phi(i,j,nlev) = phis(i,j) + Rgas*T_v(i,j,nlev)*hkk(i)
+
+summ(i) = sum(Rgas*T_v(i,j,1:nlev)*dp(i,j,1:nlev)/p(i,j,1:nlev))
+
+          end do
+#if 0
+          !summ(:) = 
+          do k=nlev-1,2,-1
+             do i=1,np
+                ! hkk = dp*ckk
+                hkk(i) = dp(i,j,k)*0.5d0/p(i,j,k)
+                hkl(i) = 2*hkk(i)
+                phii(i,j,k) = phii(i,j,k+1) + Rgas*T_v(i,j,k)*hkl(i)
+                phi(i,j,k) = phis(i,j) + phii(i,j,k+1) + Rgas*T_v(i,j,k)*hkk(i)
+             end do
+          end do
+          do i=1,np
+             ! hkk = dp*ckk
+             hkk(i) = 0.5d0*dp(i,j,1)/p(i,j,1)
+             phi(i,j,1) = phis(i,j) + phii(i,j,2) + Rgas*T_v(i,j,1)*hkk(i)
+          end do
+#endif
+!          summ(1:np) =
+!          Rgas*T_v(1:np,j,1:nlev)*dp(1:np,j,1:nlev)/p(1:np,j,1:nlev)
+          phii(:,j,1) = summ(:)
+          do k=2,nlev-1
+             do i=1,np
+                ! hkk = dp*ckk
+                !hkk(i) = dp(i,j,k)*0.5d0/p(i,j,k)
+                !hkl(i) = 2*hkk(i)
+                !phii(i,j,k) = phii(i,j,k+1) + Rgas*T_v(i,j,k)*hkl(i)
+                !phi(i,j,k) = phis(i,j) + phii(i,j,k+1) + Rgas*T_v(i,j,k)*hkk(i)
+                phii(i,j,k) =phii(i,j,k-1)-Rgas*T_v(i,j,k-1)*dp(i,j,k-1)/p(i,j,k-1)
+                phi(i,j,k) = phis(i,j) + phii(i,j,k) +Rgas*T_v(i,j,k)*dp(i,j,k)*0.5d0/p(i,j,k)
+             end do
+          end do
+          do i=1,np
+             ! hkk = dp*ckk
+             hkk(i) = 0.5d0*dp(i,j,1)/p(i,j,1)
+             phi(i,j,1) = phis(i,j) + phii(i,j,2) + Rgas*T_v(i,j,1)*hkk(i)
+          end do
+
+!enddo
+       end do
+end subroutine preq_hydrostatic_
+
+
+
+
+
+
+
+
 end module routine_mod_ST
