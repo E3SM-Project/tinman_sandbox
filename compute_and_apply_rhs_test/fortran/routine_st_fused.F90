@@ -141,7 +141,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
   real (kind=real_kind) ::  vtens1(np,np,nlev)
   real (kind=real_kind) ::  vtens2(np,np,nlev)
   real (kind=real_kind) ::  ttens(np,np,nlev)
-  real (kind=real_kind) ::  stashdp3d (np,np,nlev)
+  real (kind=real_kind) ::  stashdp3d (np,np,nlev), quot(np,np,nlev)
   real (kind=real_kind) ::  tempdp3d  (np,np)
   real (kind=real_kind) ::  cp2,cp_ratio,E,de,Qt,v1,v2
   real (kind=real_kind) ::  glnps1,glnps2,gpterm
@@ -239,6 +239,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 
               vgrad_T(i,j,k) =  v1*vtemp1(i,j,1,k) + v2*vtemp1(i,j,2,k)
 
+              quot(i,j,k) = Rgas*T_v(i,j,k)/p(i,j,k)*ST( iXjXkXdpXn0Xie )
            end do
         end do
 
@@ -252,7 +253,8 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
      enddo
 #endif
 #if 1
-     call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) ,T_v,p, ST( dXdXdXdpXn0Xie ) )
+     !call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) ,T_v,p, ST( dXdXdXdpXn0Xie ) )
+     call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) , quot )
 #endif
 #if 1
      call preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
@@ -407,7 +409,7 @@ end subroutine caar
        end do
 end subroutine preq_hydrostatic_
 
-subroutine preq_hydrostatic(phi,phis,T_v,p,dp)
+subroutine preq_hydrostatic2(phi,phis,T_v,p,dp)
     use kinds, only : real_kind, np, nlev
     use physical_constants, only : rgas
     implicit none
@@ -431,8 +433,31 @@ subroutine preq_hydrostatic(phi,phis,T_v,p,dp)
              phi(j,k) = phis(j) + summ + frac(k)*0.50d0
           end do
        end do
-end subroutine preq_hydrostatic
+end subroutine preq_hydrostatic2
 
+subroutine preq_hydrostatic(phi,phis,quot)
+    use kinds, only : real_kind, np, nlev
+    use physical_constants, only : rgas
+    implicit none
+    real(kind=real_kind), intent(out) :: phi(np*np,nlev)
+    real(kind=real_kind), intent(in) :: phis(np*np)
+    real(kind=real_kind), intent(in) :: quot(np*np,nlev)
+    integer i,j,k,q                         ! longitude, level indices
+    real(kind=real_kind) :: summ, accum, frac(nlev), philoc(nlev)
+#if HOMP
+!$omp parallel do private(j,summ,frac)
+#endif
+       do j=1,np*np   !   Loop inversion (AAM)
+          summ = 0.d0
+          do k=1,nlev
+             summ = summ + quot(j,k)
+          enddo
+          do k=1,nlev
+             summ = summ-quot(j,k)
+             phi(j,k) = phis(j) + summ + quot(j,k)*0.50d0
+          end do
+       end do
+end subroutine preq_hydrostatic
 
 
 
