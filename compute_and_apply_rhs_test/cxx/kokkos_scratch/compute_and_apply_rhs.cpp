@@ -61,8 +61,7 @@ struct update_state {
     ExecViewUnmanaged<Real[2][NP][NP]> vector_buf;
 
   private:
-    const int m_ie;
-    int m_ilev, m_igp, m_jgp;
+    int m_ie, m_ilev, m_igp, m_jgp;
   };
 
   KOKKOS_INLINE_FUNCTION
@@ -92,8 +91,7 @@ struct update_state {
       //     m_region.PECND(k_locals.ie(), k_locals.ilev())(igp, jgp);
       k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) =
           m_region.U_current(k_locals.ie(), k_locals.ilev())(k_locals.igp(),
-                                                             k_locals.jgp());
-      k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) *=
+                                                             k_locals.jgp()) *
           m_region.U_current(k_locals.ie(), k_locals.ilev())(k_locals.igp(),
                                                              k_locals.jgp());
       // FMA, so no hidden register required
@@ -294,7 +292,7 @@ struct update_state {
           0.5 / p_ilev(k_locals.igp(), k_locals.jgp()) *
               m_data.div_vdp(k_locals.ie(), 0, k_locals.igp(), k_locals.jgp());
 
-      m_data.scalar_buf(k_locals.ie(), 0)(k_locals.igp(), k_locals.jgp()) =
+      m_data.scalar_buf(k_locals.ie(), 0, k_locals.igp(), k_locals.jgp()) =
           m_data.div_vdp(k_locals.ie(), 0, k_locals.igp(), k_locals.jgp());
     });
   }
@@ -328,12 +326,12 @@ struct update_state {
         m_data.omega_p(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                        k_locals.jgp()) =
             vgrad_p / p_ilev(k_locals.igp(), k_locals.jgp()) -
-            ckl * m_data.scalar_buf(k_locals.ie(), 0)(k_locals.igp(),
-                                                      k_locals.jgp()) -
+            ckl * m_data.scalar_buf(k_locals.ie(), 0, k_locals.igp(),
+                                    k_locals.jgp()) -
             ckk * m_data.div_vdp(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                                  k_locals.jgp());
 
-        m_data.scalar_buf(k_locals.ie(), 0)(k_locals.igp(), k_locals.jgp()) +=
+        m_data.scalar_buf(k_locals.ie(), 0, k_locals.igp(), k_locals.jgp()) +=
             m_data.div_vdp(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                            k_locals.jgp());
       });
@@ -372,8 +370,7 @@ struct update_state {
 
       // (vgrad_p - vector_buf_1 - div_vdp) / p_ilev
       k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) -=
-          m_data.scalar_buf(k_locals.ie(), 0)(0, k_locals.igp(),
-                                              k_locals.jgp());
+          m_data.scalar_buf(k_locals.ie(), 0, k_locals.igp(), k_locals.jgp());
       // FMA, so no temporary needed
       k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) +=
           -0.5 * m_data.div_vdp(k_locals.ie(), NUM_LEV - 1, k_locals.igp(),
@@ -414,9 +411,8 @@ struct update_state {
       k_locals.igp() = idx / NP;
       k_locals.jgp() = idx % NP;
       k_locals.scalar_buf(0, 0) = m_data.hybrid_a(0) * m_data.ps0();
-      k_locals.scalar_buf(0, 1) =
-          0.5 * m_region.DP3D_current(k_locals.ie())(0, k_locals.igp(),
-                                                     k_locals.jgp());
+      k_locals.scalar_buf(0, 1) = 0.5 * m_region.DP3D_current(k_locals.ie())(
+                                            0, k_locals.igp(), k_locals.jgp());
       pressure(0, k_locals.igp(), k_locals.jgp()) =
           k_locals.scalar_buf(0, 0) + k_locals.scalar_buf(0, 1);
       for (k_locals.ilev() = 1; k_locals.ilev() < NUM_LEV; k_locals.ilev()++) {
@@ -495,32 +491,34 @@ struct update_state {
       k_locals.jgp() = idx % NP;
 
       k_locals.vector_buf(0, k_locals.igp(), k_locals.jgp()) =
-          m_region.U_current(k_locals.ie(), k_locals.ilev())(k_locals.igp(),
-                                                             k_locals.jgp()) *
-          m_region.DP3D_current(k_locals.ie())(k_locals.ilev(), k_locals.igp(),
-                                               k_locals.jgp());
-      k_locals.vector_buf(1, k_locals.igp(), k_locals.jgp()) =
-          m_region.V_current(k_locals.ie(), k_locals.ilev())(k_locals.igp(),
-                                                             k_locals.jgp()) *
-          m_region.DP3D_current(k_locals.ie())(k_locals.ilev(), k_locals.igp(),
-                                               k_locals.jgp());
+          m_region.U_current(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
+                             k_locals.jgp()) *
+          m_region.DP3D_current(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
+                                k_locals.jgp());
 
-      k_locals.scalar_buf(0, 0) =
+      k_locals.vector_buf(1, k_locals.igp(), k_locals.jgp()) =
+          m_region.V_current(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
+                             k_locals.jgp()) *
+          m_region.DP3D_current(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
+                                k_locals.jgp());
+
+      k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) =
           PhysicalConstants::eta_ave_w *
           k_locals.vector_buf(0, k_locals.igp(), k_locals.jgp());
-      m_region.DERIVED_UN0_update(k_locals.ie(), k_locals.ilev())(
-          k_locals.igp(), k_locals.jgp()) =
-          m_region.DERIVED_UN0(k_locals.ie(), k_locals.ilev())(k_locals.igp(),
-                                                               k_locals.jgp()) +
-          k_locals.scalar_buf(0, 0);
+
+      m_region.DERIVED_UN0_update(k_locals.ie(), k_locals.ilev(),
+                                  k_locals.igp(), k_locals.jgp()) =
+          m_region.DERIVED_UN0(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
+                               k_locals.jgp()) +
+          k_locals.scalar_buf(k_locals.igp(), k_locals.jgp());
 
       k_locals.scalar_buf(0, 0) =
           PhysicalConstants::eta_ave_w *
           k_locals.vector_buf(1, k_locals.igp(), k_locals.jgp());
-      m_region.DERIVED_VN0_update(k_locals.ie(), k_locals.ilev())(
-          k_locals.igp(), k_locals.jgp()) =
-          m_region.DERIVED_VN0(k_locals.ie(), k_locals.ilev())(k_locals.igp(),
-                                                               k_locals.jgp()) +
+      m_region.DERIVED_VN0_update(k_locals.ie(), k_locals.ilev(),
+                                  k_locals.igp(), k_locals.jgp()) =
+          m_region.DERIVED_VN0(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
+                               k_locals.jgp()) +
           k_locals.scalar_buf(0, 0);
     });
 
@@ -728,7 +726,6 @@ void print_results_2norm(const Control &data, const Region &region) {
     tnorm += std::pow(compute_norm(T), 2);
     dpnorm += std::pow(compute_norm(DP3D), 2);
   }
-
   std::cout << std::setprecision(15);
   std::cout << "   ---> Norms:\n"
             << "          ||v||_2  = " << std::sqrt(vnorm) << "\n"

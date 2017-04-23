@@ -132,6 +132,12 @@ public:
     return Kokkos::subview(m_scalar_buf, ie, ilev, Kokkos::ALL, Kokkos::ALL);
   }
 
+  KOKKOS_INLINE_FUNCTION Real &scalar_buf(const int &ie, const int &ilev,
+                                          const int &igp,
+                                          const int &jgp) const {
+    return m_scalar_buf(ie, ilev, igp, jgp);
+  }
+
   KOKKOS_INLINE_FUNCTION ExecViewUnmanaged<Real[NUM_LEV][2][NP][NP]>
   vector_buf(const TeamPolicy &team, const int &buf_id) const {
     assert(buf_id < 2);
@@ -151,6 +157,13 @@ public:
     assert(buf_id < 2);
     return Kokkos::subview(m_vector_buf, ie, buf_id, ilev, Kokkos::ALL,
                            Kokkos::ALL, Kokkos::ALL);
+  }
+
+  KOKKOS_INLINE_FUNCTION Real &vector_buf(const int &ie, const int &ilev,
+                                          const int &buf_id, const int &hgp,
+                                          const int &igp,
+                                          const int &jgp) const {
+    return m_vector_buf(ie, ilev, buf_id, hgp, igp, jgp);
   }
 
 private:
