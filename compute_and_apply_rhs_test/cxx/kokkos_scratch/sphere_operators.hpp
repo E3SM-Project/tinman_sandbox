@@ -129,12 +129,12 @@ divergence_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
   constexpr int contra_iters = NP * NP * 2;
   Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, contra_iters),
                        KOKKOS_LAMBDA(const int loop_idx) {
-    const int igp = loop_idx / 2 / NP;
-    const int jgp = (loop_idx / 2) % NP;
-    const int kgp = loop_idx % 2;
-    gv(kgp, igp, jgp) =
-        metDet(igp, jgp) * (DInv(kgp, 0, igp, jgp) * v(0, igp, jgp) +
-                            DInv(kgp, 1, igp, jgp) * v(1, igp, jgp));
+    const int hgp = (loop_idx / NP) / NP;
+    const int igp = (loop_idx / NP) % NP;
+    const int jgp = loop_idx % NP;
+    gv(hgp, igp, jgp) =
+        metDet(igp, jgp) * (DInv(hgp, 0, igp, jgp) * v(0, igp, jgp) +
+                            DInv(hgp, 1, igp, jgp) * v(1, igp, jgp));
   });
 
   constexpr int div_iters = NP * NP;
