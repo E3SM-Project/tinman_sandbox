@@ -76,10 +76,10 @@ gradient_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
                        KOKKOS_LAMBDA(const int loop_idx) {
     const int i = loop_idx / NP;
     const int j = loop_idx % NP;
-    grad_s(0, i, j) =
-        DInv(0, 0, i, j) * v_buf(0, i, j) + DInv(1, 0, i, j) * v_buf(1, i, j);
-    grad_s(1, i, j) =
-        DInv(0, 1, i, j) * v_buf(0, i, j) + DInv(1, 1, i, j) * v_buf(1, i, j);
+    Real tmp = DInv(0, 0, i, j) * v_buf(0, i, j);
+    grad_s(0, i, j) = tmp + DInv(1, 0, i, j) * v_buf(1, i, j);
+    tmp = DInv(0, 1, i, j) * v_buf(0, i, j);
+    grad_s(1, i, j) = tmp + DInv(1, 1, i, j) * v_buf(1, i, j);
   });
 }
 
@@ -109,10 +109,13 @@ gradient_sphere_update(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
                        KOKKOS_LAMBDA(const int loop_idx) {
     const int i = loop_idx / NP;
     const int j = loop_idx % NP;
-    grad_s(0, i, j) +=
-        (DInv(0, 0, i, j) * v_buf(0, i, j) + DInv(1, 0, i, j) * v_buf(1, i, j));
-    grad_s(1, i, j) +=
-        (DInv(0, 1, i, j) * v_buf(0, i, j) + DInv(1, 1, i, j) * v_buf(1, i, j));
+    Real tmp = DInv(0, 0, i, j) * v_buf(0, i, j);
+    tmp += DInv(1, 0, i, j) * v_buf(1, i, j);
+    grad_s(0, i, j) += tmp;
+
+    tmp = DInv(0, 1, i, j) * v_buf(0, i, j);
+    tmp += DInv(1, 1, i, j) * v_buf(1, i, j);
+    grad_s(1, i, j) += tmp;
   });
 }
 
@@ -132,9 +135,9 @@ divergence_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
     const int igp = loop_idx / 2 / NP;
     const int jgp = (loop_idx / 2) % NP;
     const int kgp = loop_idx % 2;
-    gv(kgp, igp, jgp) =
-        metDet(igp, jgp) * (DInv(kgp, 0, igp, jgp) * v(0, igp, jgp) +
-                            DInv(kgp, 1, igp, jgp) * v(1, igp, jgp));
+    Real cur_gv = DInv(kgp, 0, igp, jgp) * v(0, igp, jgp);
+    cur_gv += DInv(kgp, 1, igp, jgp) * v(1, igp, jgp);
+    gv(kgp, igp, jgp) = cur_gv * metDet(igp, jgp);
   });
 
   constexpr int div_iters = NP * NP;
@@ -142,14 +145,13 @@ divergence_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
                        KOKKOS_LAMBDA(const int loop_idx) {
     const int igp = loop_idx / NP;
     const int jgp = loop_idx % NP;
-    Real dudx = 0.0, dvdy = 0.0;
+    Real tmp_sum = 0.0;
     for (int kgp = 0; kgp < NP; ++kgp) {
-      dudx += data.dvv(kgp, igp) * gv(0, kgp, jgp);
-      dvdy += data.dvv(kgp, jgp) * gv(1, igp, kgp);
+      tmp_sum += data.dvv(kgp, igp) * gv(0, kgp, jgp);
+      tmp_sum += data.dvv(kgp, jgp) * gv(1, igp, kgp);
     }
-
-    div_v(igp, jgp) =
-        PhysicalConstants::rrearth * (dudx + dvdy) / metDet(igp, jgp);
+    tmp_sum /= metDet(igp, jgp);
+    div_v(igp, jgp) = PhysicalConstants::rrearth * tmp_sum;
   });
 }
 
@@ -169,10 +171,12 @@ vorticity_sphere(const Kokkos::TeamPolicy<ExecSpace>::member_type &team,
                        KOKKOS_LAMBDA(const int loop_idx) {
     const int igp = loop_idx / NP;
     const int jgp = loop_idx % NP;
-    vcov(0, igp, jgp) =
-        D(0, 0, igp, jgp) * u(igp, jgp) + D(1, 0, igp, jgp) * v(igp, jgp);
-    vcov(1, igp, jgp) =
-        D(0, 1, igp, jgp) * u(igp, jgp) + D(1, 1, igp, jgp) * v(igp, jgp);
+
+    Real vcov_part1 = D(0, 0, igp, jgp) * u(igp, jgp);
+    vcov(0, igp, jgp) = vcov_part1 + D(1, 0, igp, jgp) * v(igp, jgp);
+
+    vcov_part1 = D(0, 1, igp, jgp) * u(igp, jgp);
+    vcov(1, igp, jgp) = vcov_part1 + D(1, 1, igp, jgp) * v(igp, jgp);
   });
 
   constexpr int vort_iters = NP * NP;
