@@ -19,8 +19,10 @@ struct update_state {
   struct KernelVariables {
     KOKKOS_INLINE_FUNCTION
     KernelVariables(TeamPolicy &team)
-        : team(team), scalar_buf(allocate_thread<Real, Real[NP][NP]>(team)),
-          vector_buf(allocate_thread<Real, Real[2][NP][NP]>(team)),
+        : team(team), scalar_buf_1(allocate_thread<Real, Real[NP][NP]>(team)),
+          scalar_buf_2(allocate_thread<Real, Real[NP][NP]>(team)),
+          vector_buf_1(allocate_thread<Real, Real[2][NP][NP]>(team)),
+          vector_buf_2(allocate_thread<Real, Real[2][NP][NP]>(team)),
           m_ie(team.league_rank()), m_ilev(-1), m_igp(-1), m_jgp(-1) {}
 
     KOKKOS_INLINE_FUNCTION
@@ -52,13 +54,15 @@ struct update_state {
     KOKKOS_INLINE_FUNCTION
     static size_t shmem_size(int team_size) {
       size_t mem_size =
-          (sizeof(Real[2][NP][NP]) + sizeof(Real[NP][NP])) * team_size;
+          (2 * sizeof(Real[2][NP][NP]) + 2 * sizeof(Real[NP][NP])) * team_size;
       return mem_size;
     }
 
     const TeamPolicy &team;
-    ExecViewUnmanaged<Real[NP][NP]> scalar_buf;
-    ExecViewUnmanaged<Real[2][NP][NP]> vector_buf;
+    ExecViewUnmanaged<Real[NP][NP]> scalar_buf_1;
+    ExecViewUnmanaged<Real[NP][NP]> scalar_buf_2;
+    ExecViewUnmanaged<Real[2][NP][NP]> vector_buf_1;
+    ExecViewUnmanaged<Real[2][NP][NP]> vector_buf_2;
 
   private:
     int m_ie, m_ilev, m_igp, m_jgp;
@@ -72,7 +76,7 @@ struct update_state {
   // Modifies Ephi_grad
   KOKKOS_INLINE_FUNCTION void
   compute_energy_grad(KernelVariables &k_locals) const {
-    // ExecViewUnmanaged<Real[NP][NP]> Ephi = k_locals.scalar_buf;
+    // ExecViewUnmanaged<Real[NP][NP]> Ephi = k_locals.scalar_buf_1;
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
                          [&](const int idx) {
       k_locals.igp() = idx / NP;
@@ -89,28 +93,27 @@ struct update_state {
       // jgp)) +
       //     m_region.PHI_update(k_locals.ie())(k_locals.ilev(), igp, jgp) +
       //     m_region.PECND(k_locals.ie(), k_locals.ilev())(igp, jgp);
-      k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) =
+      k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp()) =
           m_region.U_current(k_locals.ie(), k_locals.ilev())(k_locals.igp(),
                                                              k_locals.jgp()) *
           m_region.U_current(k_locals.ie(), k_locals.ilev())(k_locals.igp(),
                                                              k_locals.jgp());
       // FMA, so no hidden register required
-      k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) +=
+      k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp()) +=
           m_region.V_current(k_locals.ie(), k_locals.ilev())(k_locals.igp(),
                                                              k_locals.jgp()) *
           m_region.V_current(k_locals.ie(), k_locals.ilev())(k_locals.igp(),
                                                              k_locals.jgp());
-      k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) *= 0.5;
-      k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) +=
+      k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp()) *= 0.5;
+      k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp()) +=
           m_region.PHI_update(k_locals.ie())(k_locals.ilev(), k_locals.igp(),
                                              k_locals.jgp());
-      k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) += m_region.PECND(
+      k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp()) += m_region.PECND(
           k_locals.ie(), k_locals.ilev())(k_locals.igp(), k_locals.jgp());
     });
-    gradient_sphere_update(k_locals.team, k_locals.scalar_buf, m_data,
-                           m_region.DINV(k_locals.ie()),
-                           m_data.vector_buf(k_locals.ie(), 0, k_locals.ilev()),
-                           k_locals.vector_buf);
+    gradient_sphere_update(k_locals.team, k_locals.scalar_buf_1, m_data,
+                           m_region.DINV(k_locals.ie()), k_locals.vector_buf_1,
+                           k_locals.vector_buf_2);
   }
 
   // Depends on pressure, PHI, U_current, V_current, METDET,
@@ -134,32 +137,30 @@ struct update_state {
         m_data.pressure(k_locals.ie(), k_locals.ilev());
 
     gradient_sphere(k_locals.team, p_ilev, m_data, m_region.DINV(k_locals.ie()),
-                    m_data.vector_buf(k_locals.ie(), 0, k_locals.ilev()),
-                    k_locals.vector_buf);
+                    k_locals.vector_buf_1, k_locals.vector_buf_2);
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, 2 * NP * NP),
                          [&](const int idx) {
       const int hgp = (idx / NP) / NP;
       k_locals.igp() = (idx / NP) % NP;
       k_locals.jgp() = idx % NP;
 
-      k_locals.vector_buf(hgp, k_locals.igp(), k_locals.jgp()) *=
+      k_locals.vector_buf_2(hgp, k_locals.igp(), k_locals.jgp()) *=
           PhysicalConstants::Rgas;
-      k_locals.vector_buf(hgp, k_locals.igp(), k_locals.jgp()) *= m_data.T_v(
+      k_locals.vector_buf_2(hgp, k_locals.igp(), k_locals.jgp()) *= m_data.T_v(
           k_locals.ie(), k_locals.ilev(), k_locals.igp(), k_locals.jgp());
-      k_locals.vector_buf(hgp, k_locals.igp(), k_locals.jgp()) /=
+      k_locals.vector_buf_2(hgp, k_locals.igp(), k_locals.jgp()) /=
           p_ilev(k_locals.igp(), k_locals.jgp());
     });
 
-    // k_locals.vector_buf -> Ephi_grad + glnpsi
+    // k_locals.vector_buf_2 -> Ephi_grad + glnpsi
     compute_energy_grad(k_locals);
 
-    ExecViewUnmanaged<Real[NP][NP]> vort =
-        m_data.scalar_buf(k_locals.ie(), k_locals.ilev());
-    vorticity_sphere(
-        k_locals.team, m_region.U_current(k_locals.ie(), k_locals.ilev()),
-        m_region.V_current(k_locals.ie(), k_locals.ilev()), m_data,
-        m_region.METDET(k_locals.ie()), m_region.D(k_locals.ie()),
-        m_data.vector_buf(k_locals.ie(), 0, k_locals.ilev()), vort);
+    const ExecViewUnmanaged<Real[NP][NP]> &vort = k_locals.scalar_buf_2;
+    vorticity_sphere(k_locals.team,
+                     m_region.U_current(k_locals.ie(), k_locals.ilev()),
+                     m_region.V_current(k_locals.ie(), k_locals.ilev()), m_data,
+                     m_region.METDET(k_locals.ie()), m_region.D(k_locals.ie()),
+                     k_locals.vector_buf_1, vort);
 
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
                          [&](const int idx) {
@@ -169,37 +170,37 @@ struct update_state {
       vort(k_locals.igp(), k_locals.jgp()) +=
           m_region.FCOR(k_locals.ie())(k_locals.igp(), k_locals.jgp());
 
-      k_locals.vector_buf(0, k_locals.igp(), k_locals.jgp()) *= -1;
-      k_locals.vector_buf(
+      k_locals.vector_buf_2(0, k_locals.igp(), k_locals.jgp()) *= -1;
+      k_locals.vector_buf_2(
           0, k_locals.igp(),
           k_locals.jgp()) += // v_vadv(k_locals.igp(), k_locals.jgp()) +
           m_region.V_current(k_locals.ie(), k_locals.ilev())(k_locals.igp(),
                                                              k_locals.jgp()) *
           vort(k_locals.igp(), k_locals.jgp());
-      k_locals.vector_buf(0, k_locals.igp(), k_locals.jgp()) *= m_data.dt2();
-      k_locals.vector_buf(0, k_locals.igp(), k_locals.jgp()) +=
+      k_locals.vector_buf_2(0, k_locals.igp(), k_locals.jgp()) *= m_data.dt2();
+      k_locals.vector_buf_2(0, k_locals.igp(), k_locals.jgp()) +=
           m_region.U_previous(k_locals.ie())(k_locals.ilev(), k_locals.igp(),
                                              k_locals.jgp());
       m_region.U_future(k_locals.ie())(k_locals.ilev(), k_locals.igp(),
                                        k_locals.jgp()) =
           m_region.SPHEREMP(k_locals.ie())(k_locals.igp(), k_locals.jgp()) *
-          k_locals.vector_buf(0, k_locals.igp(), k_locals.jgp());
+          k_locals.vector_buf_2(0, k_locals.igp(), k_locals.jgp());
 
-      k_locals.vector_buf(1, k_locals.igp(), k_locals.jgp()) *= -1;
-      k_locals.vector_buf(
+      k_locals.vector_buf_2(1, k_locals.igp(), k_locals.jgp()) *= -1;
+      k_locals.vector_buf_2(
           1, k_locals.igp(),
           k_locals.jgp()) += // v_vadv(k_locals.igp(), k_locals.jgp()) +
           -m_region.U_current(k_locals.ie(), k_locals.ilev())(k_locals.igp(),
                                                               k_locals.jgp()) *
           vort(k_locals.igp(), k_locals.jgp());
-      k_locals.vector_buf(1, k_locals.igp(), k_locals.jgp()) *= m_data.dt2();
-      k_locals.vector_buf(1, k_locals.igp(), k_locals.jgp()) +=
+      k_locals.vector_buf_2(1, k_locals.igp(), k_locals.jgp()) *= m_data.dt2();
+      k_locals.vector_buf_2(1, k_locals.igp(), k_locals.jgp()) +=
           m_region.V_previous(k_locals.ie())(k_locals.ilev(), k_locals.igp(),
                                              k_locals.jgp());
       m_region.V_future(k_locals.ie())(k_locals.ilev(), k_locals.igp(),
                                        k_locals.jgp()) =
           m_region.SPHEREMP(k_locals.ie())(k_locals.igp(), k_locals.jgp()) *
-          k_locals.vector_buf(1, k_locals.igp(), k_locals.jgp());
+          k_locals.vector_buf_2(1, k_locals.igp(), k_locals.jgp());
     });
   }
 
@@ -243,26 +244,26 @@ struct update_state {
                          [&](const int loop_idx) {
       k_locals.igp() = loop_idx / NP;
       k_locals.jgp() = loop_idx % NP;
-      k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) = 0.0;
+      k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp()) = 0.0;
       for (k_locals.ilev() = NUM_LEV - 1; k_locals.ilev() >= 0;
            --k_locals.ilev()) {
-        k_locals.vector_buf(0, k_locals.igp(), k_locals.jgp()) =
+        k_locals.vector_buf_2(0, k_locals.igp(), k_locals.jgp()) =
             PhysicalConstants::Rgas /
             pressure(k_locals.ilev(), k_locals.igp(), k_locals.jgp());
-        k_locals.vector_buf(0, k_locals.igp(), k_locals.jgp()) *=
+        k_locals.vector_buf_2(0, k_locals.igp(), k_locals.jgp()) *=
             T_v(k_locals.ilev(), k_locals.igp(), k_locals.jgp());
-        k_locals.vector_buf(0, k_locals.igp(), k_locals.jgp()) *=
+        k_locals.vector_buf_2(0, k_locals.igp(), k_locals.jgp()) *=
             dp(k_locals.ilev(), k_locals.igp(), k_locals.jgp());
 
         phi_update(k_locals.ilev(), k_locals.igp(), k_locals.jgp()) =
             phis(k_locals.igp(), k_locals.jgp()) +
-            k_locals.scalar_buf(k_locals.igp(), k_locals.jgp());
+            k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp());
         // FMA so no temporary register needed
         phi_update(k_locals.ilev(), k_locals.igp(), k_locals.jgp()) +=
-            0.5 * k_locals.vector_buf(0, k_locals.igp(), k_locals.jgp());
+            0.5 * k_locals.vector_buf_2(0, k_locals.igp(), k_locals.jgp());
 
-        k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) +=
-            k_locals.vector_buf(0, k_locals.igp(), k_locals.jgp());
+        k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp()) +=
+            k_locals.vector_buf_2(0, k_locals.igp(), k_locals.jgp());
       }
     });
   }
@@ -271,10 +272,9 @@ struct update_state {
   preq_omega_ps_init(KernelVariables &k_locals) const {
     ExecViewUnmanaged<const Real[NP][NP]> p_ilev =
         m_data.pressure(k_locals.ie(), 0);
-    ExecViewUnmanaged<Real[2][NP][NP]> grad_p =
-        m_data.vector_buf(k_locals.ie(), 0, 0);
+    const ExecViewUnmanaged<Real[2][NP][NP]> &grad_p = k_locals.vector_buf_1;
     gradient_sphere(k_locals.team, p_ilev, m_data, m_region.DINV(k_locals.ie()),
-                    k_locals.vector_buf, grad_p);
+                    k_locals.vector_buf_2, grad_p);
 
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
                          [&](const int loop_idx) {
@@ -292,7 +292,7 @@ struct update_state {
           0.5 / p_ilev(k_locals.igp(), k_locals.jgp()) *
               m_data.div_vdp(k_locals.ie(), 0, k_locals.igp(), k_locals.jgp());
 
-      m_data.scalar_buf(k_locals.ie(), 0, k_locals.igp(), k_locals.jgp()) =
+      k_locals.scalar_buf_2(k_locals.igp(), k_locals.jgp()) =
           m_data.div_vdp(k_locals.ie(), 0, k_locals.igp(), k_locals.jgp());
     });
   }
@@ -301,13 +301,12 @@ struct update_state {
   void preq_omega_ps_loop(KernelVariables &k_locals) const {
     // Another candidate for parallel scan
     ExecViewUnmanaged<const Real[NP][NP]> p_ilev;
-    ExecViewUnmanaged<Real[2][NP][NP]> grad_p =
-        m_data.vector_buf(k_locals.ie(), 0, 0);
+    const ExecViewUnmanaged<Real[2][NP][NP]> &grad_p = k_locals.vector_buf_1;
     for (k_locals.ilev() = 1; k_locals.ilev() < NUM_LEV - 1;
          ++k_locals.ilev()) {
       p_ilev = m_data.pressure(k_locals.ie(), k_locals.ilev());
       gradient_sphere(k_locals.team, p_ilev, m_data,
-                      m_region.DINV(k_locals.ie()), k_locals.vector_buf,
+                      m_region.DINV(k_locals.ie()), k_locals.vector_buf_2,
                       grad_p);
 
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
@@ -326,14 +325,12 @@ struct update_state {
         m_data.omega_p(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                        k_locals.jgp()) =
             vgrad_p / p_ilev(k_locals.igp(), k_locals.jgp()) -
-            ckl * m_data.scalar_buf(k_locals.ie(), 0, k_locals.igp(),
-                                    k_locals.jgp()) -
+            ckl * k_locals.scalar_buf_2(k_locals.igp(), k_locals.jgp()) -
             ckk * m_data.div_vdp(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                                  k_locals.jgp());
 
-        m_data.scalar_buf(k_locals.ie(), 0, k_locals.igp(), k_locals.jgp()) +=
-            m_data.div_vdp(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
-                           k_locals.jgp());
+        k_locals.scalar_buf_2(k_locals.igp(), k_locals.jgp()) += m_data.div_vdp(
+            k_locals.ie(), k_locals.ilev(), k_locals.igp(), k_locals.jgp());
       });
     }
   }
@@ -342,37 +339,36 @@ struct update_state {
   void preq_omega_ps_tail(KernelVariables &k_locals) const {
     ExecViewUnmanaged<const Real[NP][NP]> p_ilev =
         m_data.pressure(k_locals.ie(), NUM_LEV - 1);
-    ExecViewUnmanaged<Real[2][NP][NP]> grad_p =
-        m_data.vector_buf(k_locals.ie(), 0, 0);
+    const ExecViewUnmanaged<Real[2][NP][NP]> &grad_p = k_locals.vector_buf_1;
     gradient_sphere(k_locals.team, p_ilev, m_data, m_region.DINV(k_locals.ie()),
-                    k_locals.vector_buf, grad_p);
+                    k_locals.vector_buf_2, grad_p);
 
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
                          [&](const int loop_idx) {
       k_locals.igp() = loop_idx / NP;
       k_locals.jgp() = loop_idx % NP;
-      // const Real vgrad_p = k_locals.scalar_buf;
+      // const Real vgrad_p = k_locals.scalar_buf_1;
       //     m_region.U_current(k_locals.ie(), NUM_LEV - 1)(k_locals.igp(),
       // k_locals.jgp()) *
       //         grad_p(0, k_locals.igp(), k_locals.jgp()) +
       //     m_region.V_current(k_locals.ie(), NUM_LEV - 1)(k_locals.igp(),
       // k_locals.jgp()) *
       //         grad_p(1, k_locals.igp(), k_locals.jgp());
-      k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) =
+      k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp()) =
           m_region.U_current(k_locals.ie(), NUM_LEV - 1)(k_locals.igp(),
                                                          k_locals.jgp()) *
           grad_p(0, k_locals.igp(), k_locals.jgp());
       // FMA, so no temporary needed
-      k_locals.scalar_buf(k_locals.jgp(), k_locals.igp()) +=
+      k_locals.scalar_buf_1(k_locals.jgp(), k_locals.igp()) +=
           m_region.V_current(k_locals.ie(), NUM_LEV - 1)(k_locals.igp(),
                                                          k_locals.jgp()) *
           grad_p(1, k_locals.igp(), k_locals.jgp());
 
       // (vgrad_p - vector_buf_1 - div_vdp) / p_ilev
-      k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) -=
-          m_data.scalar_buf(k_locals.ie(), 0, k_locals.igp(), k_locals.jgp());
+      k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp()) -=
+          k_locals.scalar_buf_2(k_locals.igp(), k_locals.jgp());
       // FMA, so no temporary needed
-      k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) +=
+      k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp()) +=
           -0.5 * m_data.div_vdp(k_locals.ie(), NUM_LEV - 1, k_locals.igp(),
                                 k_locals.jgp());
 
@@ -380,7 +376,7 @@ struct update_state {
 
       m_data.omega_p(k_locals.ie(), NUM_LEV - 1, k_locals.igp(),
                      k_locals.jgp()) =
-          k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) /
+          k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp()) /
           p_ilev(k_locals.igp(), k_locals.jgp());
     });
   }
@@ -392,10 +388,11 @@ struct update_state {
     //       gradient_sphere requires a 'consistent' pressure,
     //       meaning that we cannot update the different pressure
     //       points within a level before the gradient is complete!
-    // Uses m_data.scalar_buf to store the intermediate integration
-    //      m_data.vector_buf to store the gradient
-    //      k_locals.scalar_buf for intermediate computations registers
-    //      k_locals.vector_buf for the gradient buffer
+    // Uses k_locals.scalar_buf_1 for intermediate computations registers
+    //      k_locals.scalar_buf_2 to store the intermediate integration
+    //      k_locals.vector_buf_1 to store the gradient
+    //      k_locals.vector_buf_2 for the gradient buffer
+    //
     preq_omega_ps_init(k_locals);
     preq_omega_ps_loop(k_locals);
     preq_omega_ps_tail(k_locals);
@@ -410,20 +407,21 @@ struct update_state {
                          [&](const int idx) {
       k_locals.igp() = idx / NP;
       k_locals.jgp() = idx % NP;
-      k_locals.scalar_buf(0, 0) = m_data.hybrid_a(0) * m_data.ps0();
-      k_locals.scalar_buf(0, 1) = 0.5 * m_region.DP3D_current(k_locals.ie())(
-                                            0, k_locals.igp(), k_locals.jgp());
+      k_locals.scalar_buf_1(0, 0) = m_data.hybrid_a(0) * m_data.ps0();
+      k_locals.scalar_buf_1(0, 1) =
+          0.5 * m_region.DP3D_current(k_locals.ie())(0, k_locals.igp(),
+                                                     k_locals.jgp());
       pressure(0, k_locals.igp(), k_locals.jgp()) =
-          k_locals.scalar_buf(0, 0) + k_locals.scalar_buf(0, 1);
+          k_locals.scalar_buf_1(0, 0) + k_locals.scalar_buf_1(0, 1);
       for (k_locals.ilev() = 1; k_locals.ilev() < NUM_LEV; k_locals.ilev()++) {
-        k_locals.scalar_buf(0, 0) =
+        k_locals.scalar_buf_1(0, 0) =
             0.5 * (m_region.DP3D_current(k_locals.ie())(
                        k_locals.ilev() - 1, k_locals.igp(), k_locals.jgp()) +
                    m_region.DP3D_current(k_locals.ie())(
                        k_locals.ilev(), k_locals.igp(), k_locals.jgp()));
         pressure(k_locals.ilev(), k_locals.igp(), k_locals.jgp()) =
             pressure(k_locals.ilev() - 1, k_locals.igp(), k_locals.jgp()) +
-            k_locals.scalar_buf(0, 0);
+            k_locals.scalar_buf_1(0, 0);
       }
     });
   }
@@ -459,19 +457,19 @@ struct update_state {
       k_locals.igp() = idx / NP;
       k_locals.jgp() = idx % NP;
 
-      // Real Qt = k_locals.scalar_buf(0, 0);
-      k_locals.scalar_buf(0, 0) =
+      // Real Qt = k_locals.scalar_buf_1(0, 0);
+      k_locals.scalar_buf_1(0, 0) =
           m_region.QDP(k_locals.ie(), 0, m_data.qn0())(
               k_locals.ilev(), k_locals.igp(), k_locals.jgp()) /
           m_region.DP3D_current(k_locals.ie())(k_locals.ilev(), k_locals.igp(),
                                                k_locals.jgp());
-      k_locals.scalar_buf(0, 0) *=
+      k_locals.scalar_buf_1(0, 0) *=
           PhysicalConstants::Rwater_vapor / PhysicalConstants::Rgas - 1.0;
-      k_locals.scalar_buf(0, 0) += 1.0;
+      k_locals.scalar_buf_1(0, 0) += 1.0;
       T_v(k_locals.ilev(), k_locals.igp(), k_locals.jgp()) =
           m_region.T_current(k_locals.ie())(k_locals.ilev(), k_locals.igp(),
                                             k_locals.jgp()) *
-          k_locals.scalar_buf(0, 0);
+          k_locals.scalar_buf_1(0, 0);
     });
   }
 
@@ -483,51 +481,51 @@ struct update_state {
   void compute_div_vdp(KernelVariables &k_locals) const {
     // Create subviews to explicitly have static dimensions
     // ExecViewUnmanaged<Real[2][NP][NP]> vdp_ilev =
-    // k_locals.vector_buf;
+    // k_locals.vector_buf_2;
 
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
                          [&](const int idx) {
       k_locals.igp() = idx / NP;
       k_locals.jgp() = idx % NP;
 
-      k_locals.vector_buf(0, k_locals.igp(), k_locals.jgp()) =
+      k_locals.vector_buf_2(0, k_locals.igp(), k_locals.jgp()) =
           m_region.U_current(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                              k_locals.jgp()) *
           m_region.DP3D_current(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                                 k_locals.jgp());
 
-      k_locals.vector_buf(1, k_locals.igp(), k_locals.jgp()) =
+      k_locals.vector_buf_2(1, k_locals.igp(), k_locals.jgp()) =
           m_region.V_current(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                              k_locals.jgp()) *
           m_region.DP3D_current(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                                 k_locals.jgp());
 
-      k_locals.scalar_buf(k_locals.igp(), k_locals.jgp()) =
+      k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp()) =
           PhysicalConstants::eta_ave_w *
-          k_locals.vector_buf(0, k_locals.igp(), k_locals.jgp());
+          k_locals.vector_buf_2(0, k_locals.igp(), k_locals.jgp());
 
       m_region.DERIVED_UN0_update(k_locals.ie(), k_locals.ilev(),
                                   k_locals.igp(), k_locals.jgp()) =
           m_region.DERIVED_UN0(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                                k_locals.jgp()) +
-          k_locals.scalar_buf(k_locals.igp(), k_locals.jgp());
+          k_locals.scalar_buf_1(k_locals.igp(), k_locals.jgp());
 
-      k_locals.scalar_buf(0, 0) =
+      k_locals.scalar_buf_1(0, 0) =
           PhysicalConstants::eta_ave_w *
-          k_locals.vector_buf(1, k_locals.igp(), k_locals.jgp());
+          k_locals.vector_buf_2(1, k_locals.igp(), k_locals.jgp());
       m_region.DERIVED_VN0_update(k_locals.ie(), k_locals.ilev(),
                                   k_locals.igp(), k_locals.jgp()) =
           m_region.DERIVED_VN0(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                                k_locals.jgp()) +
-          k_locals.scalar_buf(0, 0);
+          k_locals.scalar_buf_1(0, 0);
     });
 
     ExecViewUnmanaged<Real[NP][NP]> div_vdp_ilev =
         Kokkos::subview(m_data.div_vdp(k_locals.team), k_locals.ilev(),
                         Kokkos::ALL(), Kokkos::ALL());
-    divergence_sphere(k_locals.team, k_locals.vector_buf, m_data,
+    divergence_sphere(k_locals.team, k_locals.vector_buf_2, m_data,
                       m_region.METDET(k_locals.ie()),
-                      m_region.DINV(k_locals.ie()), k_locals.vector_buf,
+                      m_region.DINV(k_locals.ie()), k_locals.vector_buf_1,
                       div_vdp_ilev);
   }
 
@@ -569,11 +567,10 @@ struct update_state {
         Kokkos::subview(m_region.T_current(k_locals.ie()), k_locals.ilev(),
                         Kokkos::ALL(), Kokkos::ALL());
 
-    ExecViewUnmanaged<Real[2][NP][NP]> grad_tmp =
-        m_data.vector_buf(k_locals.ie(), 0, k_locals.ilev());
+    const ExecViewUnmanaged<Real[2][NP][NP]> &grad_tmp = k_locals.vector_buf_1;
 
     gradient_sphere(k_locals.team, temperature, m_data,
-                    m_region.DINV(k_locals.ie()), k_locals.vector_buf,
+                    m_region.DINV(k_locals.ie()), k_locals.vector_buf_2,
                     grad_tmp);
 
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
@@ -581,7 +578,7 @@ struct update_state {
       k_locals.igp() = idx / NP;
       k_locals.jgp() = idx % NP;
 
-      k_locals.scalar_buf(0, 0) =
+      k_locals.scalar_buf_1(0, 0) =
           PhysicalConstants::eta_ave_w *
           m_data.omega_p(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                          k_locals.jgp());
@@ -589,46 +586,46 @@ struct update_state {
                                                               k_locals.jgp()) =
           m_region.OMEGA_P(k_locals.ie(), k_locals.ilev())(k_locals.igp(),
                                                            k_locals.jgp()) +
-          k_locals.scalar_buf(0, 0);
+          k_locals.scalar_buf_1(0, 0);
 
-      // const Real ttens = k_locals.scalar_buf(0, 0);
-      k_locals.scalar_buf(0, 0) =
+      // const Real ttens = k_locals.scalar_buf_1(0, 0);
+      k_locals.scalar_buf_1(0, 0) =
           m_region.U_current(k_locals.ie())(k_locals.ilev(), k_locals.igp(),
                                             k_locals.jgp()) *
           grad_tmp(0, k_locals.igp(), k_locals.jgp());
-      k_locals.scalar_buf(0, 1) =
+      k_locals.scalar_buf_1(0, 1) =
           m_region.V_current(k_locals.ie())(k_locals.ilev(), k_locals.igp(),
                                             k_locals.jgp()) *
           grad_tmp(1, k_locals.igp(), k_locals.jgp());
-      k_locals.scalar_buf(0, 0) += k_locals.scalar_buf(0, 1);
-      k_locals.scalar_buf(0, 1) =
+      k_locals.scalar_buf_1(0, 0) += k_locals.scalar_buf_1(0, 1);
+      k_locals.scalar_buf_1(0, 1) =
           PhysicalConstants::kappa * m_data.T_v(k_locals.ie(), k_locals.ilev(),
                                                 k_locals.igp(), k_locals.jgp());
-      k_locals.scalar_buf(0, 0) +=
-          k_locals.scalar_buf(0, 1) *
+      k_locals.scalar_buf_1(0, 0) +=
+          k_locals.scalar_buf_1(0, 1) *
           m_data.omega_p(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                          k_locals.jgp());
 
       // ttens * dt2 + T_previous
-      k_locals.scalar_buf(0, 0) *= m_data.dt2();
-      k_locals.scalar_buf(0, 0) += m_region.T_previous(k_locals.ie())(
+      k_locals.scalar_buf_1(0, 0) *= m_data.dt2();
+      k_locals.scalar_buf_1(0, 0) += m_region.T_previous(k_locals.ie())(
           k_locals.ilev(), k_locals.igp(), k_locals.jgp());
 
       m_region.T_future(k_locals.ie())(k_locals.ilev(), k_locals.igp(),
                                        k_locals.jgp()) =
           m_region.SPHEREMP(k_locals.ie())(k_locals.igp(), k_locals.jgp()) *
-          k_locals.scalar_buf(0, 0);
+          k_locals.scalar_buf_1(0, 0);
 
-      k_locals.scalar_buf(0, 0) =
+      k_locals.scalar_buf_1(0, 0) =
           m_data.div_vdp(k_locals.ie(), k_locals.ilev(), k_locals.igp(),
                          k_locals.jgp()) *
           -m_data.dt2();
-      k_locals.scalar_buf(0, 0) += m_region.DP3D_previous(k_locals.ie())(
+      k_locals.scalar_buf_1(0, 0) += m_region.DP3D_previous(k_locals.ie())(
           k_locals.ilev(), k_locals.igp(), k_locals.jgp());
       m_region.DP3D_future(k_locals.ie())(k_locals.ilev(), k_locals.igp(),
                                           k_locals.jgp()) =
           m_region.SPHEREMP(k_locals.ie())(k_locals.igp(), k_locals.jgp()) *
-          k_locals.scalar_buf(0, 0);
+          k_locals.scalar_buf_1(0, 0);
     });
   }
 
