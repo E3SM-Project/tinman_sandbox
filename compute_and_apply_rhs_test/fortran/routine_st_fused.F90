@@ -320,7 +320,8 @@ end subroutine caar
     Tv = Tin*(1_real_kind + (Rwater_vapor/Rgas - 1.0_real_kind)*rin)
   end function Virtual_Temperature1d
 
-  subroutine preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
+!original
+  subroutine preq_omega_ps_(omega_p,hvcoord,p,vgrad_p,divdp)
     use kinds, only : real_kind, np, nlev
     use hybvcoord_mod, only : hvcoord_t
 
@@ -366,11 +367,51 @@ end subroutine caar
              omega_p(i,j,nlev) = omega_p(i,j,nlev) - ckl*suml(i,j) - ckk*term
           end do
        end do
+  end subroutine preq_omega_ps_
+
+  subroutine preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
+    use kinds, only : real_kind, np, nlev
+    use hybvcoord_mod, only : hvcoord_t
+
+    implicit none
+    real(kind=real_kind), intent(in) :: divdp(np*np,nlev)      ! divergence
+    real(kind=real_kind), intent(in) :: vgrad_p(np*np,nlev) ! v.grad(p)
+    real(kind=real_kind), intent(in) :: p(np*np,nlev)     ! layer thicknesses
+    type (hvcoord_t),     intent(in) :: hvcoord
+    real(kind=real_kind), intent(out):: omega_p(np*np,nlev)   ! vertical
+
+    integer j,k                         ! longitude, level indices
+    real(kind=real_kind) term             ! one half of basic term in omega/p
+    real(kind=real_kind) summ(np*np)      ! partial sum over l = (1, k-1)
+
+#if HOMP
+!$omp parallel do private(k,j,term)
+#endif
+
+       do j=1,np*np  !   Loop inversion (AAM)
+#if 0
+        do i=1,np
+           summ(i,j) = 0.0d0
+           do k=1,nlev
+              term = divdp(i,j,k)
+              omega_p(i,j,k) = (vgrad_p(i,j,k) - summ(i,j) - term*0.5d0)/p(i,j,k)
+              summ(i,j) = summ(i,j) + term
+           enddo
+        enddo
+#endif
+        summ(j) = 0.0d0
+        do k=1,nlev
+           term = divdp(j,k)
+           omega_p(j,k) = (vgrad_p(j,k) - summ(j) -term*0.5d0)/p(j,k)
+           summ(j) = summ(j) + term
+        enddo
+       end do
+
   end subroutine preq_omega_ps
 
 
 ! ORIGINAL
-  subroutine preq_hydrostatic_(phi,phis,T_v,p,dp)
+  subroutine preq_hydrostatic_orig(phi,phis,T_v,p,dp)
     use kinds, only : real_kind, np, nlev
     use physical_constants, only : rgas
     implicit none
@@ -407,33 +448,7 @@ end subroutine caar
              phi(i,j,1) = phis(i,j) + phii(i,j,2) + Rgas*T_v(i,j,1)*hkk
           end do
        end do
-end subroutine preq_hydrostatic_
-
-subroutine preq_hydrostatic2(phi,phis,T_v,p,dp)
-    use kinds, only : real_kind, np, nlev
-    use physical_constants, only : rgas
-    implicit none
-    real(kind=real_kind), intent(out) :: phi(np*np,nlev)
-    real(kind=real_kind), intent(in) :: phis(np*np)
-    real(kind=real_kind), intent(in) :: T_v(np*np,nlev)
-    real(kind=real_kind), intent(in) :: p(np*np,nlev)
-    real(kind=real_kind), intent(in) :: dp(np*np,nlev)
-    integer i,j,k,q                         ! longitude, level indices
-    real(kind=real_kind) :: summ, accum, frac(nlev), philoc(nlev)
-#if HOMP
-!$omp parallel do private(j,summ,frac)
-#endif
-       do j=1,np*np   !   Loop inversion (AAM)
-          do k=1,nlev
-             frac(k) = Rgas*T_v(j,k)*dp(j,k)/p(j,k)
-          enddo
-          summ = sum(frac)
-          do k=1,nlev
-             summ = summ-frac(k)
-             phi(j,k) = phis(j) + summ + frac(k)*0.50d0
-          end do
-       end do
-end subroutine preq_hydrostatic2
+end subroutine preq_hydrostatic_orig
 
 subroutine preq_hydrostatic(phi,phis,quot)
     use kinds, only : real_kind, np, nlev
