@@ -252,12 +252,10 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 
      enddo
 #endif
+     !call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) , quot )
+     !call preq_omega_ps(omega_p,p,vgrad_p,divdp)
 #if 1
-     !call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) ,T_v,p, ST( dXdXdXdpXn0Xie ) )
-     call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) , quot )
-#endif
-#if 1
-     call preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
+     call merged_hydro_omega(phi, ST( dXdX1XphisX1Xie ) , quot , omega_p,p,vgrad_p,divdp )
 #endif
      ! VERTICALLY LAGRANGIAN:   no vertical motion
      T_vadv=0
@@ -369,15 +367,13 @@ end subroutine caar
        end do
   end subroutine preq_omega_ps_
 
-  subroutine preq_omega_ps(omega_p,hvcoord,p,vgrad_p,divdp)
+  subroutine preq_omega_ps(omega_p,p,vgrad_p,divdp)
     use kinds, only : real_kind, np, nlev
-    use hybvcoord_mod, only : hvcoord_t
 
     implicit none
     real(kind=real_kind), intent(in) :: divdp(np*np,nlev)      ! divergence
     real(kind=real_kind), intent(in) :: vgrad_p(np*np,nlev) ! v.grad(p)
     real(kind=real_kind), intent(in) :: p(np*np,nlev)     ! layer thicknesses
-    type (hvcoord_t),     intent(in) :: hvcoord
     real(kind=real_kind), intent(out):: omega_p(np*np,nlev)   ! vertical
 
     integer j,k                         ! longitude, level indices
@@ -389,25 +385,52 @@ end subroutine caar
 #endif
 
        do j=1,np*np  !   Loop inversion (AAM)
-#if 0
-        do i=1,np
-           summ(i,j) = 0.0d0
-           do k=1,nlev
-              term = divdp(i,j,k)
-              omega_p(i,j,k) = (vgrad_p(i,j,k) - summ(i,j) - term*0.5d0)/p(i,j,k)
-              summ(i,j) = summ(i,j) + term
-           enddo
-        enddo
-#endif
         summ(j) = 0.0d0
         do k=1,nlev
            term = divdp(j,k)
-           omega_p(j,k) = (vgrad_p(j,k) - summ(j) -term*0.5d0)/p(j,k)
+           omega_p(j,k) = (vgrad_p(j,k) - summ(j) - term*0.5d0)/p(j,k)
            summ(j) = summ(j) + term
         enddo
        end do
 
   end subroutine preq_omega_ps
+
+  subroutine merged_hydro_omega(phi,phis,quot,omega_p,p,vgrad_p,divdp)
+    use kinds, only : real_kind, np, nlev
+    use physical_constants, only : rgas
+    implicit none
+    real(kind=real_kind), intent(in) :: divdp(np*np,nlev)      ! divergence
+    real(kind=real_kind), intent(in) :: vgrad_p(np*np,nlev) ! v.grad(p)
+    real(kind=real_kind), intent(in) :: p(np*np,nlev)     ! layer thicknesses
+    real(kind=real_kind), intent(out):: omega_p(np*np,nlev)   ! vertical
+
+    integer j,k                         ! longitude, level indices
+    real(kind=real_kind) term             ! one half of basic term in omega/p
+    real(kind=real_kind) summ      ! partial sum over l = (1, k-1)
+
+    real(kind=real_kind), intent(out) :: phi(np*np,nlev)
+    real(kind=real_kind), intent(in) :: phis(np*np)
+    real(kind=real_kind), intent(in) :: quot(np*np,nlev)
+    real(kind=real_kind) :: suml, accum, frac(nlev), philoc(nlev)
+
+#if HOMP
+!$omp parallel do private(k,j,term,summ,suml)
+#endif
+       do j=1,np*np  !   Loop inversion (AAM)
+        summ = 0.0d0
+        suml = 0.0d0
+        do k=1,nlev
+           suml = suml + quot(j,k)
+        enddo
+        do k=1,nlev
+           term = divdp(j,k)
+           omega_p(j,k) = (vgrad_p(j,k) - summ - term*0.5d0)/p(j,k)
+           summ = summ + term
+           suml = suml-quot(j,k)
+           phi(j,k) = phis(j) + suml + quot(j,k)*0.50d0
+        enddo
+       end do
+  end subroutine merged_hydro_omega
 
 
 ! ORIGINAL
@@ -460,7 +483,7 @@ subroutine preq_hydrostatic(phi,phis,quot)
     integer i,j,k,q                         ! longitude, level indices
     real(kind=real_kind) :: summ, accum, frac(nlev), philoc(nlev)
 #if HOMP
-!$omp parallel do private(j,summ,frac)
+!$omp parallel do private(j,k,summ,frac)
 #endif
        do j=1,np*np   !   Loop inversion (AAM)
           summ = 0.d0
