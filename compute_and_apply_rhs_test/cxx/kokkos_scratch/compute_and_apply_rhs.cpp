@@ -229,26 +229,28 @@ struct update_state {
                          [&](const int loop_idx) {
       k_locals.m_igp = loop_idx / NP;
       k_locals.m_jgp = loop_idx % NP;
-      k_locals.scalar_buf_1(k_locals.m_igp, k_locals.m_jgp) = 0.0;
+      Real &integral = k_locals.m_temp[0];
+      // k_locals.scalar_buf_1(k_locals.m_igp, k_locals.m_jgp)
+      integral = 0.0;
       for (k_locals.m_ilev = NUM_LEV - 1; k_locals.m_ilev >= 0;
            --k_locals.m_ilev) {
-        k_locals.vector_buf_2(0, k_locals.m_igp, k_locals.m_jgp) =
-            PhysicalConstants::Rgas /
-            pressure(k_locals.m_ilev, k_locals.m_igp, k_locals.m_jgp);
-        k_locals.vector_buf_2(0, k_locals.m_igp, k_locals.m_jgp) *=
-            T_v(k_locals.m_ilev, k_locals.m_igp, k_locals.m_jgp);
-        k_locals.vector_buf_2(0, k_locals.m_igp, k_locals.m_jgp) *=
+	Real &tmp = k_locals.m_temp[1];
+        // k_locals.vector_buf_2(0, k_locals.m_igp, k_locals.m_jgp)
+        tmp = PhysicalConstants::Rgas /
+              pressure(k_locals.m_ilev, k_locals.m_igp, k_locals.m_jgp);
+        tmp *=
+             T_v(k_locals.m_ilev, k_locals.m_igp, k_locals.m_jgp);
+        tmp *=
             dp(k_locals.m_ilev, k_locals.m_igp, k_locals.m_jgp);
 
         phi_update(k_locals.m_ilev, k_locals.m_igp, k_locals.m_jgp) =
             phis(k_locals.m_igp, k_locals.m_jgp) +
-            k_locals.scalar_buf_1(k_locals.m_igp, k_locals.m_jgp);
+            integral;
         // FMA so no temporary register needed
         phi_update(k_locals.m_ilev, k_locals.m_igp, k_locals.m_jgp) +=
-            0.5 * k_locals.vector_buf_2(0, k_locals.m_igp, k_locals.m_jgp);
+            0.5 * tmp;
 
-        k_locals.scalar_buf_1(k_locals.m_igp, k_locals.m_jgp) +=
-            k_locals.vector_buf_2(0, k_locals.m_igp, k_locals.m_jgp);
+        integral += tmp;
       }
     });
   }
