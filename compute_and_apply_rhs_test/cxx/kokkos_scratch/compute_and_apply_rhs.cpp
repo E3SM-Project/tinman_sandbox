@@ -81,7 +81,8 @@ struct update_state {
       // jgp)) +
       //     m_region.PHI_update(k_locals.m_ie)(k_locals.m_ilev, igp, jgp) +
       //     m_region.PECND(k_locals.m_ie, k_locals.m_ilev)(igp, jgp);
-      k_locals.scalar_buf_1(k_locals.m_igp, k_locals.m_jgp) =
+      Real &energy = k_locals.m_temp[0];
+      energy =
           m_region.U_current(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
                              k_locals.m_jgp) *
           m_region.U_current(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
@@ -90,11 +91,11 @@ struct update_state {
                              k_locals.m_jgp) *
           m_region.V_current(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
                              k_locals.m_jgp);
-      k_locals.scalar_buf_1(k_locals.m_igp, k_locals.m_jgp) *= 0.5;
-      k_locals.scalar_buf_1(k_locals.m_igp, k_locals.m_jgp) +=
+      energy *= 0.5;
+      energy +=
         m_region.PHI_update(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
                                              k_locals.m_jgp);
-      k_locals.scalar_buf_1(k_locals.m_igp, k_locals.m_jgp) += m_region.PECND(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp, k_locals.m_jgp);
+      k_locals.scalar_buf_1(k_locals.m_igp, k_locals.m_jgp) = energy + m_region.PECND(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp, k_locals.m_jgp);
     });
     gradient_sphere_update(k_locals.team, k_locals.scalar_buf_1, m_data,
                            m_region.DINV(k_locals.m_ie), k_locals.vector_buf_1,
@@ -131,11 +132,11 @@ struct update_state {
       k_locals.m_igp = (idx / NP) % NP;
       k_locals.m_jgp = idx % NP;
 
-      k_locals.vector_buf_2(hgp, k_locals.m_igp, k_locals.m_jgp) *=
-          PhysicalConstants::Rgas;
-      k_locals.vector_buf_2(hgp, k_locals.m_igp, k_locals.m_jgp) *= m_data.T_v(
-          k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp, k_locals.m_jgp);
-      k_locals.vector_buf_2(hgp, k_locals.m_igp, k_locals.m_jgp) /=
+      Real &glnpsi = k_locals.m_temp[0];
+      glnpsi = k_locals.vector_buf_2(hgp, k_locals.m_igp, k_locals.m_jgp) *
+          PhysicalConstants::Rgas *
+          m_data.T_v(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp, k_locals.m_jgp);
+      k_locals.vector_buf_2(hgp, k_locals.m_igp, k_locals.m_jgp) = glnpsi /
           p_ilev(k_locals.m_igp, k_locals.m_jgp);
     });
 
@@ -154,36 +155,37 @@ struct update_state {
       k_locals.m_igp = idx / NP;
       k_locals.m_jgp = idx % NP;
 
-      vort(k_locals.m_igp, k_locals.m_jgp) +=
+      Real &vort_fcor = k_locals.m_temp[0];
+      vort_fcor = vort(k_locals.m_igp, k_locals.m_jgp) +
           m_region.FCOR(k_locals.m_ie, k_locals.m_igp, k_locals.m_jgp);
 
-      k_locals.vector_buf_2(0, k_locals.m_igp, k_locals.m_jgp) *= -1;
-      k_locals.vector_buf_2(0, k_locals.m_igp, k_locals.m_jgp) += // v_vadv(k_locals.m_igp, k_locals.m_jgp) +
+      Real &vel_tmp = k_locals.m_temp[1];
+      // Compute U
+      vel_tmp = -k_locals.vector_buf_2(0, k_locals.m_igp, k_locals.m_jgp);
+      vel_tmp += // v_vadv(k_locals.m_igp, k_locals.m_jgp) +
           m_region.V_current(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
                              k_locals.m_jgp) *
-          vort(k_locals.m_igp, k_locals.m_jgp);
-      k_locals.vector_buf_2(0, k_locals.m_igp, k_locals.m_jgp) *= m_data.dt2();
-      k_locals.vector_buf_2(0, k_locals.m_igp, k_locals.m_jgp) +=
-          m_region.U_previous(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
-                              k_locals.m_jgp);
-      m_region.U_future(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
-                                       k_locals.m_jgp) =
-        m_region.SPHEREMP(k_locals.m_ie, k_locals.m_igp, k_locals.m_jgp) *
-          k_locals.vector_buf_2(0, k_locals.m_igp, k_locals.m_jgp);
+          vort_fcor;
+      vel_tmp *= m_data.dt2();
+      vel_tmp += m_region.U_previous(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
+                                     k_locals.m_jgp);
+      m_region.U_future(k_locals.m_ie, k_locals.m_ilev,
+                        k_locals.m_igp, k_locals.m_jgp) = vel_tmp *
+        m_region.SPHEREMP(k_locals.m_ie, k_locals.m_igp, k_locals.m_jgp);
 
-      k_locals.vector_buf_2(1, k_locals.m_igp, k_locals.m_jgp) *= -1;
-      k_locals.vector_buf_2(1, k_locals.m_igp, k_locals.m_jgp) += // v_vadv(k_locals.m_igp, k_locals.m_jgp) +
+      // Compute V
+      vel_tmp = -k_locals.vector_buf_2(1, k_locals.m_igp, k_locals.m_jgp);
+      vel_tmp += // v_vadv(k_locals.m_igp, k_locals.m_jgp) +
           -m_region.U_current(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
                               k_locals.m_jgp) *
-          vort(k_locals.m_igp, k_locals.m_jgp);
-      k_locals.vector_buf_2(1, k_locals.m_igp, k_locals.m_jgp) *= m_data.dt2();
-      k_locals.vector_buf_2(1, k_locals.m_igp, k_locals.m_jgp) +=
-          m_region.V_previous(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
-                              k_locals.m_jgp);
+          vort_fcor;
+      vel_tmp *= m_data.dt2();
+      vel_tmp += m_region.V_previous(k_locals.m_ie, k_locals.m_ilev,
+                                     k_locals.m_igp, k_locals.m_jgp);
       m_region.V_future(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
                         k_locals.m_jgp) =
           m_region.SPHEREMP(k_locals.m_ie, k_locals.m_igp, k_locals.m_jgp) *
-          k_locals.vector_buf_2(1, k_locals.m_igp, k_locals.m_jgp);
+          vel_tmp;
     });
   }
 
@@ -309,18 +311,20 @@ struct update_state {
                          [&](const int idx) {
       k_locals.m_igp = idx / NP;
       k_locals.m_jgp = idx % NP;
-      k_locals.scalar_buf_1(0, 0) = m_data.hybrid_a(0) * m_data.ps0();
-      k_locals.scalar_buf_1(0, 1) =
-          0.5 * m_region.DP3D_current(k_locals.m_ie, 0, k_locals.m_igp, k_locals.m_jgp);
+      Real &tmp_1 = k_locals.m_temp[0];
+      tmp_1 = m_data.hybrid_a(0) * m_data.ps0();
+
+      Real &tmp_2 = k_locals.m_temp[1];
+      tmp_2 = 0.5 * m_region.DP3D_current(k_locals.m_ie, 0, k_locals.m_igp, k_locals.m_jgp);
       pressure(0, k_locals.m_igp, k_locals.m_jgp) =
-          k_locals.scalar_buf_1(0, 0) + k_locals.scalar_buf_1(0, 1);
+          tmp_1 + tmp_2;
       for (k_locals.m_ilev = 1; k_locals.m_ilev < NUM_LEV; k_locals.m_ilev++) {
-        k_locals.scalar_buf_1(0, 0) =
+        tmp_1 =
             0.5 * (m_region.DP3D_current(k_locals.m_ie, k_locals.m_ilev - 1, k_locals.m_igp, k_locals.m_jgp) +
                    m_region.DP3D_current(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp, k_locals.m_jgp));
         pressure(k_locals.m_ilev, k_locals.m_igp, k_locals.m_jgp) =
             pressure(k_locals.m_ilev - 1, k_locals.m_igp, k_locals.m_jgp) +
-            k_locals.scalar_buf_1(0, 0);
+            tmp_1;
       }
     });
   }
@@ -404,14 +408,14 @@ struct update_state {
                                k_locals.m_jgp) +
           k_locals.scalar_buf_1(k_locals.m_igp, k_locals.m_jgp);
 
-      k_locals.scalar_buf_1(0, 0) =
-          PhysicalConstants::eta_ave_w *
-          k_locals.vector_buf_2(1, k_locals.m_igp, k_locals.m_jgp);
+      Real &tmp = k_locals.m_temp[0];
+      // k_locals.scalar_buf_1(0, 0)
+      tmp = PhysicalConstants::eta_ave_w *
+            k_locals.vector_buf_2(1, k_locals.m_igp, k_locals.m_jgp);
       m_region.DERIVED_VN0_update(k_locals.m_ie, k_locals.m_ilev,
                                   k_locals.m_igp, k_locals.m_jgp) =
           m_region.DERIVED_VN0(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
-                               k_locals.m_jgp) +
-          k_locals.scalar_buf_1(0, 0);
+                               k_locals.m_jgp) + tmp;
     });
 
     ExecViewUnmanaged<Real[NP][NP]> div_vdp_ilev =
