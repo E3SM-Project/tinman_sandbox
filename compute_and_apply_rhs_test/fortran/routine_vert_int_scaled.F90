@@ -150,143 +150,53 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
   
   integer :: tid, OMP_GET_MAX_THREADS, OMP_GET_THREAD_NUM
 
-  real(kind=real_kind) term     
-  real(kind=real_kind) summ     
-  real(kind=real_kind) :: suml, accum, frac(nlev)
 
-!  print *, 'Hello Routine'
-!  tid = OMP_GET_MAX_THREADS()     
-!  print *, 'Max number TH ', tid
-!  tid = OMP_GET_THREAD_NUM()     
-!  print *, 'My tid is ', tid
-
-! a dummy loop
-!!!$omp parallel do private(k,q)
-! end of the dummy
+  real(kind=real_kind) term             ! one half of basic term in omega/p
+  real(kind=real_kind) summ      ! partial sum over l = (1, k-1)
+  real(kind=real_kind) :: suml, accum, frac(nlev), philoc(nlev)
 
      phi => elem(ie)%derived%phi(:,:,:)
      p(:,:,1)=hvcoord%hyai(1)*hvcoord%ps0 + ST( dXdX1XdpXn0Xie  ) /2
 
 ! this can be rewritten
-
      do k=2,nlev
         p(:,:,k)=p(:,:,k-1) + ST( dXdXkm1XdpXn0Xie )/2 + ST( dXdXkXdpXn0Xie )/2
      enddo
 
-#if 1
-
 #if HOMP
-!$omp parallel do private(k,i,j,v1,v2,Qt,eta_ave_w)
+!$omp parallel do collapse(2) private(j,i,k,q,v1,v2)
 #endif
-     do k=1,nlev
-
-!        tid = OMP_GET_THREAD_NUM()     
-!        print *, 'next loop: My tid is ', tid
-
-        grad_p(:,:,:,k) = gradient_sphere(p(:,:,k),deriv,elem(ie)%Dinv)
-
-        rdp(:,:,k) = 1.0D0/ST( dXdXkXdpXn0Xie )
-
-        vtemp1(:,:,:,k)   = gradient_sphere( ST( dXdXkXtXn0Xie ), deriv,elem(ie)%Dinv)
-        do j=1,np
-           do i=1,np
-              v1 = ST( iXjXkXuXn0Xie )
-              v2 = ST( iXjXkXvXn0Xie )
-              vgrad_p(i,j,k) = (v1*grad_p(i,j,1,k) + v2*grad_p(i,j,2,k))
-              vdp(i,j,1,k) = v1*ST( iXjXkXdpXn0Xie )
-              vdp(i,j,2,k) = v2*ST( iXjXkXdpXn0Xie )
-
-              Qt = ST( iXjXkXqXqn0Xie )/ ST( iXjXkXdpXn0Xie )
-              T_v(i,j,k) = Virtual_Temperature1d( ST( iXjXkXtXn0Xie ),Qt)
-              kappa_star(i,j,k) = kappa
-
-              vgrad_T(i,j,k) =  v1*vtemp1(i,j,1,k) + v2*vtemp1(i,j,2,k)
-
-              quot(i,j,k) = Rgas*T_v(i,j,k)/p(i,j,k)*ST( iXjXkXdpXn0Xie )
-           end do
-        end do
-
-        elem(ie)%derived%vn0(:,:,:,k)=elem(ie)%derived%vn0(:,:,:,k)+eta_ave_w*vdp(:,:,:,k)
-        divdp(:,:,k)=divergence_sphere(vdp(:,:,:,k),deriv,elem(ie))
-        vort(:,:,k)=vorticity_v2( ST( dXdXkXuXn0Xie ) , ST( dXdXkXvXn0Xie ) ,deriv,elem(ie))
-
-        elem(ie)%derived%omega_p(:,:,k) = &
-             elem(ie)%derived%omega_p(:,:,k) + eta_ave_w*omega_p(:,:,k)
-
-     enddo
-#endif
-     !call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) , quot )
-     !call preq_omega_ps(omega_p,p,vgrad_p,divdp)
-#if 1
-     !call merged_hydro_omega(phi, ST( dXdX1XphisX1Xie ) , quot , omega_p,p,vgrad_p,divdp )
-#if HOMP
-!$omp parallel do collapse(2) private(j,i,k,summ,suml,term,v1,v2)
-#endif
-       do j=1,np
+       do j=1,np  
+!tid = OMP_GET_THREAD_NUM()     
+!print *, 'My tid is ', tid, ' my j is', j
        do i=1,np
-         summ = 0.0d0
-         suml = 0.0d0
-         do k=1,nlev
-           suml = suml + quot(i,j,k)
-         enddo
-         do k=1,nlev
-           term = divdp(i,j,k)
+do q=1,10000 !dummy
+       !  do k=1,nlev
+       !  v1 = ST( iXjXkXuXn0Xie )
+       !  v2 = ST( iXjXkXvXn0Xie )
+       !  vgrad_p(i,j,k) = (v1*v1 + v2*v2)**q
+       !  vdp(i,j,1,k) = v1*ST( iXjXkXdpXn0Xie )*vgrad_p(i,j,k)
+       !  vdp(i,j,2,k) = v2*ST( iXjXkXdpXn0Xie )*vgrad_p(i,j,k)
+       !  enddo
+
+        summ = 0.0d0
+        suml = 0.0d0
+        do k=1,nlev
+           suml = suml + quot(i,j,k)**q
+        enddo
+        do k=1,nlev
+           term = divdp(i,j,k)**q
            omega_p(i,j,k) = (vgrad_p(i,j,k) - summ - term*0.5d0)/p(i,j,k)
            summ = summ + term
-           suml = suml - quot(i,j,k)
+           suml = suml-quot(i,j,k)
            phi(i,j,k) = ST( iXjX1XphisX1Xie  ) + suml + quot(i,j,k)*0.50d0
-         enddo
+        enddo
+enddo
        enddo
        enddo
 
-#endif
-     ! VERTICALLY LAGRANGIAN:   no vertical motion
      T_vadv=0
      v_vadv=0
-
-#if 1
-#if HOMP
-!$omp parallel do private(k,v1,v2,gpterm,glnps1,glnps2,E,Ephi,vtemp2)
-#endif
-     vertloop: do k=1,nlev
-        do j=1,np
-           do i=1,np
-              v1 = ST( iXjXkXuXn0Xie )
-              v2 = ST( iXjXkXvXn0Xie )
-              E = 0.5D0*( v1*v1 + v2*v2 )
-              Ephi(i,j)=E+phi(i,j,k)+elem(ie)%derived%pecnd(i,j,k)
-           end do
-        end do
-        vtemp2(:,:,:,k) = gradient_sphere(Ephi(:,:),deriv,elem(ie)%Dinv)
-        do j=1,np
-           do i=1,np
-              gpterm = T_v(i,j,k)/p(i,j,k)
-              glnps1 = Rgas*gpterm*grad_p(i,j,1,k)
-              glnps2 = Rgas*gpterm*grad_p(i,j,2,k)
-
-              v1 = ST( iXjXkXuXn0Xie )
-              v2 = ST( iXjXkXvXn0Xie )
-              vtens1(i,j,k) =   - v_vadv(i,j,1,k)                           &
-                   + v2*(elem(ie)%fcor(i,j) + vort(i,j,k))        &
-                   - vtemp2(i,j,1,k) - glnps1
-              vtens2(i,j,k) =   - v_vadv(i,j,2,k)                            &
-                   - v1*(elem(ie)%fcor(i,j) + vort(i,j,k))        &
-                   - vtemp2(i,j,2,k) - glnps2
-              ttens(i,j,k)  = - T_vadv(i,j,k) - vgrad_T(i,j,k) + kappa_star(i,j,k)*T_v(i,j,k)*omega_p(i,j,k)
-           end do
-        end do
-
-        ST( dXdXkXuXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXuXnm1Xie ) + dt2*vtens1(:,:,k) )
-        ST( dXdXkXvXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXvXnm1Xie ) + dt2*vtens2(:,:,k) )
-        ST( dXdXkXtXnp1Xie ) = elem(ie)%spheremp(:,:)*( ST( dXdXkXtXnm1Xie ) + dt2*ttens(:,:,k)  )
-        ST( dXdXkXdpXnp1Xie ) = &
-             elem(ie)%spheremp(:,:) * ( ST( dXdXkXdpXnm1Xie ) - &
-             dt2 * (divdp(:,:,k) + eta_dot_dpdn(:,:,k+1)-eta_dot_dpdn(:,:,k)))
-
-     end do vertloop
-#endif
-
-
 
 end subroutine caar
 
@@ -389,7 +299,7 @@ end subroutine caar
     real(kind=real_kind), intent(in) :: p(np*np,nlev)     ! layer thicknesses
     real(kind=real_kind), intent(out):: omega_p(np*np,nlev)   ! vertical
 
-    integer j,k                         ! longitude, level indices
+    integer j,k,q                         ! longitude, level indices
     real(kind=real_kind) term             ! one half of basic term in omega/p
     real(kind=real_kind) summ      ! partial sum over l = (1, k-1)
 
@@ -398,10 +308,19 @@ end subroutine caar
     real(kind=real_kind), intent(in) :: quot(np*np,nlev)
     real(kind=real_kind) :: suml, accum, frac(nlev), philoc(nlev)
 
+    integer :: tid, OMP_GET_MAX_THREADS, OMP_GET_THREAD_NUM
+
+!  tid = OMP_GET_MAX_THREADS()     
+!  print *, 'Max number TH ', tid
+
+
 #if HOMP
-!$omp parallel do private(k,j,term,summ,suml)
+!$omp parallel do private(k,j,term,summ,suml,q)
 #endif
        do j=1,np*np  !   Loop inversion (AAM)
+do q=1,10000
+!  tid = OMP_GET_THREAD_NUM()     
+!  print *, 'My tid is ', tid, ' my j is', j
         summ = 0.0d0
         suml = 0.0d0
         do k=1,nlev
@@ -414,6 +333,7 @@ end subroutine caar
            suml = suml-quot(j,k)
            phi(j,k) = phis(j) + suml + quot(j,k)*0.50d0
         enddo
+enddo
        end do
   end subroutine merged_hydro_omega
 
