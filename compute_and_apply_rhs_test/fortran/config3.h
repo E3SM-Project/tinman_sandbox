@@ -39,6 +39,9 @@
 #define dXdXkXdpXnp1Xie   :,:,k,4,np1,ie
 #define dXdXkXdpXnm1Xie   :,:,k,4,nm1,ie
 #define dXdX1XphisX1Xie   :,:,1,6,1,ie
+
+#define iXjX1XphisX1Xie   i,j,1,6,1,ie
+
 #define dXdXdXdpXn0Xie    :,:,:,4,n0,ie
 #define dXdXkXuXn0Xie     :,:,k,1,n0,ie
 #define dXdXkXvXn0Xie     :,:,k,2,n0,ie
