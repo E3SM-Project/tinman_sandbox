@@ -106,7 +106,7 @@ int main (int argc, char** argv)
   std::vector<Timer::Timer> timers(num_exec);
   for (int i=0; i<num_exec; ++i)
   {
-    data.update_time_levels();
+    //data.update_time_levels();
     timers[i].startTimer();
     compute_and_apply_rhs(data);
     timers[i].stopTimer();
