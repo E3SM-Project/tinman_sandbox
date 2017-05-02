@@ -97,7 +97,7 @@ struct update_state {
       k_locals.m_ilev = ilev;
       compute_eta_dpdn(k_locals);
       compute_velocity(k_locals);
-      compute_update_omega_p(k_locals);
+      compute_omega_p(k_locals);
       compute_update_temperature(k_locals);
       compute_dp3d(k_locals);
     });
@@ -431,7 +431,7 @@ struct update_state {
   }
 
   KOKKOS_INLINE_FUNCTION
-  void compute_update_omega_p(KernelVariables &k_locals) const {
+  void compute_omega_p(KernelVariables &k_locals) const {
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
                          [&](const int idx) {
       k_locals.m_igp = idx / NP;
