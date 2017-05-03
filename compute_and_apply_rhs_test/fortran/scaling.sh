@@ -9,14 +9,16 @@
 
 #calc(){ awk "BEGIN { print "$*" }"  };
 
-exec='./fs4omp'   #'./origomp'
+exec='./origomp' #'./fs4omp'   #'./origomp'
 
-export OMP_DISPLAY_ENV=true
+#export OMP_DISPLAY_ENV=true
 export OMP_PROC_BIND=close
 export OMP_SCHEDULE=static
 export OMP_DYNAMIC=false
+export OMP_PLACES=cores
+export OMP_WAIT_POLICY=active
 
-for (( th=1; th<=16; th=th+1 )); do
+for (( th=1; th<=8; th=th+1 )); do
 
   export OMP_NUM_THREADS=${th}
   $exec > output
@@ -39,7 +41,7 @@ done #th
 
 #example with accuracy, scale is accuracy
 #my_var=$(echo "scale=5; $temp_var/$temp_var2" | bc)
-for (( th=1; th<=16; th=th+1 )); do
+for (( th=1; th<=8; th=th+1 )); do
 echo "${th} ${speedup[${th}]}"
 done
 

@@ -151,8 +151,8 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
   integer :: tid, OMP_GET_MAX_THREADS, OMP_GET_THREAD_NUM
 
   real(kind=real_kind) term     
-  real(kind=real_kind) summ     
-  real(kind=real_kind) :: suml, accum, frac(nlev)
+  real(kind=real_kind) summ(np,np)     
+  real(kind=real_kind) :: suml(np,np), accum, frac(nlev)
 
 !  print *, 'Hello Routine'
 !  tid = OMP_GET_MAX_THREADS()     
@@ -217,8 +217,11 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 #endif
      !call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) , quot )
      !call preq_omega_ps(omega_p,p,vgrad_p,divdp)
-#if 1
-     !call merged_hydro_omega(phi, ST( dXdX1XphisX1Xie ) , quot , omega_p,p,vgrad_p,divdp )
+#if 0
+     call merged_hydro_omega(phi, ST( dXdX1XphisX1Xie ) , quot , omega_p,p,vgrad_p,divdp )
+
+!this is just a pulled code from merged routine
+#if 0
 #if HOMP
 !$omp parallel do collapse(2) private(j,i,k,summ,suml,term,v1,v2)
 #endif
@@ -238,8 +241,40 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
          enddo
        enddo
        enddo
+#endif
+
+#if 1
+#if HOMP
+!$omp single
+#endif
+       suml(:,:) = 0.0d0
+       summ(:,:) = 0.0d0
+       do k=1,nlev
+         do j=1,np
+         do i=1,np
+           suml(i,j) = suml(i,j) + quot(i,j,k)
+         enddo
+         enddo
+       enddo
+       do k=1,nlev
+         do j=1,np
+         do i=1,np
+           term = divdp(i,j,k)
+           omega_p(i,j,k) = (vgrad_p(i,j,k) - summ(i,j) - term*0.5d0)/p(i,j,k)
+           summ(i,j) = summ(i,j) + term
+           suml(i,j) = suml(i,j) - quot(i,j,k)
+           phi(i,j,k) = ST( iXjX1XphisX1Xie  ) + suml(i,j) + quot(i,j,k)*0.50d0
+         enddo
+         enddo
+       enddo
+#if HOMP
+!$omp end single
+#endif
+#endif
+
 
 #endif
+
      ! VERTICALLY LAGRANGIAN:   no vertical motion
      T_vadv=0
      v_vadv=0
