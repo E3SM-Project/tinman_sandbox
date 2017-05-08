@@ -92,14 +92,14 @@ struct update_state {
   // Depends on pressure, PHI, U_current, V_current, METDET,
   // D, DINV, U, V, FCOR, SPHEREMP, T_v, ETA_DPDN
   KOKKOS_INLINE_FUNCTION void compute_phase_3(KernelVariables &k_locals) const {
-    Kokkos::parallel_for(Kokkos::TeamThreadRange(k_locals.team, NUM_LEV),
+    Kokkos::parallel_for(Kokkos::TeamThreadRange(k_locals.team, static_cast<int>(NUM_LEV)),
                          [&](const int &ilev) {
       k_locals.m_ilev = ilev;
       compute_eta_dpdn(k_locals);
-      compute_velocity(k_locals);
-      compute_omega_p(k_locals);
+      compute_update_omega_p(k_locals);
       compute_update_temperature(k_locals);
       compute_dp3d(k_locals);
+      compute_velocity(k_locals);
     });
   }
 
@@ -414,14 +414,14 @@ struct update_state {
   KOKKOS_INLINE_FUNCTION
   void compute_temperature_div_vdp(KernelVariables &k_locals) const {
     if (m_data.qn0() == -1) {
-      Kokkos::parallel_for(Kokkos::TeamThreadRange(k_locals.team, NUM_LEV),
+      Kokkos::parallel_for(Kokkos::TeamThreadRange(k_locals.team, static_cast<int>(NUM_LEV)),
                            [&](const int ilev) {
         k_locals.m_ilev = ilev;
         compute_temperature_no_tracers_helper(k_locals);
         compute_div_vdp(k_locals);
       });
     } else {
-      Kokkos::parallel_for(Kokkos::TeamThreadRange(k_locals.team, NUM_LEV),
+      Kokkos::parallel_for(Kokkos::TeamThreadRange(k_locals.team, static_cast<int>(NUM_LEV)),
                            [&](const int ilev) {
         k_locals.m_ilev = ilev;
         compute_temperature_tracers_helper(k_locals);
@@ -431,7 +431,7 @@ struct update_state {
   }
 
   KOKKOS_INLINE_FUNCTION
-  void compute_omega_p(KernelVariables &k_locals) const {
+  void compute_update_omega_p(KernelVariables &k_locals) const {
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(k_locals.team, NP * NP),
                          [&](const int idx) {
       k_locals.m_igp = idx / NP;
@@ -476,7 +476,7 @@ struct update_state {
 
       // vgrad_t + kappa * T_v * omega_p
       Real &ttens = k_locals.m_temp[0];
-      ttens = vgrad_t + PhysicalConstants::kappa *
+      ttens = -vgrad_t + PhysicalConstants::kappa *
                             m_data.T_v(k_locals.m_ie, k_locals.m_ilev,
                                        k_locals.m_igp, k_locals.m_jgp) *
                             m_data.omega_p(k_locals.m_ie, k_locals.m_ilev,
