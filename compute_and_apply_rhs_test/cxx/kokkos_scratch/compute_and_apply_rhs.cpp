@@ -477,10 +477,10 @@ struct update_state {
       // vgrad_t + kappa * T_v * omega_p
       Real &ttens = k_locals.m_temp[0];
       ttens = -vgrad_t + PhysicalConstants::kappa *
-                            m_data.T_v(k_locals.m_ie, k_locals.m_ilev,
-                                       k_locals.m_igp, k_locals.m_jgp) *
-                            m_data.omega_p(k_locals.m_ie, k_locals.m_ilev,
-                                           k_locals.m_igp, k_locals.m_jgp);
+              m_data.T_v(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
+                         k_locals.m_jgp) *
+              m_data.omega_p(k_locals.m_ie, k_locals.m_ilev, k_locals.m_igp,
+                             k_locals.m_jgp);
 
       Real &future_temp = k_locals.m_temp[0];
       future_temp = ttens * m_data.dt2() +
@@ -608,7 +608,7 @@ void print_results_2norm(const Control &data, const Region &region) {
     tnorm += std::pow(compute_norm(T), 2);
     dpnorm += std::pow(compute_norm(DP3D), 2);
   }
-  std::cout << std::setprecision(15);
+  std::cout << std::setprecision(17);
   std::cout << "   ---> Norms:\n"
             << "          ||v||_2  = " << std::sqrt(vnorm) << "\n"
             << "          ||T||_2  = " << std::sqrt(tnorm) << "\n"

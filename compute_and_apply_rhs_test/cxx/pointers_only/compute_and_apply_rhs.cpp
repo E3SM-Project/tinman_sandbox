@@ -394,9 +394,9 @@ void print_results_2norm (const TestData& data)
   }
 
   std::cout << "   ---> Norms:\n"
-            << "          ||v||_2  = " << std::setprecision(15) << std::sqrt (vnorm) << "\n"
-            << "          ||T||_2  = " << std::setprecision(15) << std::sqrt (tnorm) << "\n"
-            << "          ||dp||_2 = " << std::setprecision(15) << std::sqrt (dpnorm) << "\n";
+            << "          ||v||_2  = " << std::setprecision(17) << std::sqrt (vnorm) << "\n"
+            << "          ||T||_2  = " << std::setprecision(17) << std::sqrt (tnorm) << "\n"
+            << "          ||dp||_2 = " << std::setprecision(17) << std::sqrt (dpnorm) << "\n";
 }
 
 void dump_results_to_file (const TestData& data)

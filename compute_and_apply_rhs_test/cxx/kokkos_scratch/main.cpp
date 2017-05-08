@@ -8,6 +8,7 @@
 #include <iostream>
 #include <cstring>
 #include <memory>
+#include <vector>
 
 bool is_unsigned_int(const char *str) {
   const size_t len = strlen(str);
