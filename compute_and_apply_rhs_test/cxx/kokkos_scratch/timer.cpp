@@ -121,9 +121,9 @@ int Timer::instant_s() {
 }
 
 std::ostream &operator<<(std::ostream &os, const Timer &t) {
-  os << t.data->elapsedTime.tv_sec << "."
+  os << t.data->deltaTime.tv_sec << "."
      << std::setfill('0') << std::setw(9)
-     << t.data->elapsedTime.tv_nsec << " s";
+     << t.data->deltaTime.tv_nsec << " s";
   return os;
 }
 };
