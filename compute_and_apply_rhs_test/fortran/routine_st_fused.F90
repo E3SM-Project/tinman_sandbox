@@ -214,12 +214,12 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
              elem(ie)%derived%omega_p(:,:,k) + eta_ave_w*omega_p(:,:,k)
 
      enddo
-#endif
+#endif !end of caar1
      !call preq_hydrostatic(phi, ST( dXdX1XphisX1Xie ) , quot )
      !call preq_omega_ps(omega_p,p,vgrad_p,divdp)
 #if 0
      call merged_hydro_omega(phi, ST( dXdX1XphisX1Xie ) , quot , omega_p,p,vgrad_p,divdp )
-
+#endif
 !this is just a pulled code from merged routine
 #if 0
 #if HOMP
@@ -272,8 +272,6 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 #endif
 #endif
 
-
-#endif
 
      ! VERTICALLY LAGRANGIAN:   no vertical motion
      T_vadv=0
