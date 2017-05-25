@@ -60,6 +60,7 @@ real (kind=real_kind) :: ST(np,np,nlev,timelevels,numst,nelemd)
 
 !insert omp here
 
+!$omp parallel do private(ie)
   do ie  =  nets, nete
     call caar(np1,nm1,n0,qn0,dt2,elem, hvcoord, deriv,ie,eta_ave_w,ST)
   enddo
