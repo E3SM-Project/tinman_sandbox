@@ -35,14 +35,14 @@ void Timer::startTimer() {
     data->started = true;
     data->deltaTime.tv_nsec = 0;
     data->deltaTime.tv_sec = 0;
-    data->err = clock_gettime(CLOCK_THREAD_CPUTIME_ID,
+    data->err = clock_gettime(CLOCK_MONOTONIC,
                               &data->startTime);
   }
 }
 
 void Timer::stopTimer() {
   if(data->started) {
-    data->err = clock_gettime(CLOCK_THREAD_CPUTIME_ID,
+    data->err = clock_gettime(CLOCK_MONOTONIC,
                               &data->endTime);
     data->started = false;
     updateTimer();

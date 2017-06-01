@@ -133,7 +133,7 @@ void run_simulation(int num_elems, int num_exec, bool dump_results, int threads,
     std::cout << id << "  " << t << "\n";
     id++;
   }
-  print_results_2norm(data, region);
+  // print_results_2norm(data, region);
   // ||v||_2  = 6756166.17359074
   // ||T||_2  = 5594554.09064558
   // ||dp||_2 = 4947346.82471321
@@ -152,7 +152,7 @@ int main(int argc, char **argv) {
   parse_args(argc, argv, num_elems, num_exec, dump_results, threads, vectors);
 
   Kokkos::initialize(argc, argv);
-  TinMan::ExecSpace::print_configuration(std::cout, true);
+  // TinMan::ExecSpace::print_configuration(std::cout, true);
 
   run_simulation(num_elems, num_exec, dump_results, threads, vectors);
 
