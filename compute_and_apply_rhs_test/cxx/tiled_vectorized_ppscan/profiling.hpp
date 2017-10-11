@@ -2,8 +2,7 @@
 #ifndef _PROFILING_HPP_
 #define _PROFILING_HPP_
 
-#if 0
-#include "gptl.h"
+#include "gptl/gptl.h"
 
 #ifdef HOMMEXX_CUDA_SPACE // Can't use GPTL timers on CUDA
 #define start_timer(name) {}
@@ -11,13 +10,6 @@
 #else
 #define start_timer(name) { GPTLstart(name); }
 #define stop_timer(name) { GPTLstop(name); }
-#endif
-
-#else
-
-#define start_timer(name) {}
-#define stop_timer(name) {}
-
 #endif
 
 #ifdef VTUNE_PROFILE

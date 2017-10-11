@@ -3,8 +3,6 @@
 
 #include "config.h.c"
 
-#include <Hommexx_config.h>
-
 #include <Kokkos_Core.hpp>
 
 namespace Homme {

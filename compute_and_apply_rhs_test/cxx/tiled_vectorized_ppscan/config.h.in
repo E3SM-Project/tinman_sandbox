@@ -7,6 +7,5 @@
 
 #define PLEV 72
 #define NP 4
-#define AVX_VERSION 512
 #define QSIZE_D 35
 

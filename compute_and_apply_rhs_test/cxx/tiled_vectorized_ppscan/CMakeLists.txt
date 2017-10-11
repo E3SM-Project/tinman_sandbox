@@ -22,6 +22,8 @@ SET(TEST_SRCS
   Control.cpp
   Derivative.cpp
   Elements.cpp
+  gptl/gptl.c
+  gptl/GPTLutil.c
 )
 
 INCLUDE_DIRECTORIES (${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})

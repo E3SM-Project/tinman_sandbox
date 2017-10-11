@@ -1,7 +1,7 @@
 #ifndef HOMMEXX_TYPES_HPP
 #define HOMMEXX_TYPES_HPP
 
-#include <Hommexx_config.h>
+#include <config.h.c>
 #include <Kokkos_Core.hpp>
 
 #include "Dimensions.hpp"

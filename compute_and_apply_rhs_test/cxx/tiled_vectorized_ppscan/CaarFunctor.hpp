@@ -51,7 +51,6 @@ struct CaarFunctor {
   KOKKOS_INLINE_FUNCTION void compute_energy_grad(KernelVariables &kv) const {
     Kokkos::parallel_for(Kokkos::ThreadVectorRange(kv.team, NP * NP),
                          [&](const int idx) {
-index_computation:
       const int igp = idx / NP;
       const int jgp = idx % NP;
       // Kinetic energy + PHI (geopotential energy) +
@@ -554,15 +553,6 @@ index_computation:
     compute_phase_3(kv);
     stop_timer("compute 3");
     stop_timer("caar compute");
-  }
-
-  struct EmptyTag {};
-
-  KOKKOS_INLINE_FUNCTION
-  void operator()(const EmptyTag &, const TeamMember team) const {
-    if(team.team_rank() > 1000) {
-      printf("argh\n");
-    }
   }
 
   KOKKOS_INLINE_FUNCTION
