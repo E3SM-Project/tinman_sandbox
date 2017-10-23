@@ -29,10 +29,10 @@ SET(TEST_SRCS
 INCLUDE_DIRECTORIES (${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
 CONFIGURE_FILE (${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h.c)
-ADD_EXECUTABLE(tiled_vectorized_ppscan ${TEST_SRCS})
+ADD_EXECUTABLE(level_vectorized_ppscan ${TEST_SRCS})
 
 IF(${CUDA_BUILD})
-  TARGET_COMPILE_OPTIONS(tiled_vectorized_ppscan PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-expt-extended-lambda -lineinfo -arch=sm_60 -maxrregcount 64>)
+  TARGET_COMPILE_OPTIONS(level_vectorized_ppscan PUBLIC $<$<COMPILE_LANGUAGE:CXX>:--expt-extended-lambda --expt-relaxed-constexpr -lineinfo -arch=sm_60 -maxrregcount 64>)
 ENDIF()
 
 IF (KOKKOS_CMAKE_BUILD)
@@ -41,9 +41,9 @@ ELSE()
   SET(Kokkos_LIBRARIES "kokkos")
 ENDIF()
 
-TARGET_LINK_LIBRARIES(tiled_vectorized_ppscan -lrt ${Kokkos_LIBRARIES} -L${KOKKOS_PATH}/lib)
+TARGET_LINK_LIBRARIES(level_vectorized_ppscan -lrt ${Kokkos_LIBRARIES} -L${KOKKOS_PATH}/lib)
 IF (HWLOC_LIBRARY_DIRS)
-  TARGET_LINK_LIBRARIES(tiled_vectorized_ppscan hwloc numa -L${HWLOC_LIBRARY_DIRS})
+  TARGET_LINK_LIBRARIES(level_vectorized_ppscan hwloc numa -L${HWLOC_LIBRARY_DIRS})
 ENDIF()
 
-SET_TARGET_PROPERTIES(tiled_vectorized_ppscan PROPERTIES LINKER_LANGUAGE CXX)
+SET_TARGET_PROPERTIES(level_vectorized_ppscan PROPERTIES LINKER_LANGUAGE CXX)
