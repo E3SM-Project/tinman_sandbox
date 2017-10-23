@@ -16,15 +16,15 @@ public:
   using value_type = typename tag_type::value_type;
   using member_type = typename tag_type::member_type;
 
-  enum : int { vector_length = tag_type::length };
+  enum : int { vector_length = l };
 
-  typedef value_type data_type[vector_length];
+  static_assert(vector_length > 0, "Requested vector with 0 length");
 
   KOKKOS_INLINE_FUNCTION
   static const char *label() { return "SIMD"; }
 
 private:
-  mutable data_type _data;
+  mutable value_type _data[vector_length];
 
 public:
   KOKKOS_INLINE_FUNCTION Vector() {

@@ -482,7 +482,7 @@ struct CaarFunctor {
       const int jgp = idx % NP;
       Kokkos::parallel_for(Kokkos::ThreadVectorRange(kv.team, NUM_LEV),
                            [&](const int &ilev) {
-        Scalar tmp = m_elements.m_dp3d(kv.ie, m_data.nm1, kv.ilev, igp, jgp);
+        Scalar tmp = m_elements.m_dp3d(kv.ie, m_data.nm1, ilev, igp, jgp);
         tmp -= m_data.dt * m_elements.buffers.div_vdp(kv.ie, kv.ilev, igp, jgp);
         m_elements.m_dp3d(kv.ie, m_data.np1, kv.ilev, igp, jgp) =
             m_elements.m_spheremp(kv.ie, igp, jgp) * tmp;

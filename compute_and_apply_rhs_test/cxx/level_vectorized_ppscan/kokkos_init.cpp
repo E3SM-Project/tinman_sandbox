@@ -147,5 +147,4 @@ int main(int argc, char **argv) {
 
   finalize_kokkos();
   GPTLpr_summary_file(0, "Timing.dat");
-  GPTLpr_summary(0);
 }
