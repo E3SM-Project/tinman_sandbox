@@ -480,11 +480,19 @@ struct CaarFunctor {
                          [&](const int idx) {
       const int igp = idx / NP;
       const int jgp = idx % NP;
-      Kokkos::parallel_for(Kokkos::ThreadVectorRange(kv.team, NUM_LEV),
-                           [&](const int &ilev) {
-        Scalar tmp = m_elements.m_dp3d(kv.ie, m_data.nm1, ilev, igp, jgp);
-        tmp -= m_data.dt * m_elements.buffers.div_vdp(kv.ie, kv.ilev, igp, jgp);
-        m_elements.m_dp3d(kv.ie, m_data.np1, kv.ilev, igp, jgp) =
+      Kokkos::parallel_for(Kokkos::ThreadVectorRange(kv.team, NUM_LEV), [&] (const int& ilev) {
+        Scalar tmp = m_elements.m_eta_dot_dpdn(kv.ie, igp, jgp, ilev);
+        tmp.shift_left(1);
+        tmp[VECTOR_SIZE - 1] =
+            m_elements.m_eta_dot_dpdn(kv.ie, igp, jgp, ilev + 1)[0];
+        // Add div_vdp before subtracting the previous value to eta_dot_dpdn
+        // This will hopefully reduce numeric error
+        tmp += m_elements.buffers.div_vdp(kv.ie, igp, jgp, ilev);
+        tmp -= m_elements.m_eta_dot_dpdn(kv.ie, igp, jgp, ilev);
+        tmp = m_elements.m_dp3d(kv.ie, m_data.nm1, igp, jgp, ilev) -
+              tmp * m_data.dt;
+
+        m_elements.m_dp3d(kv.ie, m_data.np1, igp, jgp, ilev) =
             m_elements.m_spheremp(kv.ie, igp, jgp) * tmp;
       });
     });
