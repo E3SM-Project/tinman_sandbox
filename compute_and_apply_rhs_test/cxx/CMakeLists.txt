@@ -6,3 +6,4 @@ OPTION (KOKKOS_CMAKE_BUILD, "Whether Kokkos was build with CMake. This is needed
 ADD_SUBDIRECTORY(kokkos_basic)
 ADD_SUBDIRECTORY(kokkos_scratch)
 ADD_SUBDIRECTORY(tiled_vectorized_ppscan)
+ADD_SUBDIRECTORY(level_vectorized_ppscan)

@@ -1,0 +1,11 @@
+
+#cmakedefine HOMMEXX_CUDA_SPACE
+#cmakedefine HOMMEXX_OPENMP_SPACE
+#cmakedefine HOMMEXX_THREADS_SPACE
+#cmakedefine HOMMEXX_SERIAL_SPACE
+#cmakedefine HOMMEXX_DEFAULT_SPACE
+
+#define PLEV 72
+#define NP 4
+#define QSIZE_D 35
+
