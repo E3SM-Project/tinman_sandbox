@@ -3300,8 +3300,12 @@ static int merge_thread_data()
 
   }
 
-  if( !( newtimers = (char **)malloc( max_count * sizeof (char *)) ) && max_count)
+  if( !( newtimers = (char **)malloc( max_count * sizeof (char *)) ) && max_count) {
+		if(newtimers != NULL) {
+			free(newtimers);
+		}
     return GPTLerror ("%s: memory allocation failed\n", thisfunc);
+	}
 
   for (t = 1; t < nthreads; t++) {
     memset( newtimers, max_count * sizeof (char *), 0 );
@@ -3369,6 +3373,7 @@ static int merge_thread_data()
       qsort( sort[0], count[0], sizeof (char *), cmp );
     }
   }
+	free(newtimers);
 
   free(sort[0]); 
   /* don't free timerlist[0], since needed for subsequent steps in gathering global statistics */
